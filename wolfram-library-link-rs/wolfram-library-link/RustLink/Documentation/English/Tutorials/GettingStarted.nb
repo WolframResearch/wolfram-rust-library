@@ -1,0 +1,1217 @@
+Notebook[{
+Cell[TextData[{
+ "New in: ",
+ Cell["12.1", "HistoryData",
+  CellTags->"New",ExpressionUUID->"39c08aa3-bbbc-48b2-9bd9-a89c58eb3ae0"],
+ " | Modified in: ",
+ Cell[" ", "HistoryData",
+  CellTags->"Modified",ExpressionUUID->"93a663d7-3bc0-43c0-929f-0107433e922d"],
+ " | Obsolete in: ",
+ Cell["12.1", "HistoryData",
+  CellTags->"Obsolete",ExpressionUUID->"8fd7ac61-c428-44f1-9255-1e4c9960cdbf"],
+ " | Excised in: ",
+ Cell[" ", "HistoryData",
+  CellTags->"Excised",ExpressionUUID->"a674efbb-0172-4513-9839-9bd8690c4f88"]
+}], "History",
+ Editable->True,
+ CellID->1247902091,ExpressionUUID->"66f14ab0-d98e-44b0-ab44-93a3c855b694"],
+
+Cell["Created by: connorgray on 04-16-2020 09:46:50", "AuthorDate",
+ CellID->500972764,ExpressionUUID->"78bb6475-a16d-428e-87c8-5192b6f07bb1"],
+
+Cell[CellGroupData[{
+
+Cell["Categorization", "CategorizationSection",
+ CellID->1122911449,ExpressionUUID->"b9eed37b-bbfd-4286-98ed-9461093b4437"],
+
+Cell["Tutorial", "Categorization",
+ CellLabel->"Entity Type",
+ CellID->686433507,ExpressionUUID->"067102bd-c02a-4d18-9f00-979e96c38118"],
+
+Cell["", "Categorization",
+ CellLabel->"Paclet Name",
+ CellID->605800465,ExpressionUUID->"aed595f9-5e2e-4520-8562-0ada568e1466"],
+
+Cell["", "Categorization",
+ CellLabel->"Context",
+ CellID->468444828,ExpressionUUID->"1d16fbf4-8b8f-4aa5-b1c4-74f26f694f18"],
+
+Cell["XXXX", "Categorization",
+ CellLabel->"URI",ExpressionUUID->"e5d47a1a-0d55-46cf-8641-d6d5efb46aad"]
+}, Closed]],
+
+Cell[CellGroupData[{
+
+Cell["Synonyms", "SynonymsSection",
+ CellID->1427418553,ExpressionUUID->"e448e686-77a9-4635-817d-6425547fc03e"],
+
+Cell["XXXX", "Synonyms",
+ CellID->1251652828,ExpressionUUID->"bd6698a0-73b3-4401-85e7-a9ec27e6e8f6"]
+}, Closed]],
+
+Cell[CellGroupData[{
+
+Cell["Keywords", "KeywordsSection",
+ CellID->1427428552,ExpressionUUID->"93cf42b8-a3b9-4f62-8975-05e6348ff15e"],
+
+Cell["LibraryLink", "Keywords",
+ CellID->1251852827,ExpressionUUID->"0217d95d-d229-4cee-ae76-b2743c106ce7"],
+
+Cell["Rust", "Keywords",
+ CellID->756216778,ExpressionUUID->"04e7e3cb-9848-4cd7-9dad-6c4b9a13a7db"]
+}, Closed]],
+
+Cell[CellGroupData[{
+
+Cell["Details", "DetailsSection",
+ CellID->307771771,ExpressionUUID->"cf5a9d40-eb51-46e6-9652-70ea5858223e"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Lead",
+ CellID->115134701,ExpressionUUID->"0cf02267-f394-4787-8cf1-70e31a7c5732"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Developers",
+ CellID->350963985,ExpressionUUID->"9d104c92-6c18-4978-95ef-4848d0cc5ae9"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Authors",
+ CellID->787641479,ExpressionUUID->"3edb205b-77b6-4dd4-8e10-251f60d327d8"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Feature Name",
+ CellID->489188983,ExpressionUUID->"05a0be07-2644-4773-92e9-b9d038d145e8"],
+
+Cell["XXXX", "Details",
+ CellLabel->"QA",
+ CellID->267986155,ExpressionUUID->"b5dd73e3-317c-4871-aabc-be00e56e174f"],
+
+Cell["XXXX", "Details",
+ CellLabel->"DA",
+ CellID->55052072,ExpressionUUID->"57f29181-624d-42e8-b441-65e3d98901a1"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Docs",
+ CellID->125741376,ExpressionUUID->"1a1ff11d-b5e0-4eef-aa6e-1c098da985d8"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Features Page Notes",
+ CellID->31040295,ExpressionUUID->"051d2581-e963-4240-8265-335ccac2c5fd"],
+
+Cell["XXXX", "Details",
+ CellLabel->"Comments",
+ CellID->240026365,ExpressionUUID->"cb516ef7-be70-4473-91de-f1ea3d9bc8a7"]
+}, Closed]],
+
+Cell[CellGroupData[{
+
+Cell["Getting Started with LibraryLink for Rust", "Title",
+ CellID->509267359,ExpressionUUID->"f00c7563-254d-4af0-84ba-063862cefb5a"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{
+  "PacletDirectoryLoad", "[", 
+   "\"\</Users/connorgray/Dev/WL/SyntaxHighlight/\>\"", "]"}], ";"}], "\n", 
+ RowBox[{"Needs", "[", "\"\<SyntaxHighlight`\>\"", 
+  "]"}]}], "Input", "ExcludedMaterial",
+ CellLabel->"In[40]:=",
+ CellID->1326244152,ExpressionUUID->"b89ccef3-c3f3-4ee1-9df3-1513467dff02"],
+
+Cell["\<\
+LibraryLink for Rust provides a convenient and powerful way to extend the \
+Wolfram Language via Rust libraries, and to call back into the Wolfram \
+Language from Rust code.\
+\>", "Text",
+ CellID->2057916504,ExpressionUUID->"82ec3859-cf76-42de-83d2-9945fba19ce4"],
+
+Cell["\<\
+This tutorial assumes no prior knowledge of either the Rust programming \
+language, or Wolfram LibraryLink, and is oriented towards Wolfram Language \
+users.\
+\>", "Text",
+ CellID->41584923,ExpressionUUID->"f8673204-d5b7-4165-bcff-34e7ed8c7ad7"],
+
+Cell["\<\
+The wl-library-link library provides Rust functionality, and whose \
+documentation is suitable for Rust developers.\
+\>", "Text",
+ CellID->1797251224,ExpressionUUID->"2c8cf2e4-04be-4bc3-8363-78609acd74f8"],
+
+Cell["\<\
+[[ TODO: Link to more targeted, smaller tutorials for specific features ]]\
+\>", "Text",
+ CellID->792026942,ExpressionUUID->"37e28acd-f4a0-4a7e-aea7-17ea2ecf4f9b"],
+
+Cell["\<\
+[[ TODO: Link to wl-library-link online source code examples directory ]]\
+\>", "Text",
+ CellID->1209395367,ExpressionUUID->"fc3eed6e-1576-4f61-a29a-8e2b17088c44"],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ StyleBox["Installing Rust and ", "Subsection"],
+ StyleBox["cargo", "InlineCode"]
+}], "Section",
+ CellID->304722785,ExpressionUUID->"37569c0b-cdf7-4b38-89e5-9d6bfc6df07c"],
+
+Cell[TextData[{
+ "To build you first Rust LibraryLink program, you'll need to install Rust, \
+and it's package manager, ",
+ StyleBox["cargo", "InlineCode"],
+ ". This can be done by following the official instructions found at:"
+}], "Text",
+ CellID->1919957400,ExpressionUUID->"f764c741-dca6-4634-899d-82a98c6e9eee"],
+
+Cell[TextData[ButtonBox["https://www.rust-lang.org/tools/install",
+ BaseStyle->"Hyperlink",
+ ButtonData->{
+   URL["https://www.rust-lang.org/tools/install"], None}]], "Text",
+ CellID->1541108480,ExpressionUUID->"f49def66-982d-43cc-97de-198816a745a1"],
+
+Cell[CellGroupData[{
+
+Cell["\<\
+Verify the installation succeeded by running the following command-line code:\
+\
+\>", "Text",
+ CellID->642730918,ExpressionUUID->"c3c0b299-48b0-4f24-bbf8-1c58c1717637"],
+
+Cell["\<\
+$ cargo --version
+cargo 1.42.0 (86334295e 2020-01-31)\
+\>", "Program",
+ CellID->1395952705,ExpressionUUID->"912073f7-6a5c-4421-8945-b24efe8fab03"]
+}, Open  ]],
+
+Cell[TextData[{
+ "Note that your exact ",
+ StyleBox["cargo", "InlineCode"],
+ " version may differ from the output above."
+}], "Text",
+ CellID->593204575,ExpressionUUID->"02b6ab8d-82e6-4353-9c1a-8ca34776cda2"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Your first Rust LibraryLink program", "Section",
+ CellID->693837892,ExpressionUUID->"3bbe83be-ee87-4e1e-bd63-591f84ec5bc7"],
+
+Cell[CellGroupData[{
+
+Cell["Project layout", "Subsection",
+ CellID->540010055,ExpressionUUID->"b60a50c9-1620-4019-968c-8ba3a0c0bd8c"],
+
+Cell[TextData[{
+ StyleBox["These instructions will use the variable ",
+  FontSlant->"Italic"],
+ StyleBox["$projectDir", "InlineCode",
+  FontWeight->"Bold",
+  FontSlant->"Italic"],
+ StyleBox[" to refer to the location you choose to place this new project on \
+your computer.",
+  FontSlant->"Italic"]
+}], "Text",
+ CellID->852775673,ExpressionUUID->"3694cceb-0cd9-4b07-af81-9791552ffa6e"],
+
+Cell[TextData[{
+ "A LibraryLink for Rust library consists of two components: the Wolfram \
+Language package which calls into the Rust library, and the Rust ",
+ StyleBox["crate",
+  FontSlant->"Italic"],
+ " which exposes functions to be called."
+}], "Text",
+ CellID->683102163,ExpressionUUID->"47e07785-ac60-4d3f-917c-0a80985d185e"],
+
+Cell[CellGroupData[{
+
+Cell["\<\
+By convention, we'll structure our project with separate directories for the \
+Wolfram Language and Rust components. Begin by creating a new, empty \
+directory to house this project, by evaluating the Wolfram Language code \
+below:\
+\>", "Text",
+ CellID->1281688278,ExpressionUUID->"b1afb711-5eaf-44c1-8b70-318586c8967f"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"$projectDir", "=", "\"\</some/directory/you/choose\>\""}], 
+  ";"}], "\n", 
+ RowBox[{"CreateDirectory", "[", "$projectDir", "]"}]}], "Input",
+ CellLabel->"In[36]:=",
+ CellID->688449637,ExpressionUUID->"03b779f4-5ef6-4a9f-b16e-5e5e82efb518"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["\<\
+Next, we'll initialize a fresh Wolfram Language paclet, to hold the Wolfram \
+Language portion of our code. Evaluating the code below will create the \
+subdirectories our paclet will need:\
+\>", "Text",
+ CellID->1724757778,ExpressionUUID->"0f11d174-a80a-4f55-8c2f-8a8fb4e10565"],
+
+Cell[BoxData[{
+ RowBox[{"CreateDirectory", "[", 
+  RowBox[{"FileNameJoin", "[", 
+   RowBox[{"{", 
+    RowBox[{"$projectDir", ",", " ", "\"\<MyPackage/Kernel\>\""}], "}"}], 
+   "]"}], "]"}], "\n", 
+ RowBox[{"CreateDirectory", "[", 
+  RowBox[{"FileNameJoin", "[", 
+   RowBox[{"{", 
+    RowBox[{"$projectDir", ",", " ", "\"\<MyPackage/LibraryResources\>\""}], 
+    "}"}], "]"}], "]"}]}], "Input",
+ CellID->1849576584,ExpressionUUID->"82e9044c-e8f7-441c-bd2e-53e35401cd95"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "We'll create and populate the ",
+ StyleBox["PacletInfo.wl", "InlineCode"],
+ " file with the following contents:"
+}], "Text",
+ CellID->1659982801,ExpressionUUID->"19531986-d96d-471b-ae3e-4c44a4265320"],
+
+Cell["\<\
+Paclet[
+    \"Name\" -> \"MyPackage\",
+    \"Version\" -> \"0.1\",
+    \"WolframVersion\" -> \"12.1+\",
+    \"Extensions\" -> {
+        {\"Kernel\", \"Root\" -> \"Kernel\", \"Context\" -> \"MyPackage`\"},
+        {\"LibraryLink\"}
+    }
+]\
+\>", "Program",
+ CellID->357710006,ExpressionUUID->"b4dbfa46-5cd3-4d1b-bbfe-5bb53a9121c7"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Evaluate the ",
+ Cell[BoxData[
+  ButtonBox["Put",
+   BaseStyle->"Link"]], "InlineFormula",ExpressionUUID->
+  "3ba995e7-ae3e-4643-9527-967705388d1f"],
+ " below to initialize ",
+ StyleBox["PacletInfo.wl", "InlineCode"],
+ " with the content above",
+ ":"
+}], "Text",
+ CellID->677066262,ExpressionUUID->"9cd1d416-d7fe-49f2-84c1-24bfcdb28917"],
+
+Cell[BoxData[
+ RowBox[{"Put", "[", 
+  RowBox[{
+   InterpretationBox[
+    DynamicModuleBox[{Typeset`open = False}, 
+     TemplateBox[{"Expression", 
+       RowBox[{"Paclet", "[", 
+         DynamicBox[
+          FEPrivate`FrontEndResource["FEBitmaps", "IconizeEllipsis"]], "]"}], 
+       
+       GridBox[{{
+          RowBox[{
+            TagBox["\"Byte count: \"", "IconizedLabel"], "\[InvisibleSpace]", 
+            
+            TagBox["1032", "IconizedItem"]}]}}, 
+        GridBoxAlignment -> {"Columns" -> {{Left}}}, DefaultBaseStyle -> 
+        "Column", 
+        GridBoxItemSize -> {
+         "Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}}], 
+       Dynamic[Typeset`open]},
+      "IconizedObject"]],
+    $CellContext`Paclet[
+    "Name" -> "MyPackage", "Version" -> "0.1", "WolframVersion" -> "12.1+", 
+     "Extensions" -> {{
+       "Kernel", "Root" -> "Kernel", "Context" -> "MyPackage`"}, {
+       "LibraryLink"}}],
+    SelectWithContents->True,
+    Selectable->False], ",", 
+   RowBox[{"FileNameJoin", "[", 
+    RowBox[{"{", 
+     RowBox[{"$projectDir", ",", "\"\<MyPackage/PacletInfo.wl\>\""}], "}"}], 
+    "]"}]}], "]"}]], "Input",
+ CellID->1928735347,ExpressionUUID->"22458b68-7fad-4067-b2a1-0de880db8124"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Next, create a fresh Rust library by running the following command-line \
+code from within the\[LineSeparator]",
+ StyleBox["$projectDir", "InlineCode"],
+ " directory:"
+}], "Text",
+ CellID->638204405,ExpressionUUID->"75776931-e680-4e02-a726-7c17161e0794"],
+
+Cell["$ cargo new --lib my-library", "Program",
+ CellID->1033370596,ExpressionUUID->"96363b02-605a-4b15-b193-a7912fef6a85"]
+}, Open  ]],
+
+Cell[TextData[{
+ "This will create the directory ",
+ StyleBox["my-library", "InlineCode"],
+ " and automatically populate it with the standard Rust project layout."
+}], "Text",
+ CellID->1315785579,ExpressionUUID->"70e3c231-0099-4c6a-9f32-8ad0c761f84a"],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "After completing the steps above, the directory layout of ",
+ StyleBox["$projectDir", "InlineCode"],
+ " should look like this:"
+}], "Text",
+ CellID->2133025267,ExpressionUUID->"8cd3a78c-f411-4629-827a-e527290c5d28"],
+
+Cell["\<\
+$ tree 
+.
+\:251c MyPackage
+|\[NonBreakingSpace]\[NonBreakingSpace] \:251c Kernel
+|\[NonBreakingSpace]\[NonBreakingSpace] \:251c LibraryResources
+|\[NonBreakingSpace]\[NonBreakingSpace] \:2514 PacletInfo.wl
+\:2514 my-library
+    \:251c Cargo.toml
+    \:2514 src
+        \:2514 lib.rs\
+\>", "Program",
+ SpanMinSize->10,
+ CellID->1885391930,ExpressionUUID->"9dad7291-ddf7-4f4e-b820-07ab99cc6347"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Lastly, we'll need to modify the generated ",
+ StyleBox["Cargo.toml", "InlineCode"],
+ " file to instruct the ",
+ StyleBox["cargo", "InlineCode"],
+ " build tool that building our library should produce a dynamic library (by \
+default, ",
+ StyleBox["cargo", "InlineCode"],
+ " produces a ",
+ StyleBox[".rlib", "InlineCode"],
+ " file), and to add the dependencies which we need. Additions to the file \
+are highlighted in green."
+}], "Text",
+ CellID->200480891,ExpressionUUID->"aafc4751-6f7a-456d-9dd8-ba1c917927c4"],
+
+Cell[TextData[{
+ "[package]\nname = \"my-library\"\nversion = \"0.1.0\"\nauthors = [\"Your \
+Name Here <your-email@here.com>\"]\nedition = \"2018\"\n\n",
+ StyleBox["[lib]\ncrate-type = [\"cdylib\"]",
+  Background->RGBColor[
+   0.6433051041428245, 0.9996795605401694, 0.5990997177080949]],
+ StyleBox["\n",
+  Background->RGBColor[
+   0.5550011444266423, 0.9996795605401694, 0.4998397802700847]],
+ "\n[dependencies]\n",
+ StyleBox["# TODO",
+  FontColor->RGBColor[1, 0, 0]],
+ ": Update these links to github/crates.io links when possible.\n",
+ StyleBox["wl-expr         = { git = \
+\"ssh://git@stash.wolfram.com:7999/~connorg/wl-expr.git\" }\n",
+  Background->RGBColor[
+   0.6468757152666514, 0.9996795605401694, 0.603112840466926]],
+ StyleBox["wl-library-link = { git = \
+\"ssh://git@stash.wolfram.com:7999/~connorg/wl-library-link.git\" }\n",
+  Background->RGBColor[
+   0.6452124818799115, 0.9996795605401694, 0.6012359807736324]],
+ StyleBox["# TODO",
+  FontColor->RGBColor[1, 0, 0]],
+ ": Re-export wl-parse from wl-expr so this import is unnecessary.\n",
+ StyleBox["wl-parse        = { git = \
+\"ssh://git@stash.wolfram.com:7999/~connorg/wl-parse.git\" }",
+  Background->RGBColor[
+   0.6478828107118334, 0.9996795605401694, 0.6042420080872816]]
+}], "Program",
+ PageWidth:>Infinity,
+ CellID->237421708,ExpressionUUID->"24aef4f0-4c44-43c5-891b-2195912ace90"]
+}, Open  ]],
+
+Cell["\<\
+Next, we'll add our first Rust function, and the necessary Wolfram Language \
+code to call it.\
+\>", "Text",
+ CellID->1584491451,ExpressionUUID->"fafe23cd-97a0-413f-bc00-21e1fc394c76"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[StyleBox["Adding a Rust LibraryLink function", "Subsection"]], \
+"Section",
+ CellID->364554466,ExpressionUUID->"a30618cc-2657-4915-a2d6-5c5c4b3e64e4"],
+
+Cell[TextData[{
+ "Modify the contents of ",
+ StyleBox["lib.rs", "InlineCode"],
+ " to match the Rust code below:"
+}], "Text",
+ CellID->1029524193,ExpressionUUID->"324b4c20-75b1-458e-9f03-6350ab580719"],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ StyleBox["TODO:",
+  FontColor->RGBColor[1, 0, 0]],
+ " Ensure that the highlighted Rust code is copyable as what displays, not \
+the giant formatting expression"
+}], "Text",
+ CellID->305119715,ExpressionUUID->"c9cfbaa8-af32-481b-a59c-8b8e80924ce7"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"SyntaxHighlight", "[", 
+  RowBox[{
+  "\"\<\\\nuse wl_expr::Expr;\nuse wl_library_link::{WolframEngine, \
+wolfram_library_function};\n\n#[wolfram_library_function]\npub fn \
+say_hello(engine: &WolframEngine, args: Vec<Expr>) -> Expr {\n\tExpr::string(\
+\\\"Hello, World!\\\")\n}\>\"", ",", "\"\<Rust\>\""}], 
+  "]"}]], "Input", "ExcludedMaterial",
+ CellLabel->"In[42]:=",
+ CellID->380412895,ExpressionUUID->"13799c00-8952-4d16-aefc-fd47709d48c7"],
+
+Cell[BoxData[
+ TagBox[GridBox[{
+    {
+     TemplateBox[{
+       StyleBox["\"use\"", 
+        RGBColor[
+        0.6549019607843137, 0.11372549019607843`, 0.36470588235294116`, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"wl_expr\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"::\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"Expr\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\";\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"use\"", 
+        RGBColor[
+        0.6549019607843137, 0.11372549019607843`, 0.36470588235294116`, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"wl_library_link\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"::\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"{\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"WolframEngine\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\",\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" wolfram_library_function\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"}\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\";\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"#\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"[\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"wolfram_library_function\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"]\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"pub\"", 
+        RGBColor[
+        0.6549019607843137, 0.11372549019607843`, 0.36470588235294116`, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"fn\"", 
+        RGBColor[
+        0.6549019607843137, 0.11372549019607843`, 0.36470588235294116`, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"say_hello\"", 
+        RGBColor[
+        0.4745098039215686, 0.36470588235294116`, 0.6392156862745098, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\"(\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"engine\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\":\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"&\"", 
+        RGBColor[
+        0.6549019607843137, 0.11372549019607843`, 0.36470588235294116`, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\"WolframEngine, \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"args\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\":\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"Vec\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"<\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"Expr\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\">\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\")\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"->\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" Expr\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"{\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"\\t\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"Expr\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"::\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"string\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"(\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\\\"\"", 
+        RGBColor[
+        0.09411764705882353, 0.21176470588235294`, 0.5686274509803921, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\"Hello, World!\"", 
+        RGBColor[
+        0.09411764705882353, 0.21176470588235294`, 0.5686274509803921, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\"\\\"\"", 
+        RGBColor[
+        0.09411764705882353, 0.21176470588235294`, 0.5686274509803921, 1.], 
+        StripOnInput -> False], 
+       StyleBox["\")\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"}\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]}
+   },
+   DefaultBaseStyle->"Column",
+   GridBoxAlignment->{"Columns" -> {{Left}}},
+   GridBoxBackground->{"Columns" -> {{
+        RGBColor[1., 1., 1., 1.]}}},
+   GridBoxItemSize->{"Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}},
+   GridBoxSpacings->{"Columns" -> {{Automatic}}, "Rows" -> {{0.5}}}],
+  "Column"]], "Output",
+ CellLabel->"Out[42]=",
+ CellID->382380582,ExpressionUUID->"63ffc91e-8258-49c2-9137-61e99da32774"]
+}, {2}]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Then, create and open a new file in ",
+ StyleBox["MyPackage/Kernel/", "InlineCode"],
+ " called ",
+ StyleBox["MyPackage.wl", "InlineCode"],
+ ":"
+}], "Text",
+ CellID->2032601565,ExpressionUUID->"c16cd366-cc4e-456a-a7eb-669ea89b6fda"],
+
+Cell[BoxData[
+ RowBox[{"NotebookOpen", "[", 
+  RowBox[{"CreateFile", "[", "\n", "  ", 
+   RowBox[{"FileNameJoin", "[", 
+    RowBox[{"{", 
+     RowBox[{
+     "$projectDir", ",", " ", "\"\<MyPackage/Kernel/MyPackage.wl\>\""}], 
+     "}"}], "]"}], "]"}], "]"}]], "Input",
+ CellID->1971300495,ExpressionUUID->"116ec361-eb31-4be6-b7ef-dc807ab455cc"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["and populate it with this code:", "Text",
+ CellID->272759247,ExpressionUUID->"53ac054e-74c2-49be-92aa-8f745126274b"],
+
+Cell[TextData[{
+ "BeginPackage[\"MyPackage`\"];\n\n(* Declare MyPackage`MyFunction *)\n\
+MyFunction\n\nBegin[\"`Private`\"];\n\n$RustLibraryName = \"libmy_library\";\n\
+\nlibraryFunction = LibraryFunctionLoad[\n\t$RustLibraryName,\n\t\
+\"say_hello_wrapper\",\n\tLinkObject,\n\tLinkObject\n];\n\n\
+MyFunction[args___] := Block[{\n\t(* ",
+ StyleBox["TODO:",
+  FontColor->RGBColor[1, 0, 0],
+  Background->None],
+ " Come up with a better way to do this *)\n\t$Context = \"Unused`\",\n\t\
+$ContextPath = {}\n},\n\tlibraryFunction[args]\n]\n\nEnd[]\nEndPackage[]"
+}], "Program",
+ CellID->1165657098,ExpressionUUID->"26d536f7-d269-482c-bef5-b251ec7ad53a"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Next, use the Rust build tool, ",
+ StyleBox["cargo,", "InlineCode",
+  FontColor->GrayLevel[0]],
+ " to build the Rust code into a dynamic library."
+}], "Text",
+ CellID->1245738120,ExpressionUUID->"aaa3a911-8317-46e3-b4b4-199c9ab9c34c"],
+
+Cell["\<\
+$ cd my-library
+$ cargo build\
+\>", "Program",
+ CellID->860936948,ExpressionUUID->"d9096890-6eb5-41b1-91bb-bf3eaa216c59"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "This will build the Rust code and output a dynamic library at ",
+ StyleBox["target/debug/libmy_library.dylib. ", "InlineCode"],
+ "Copy that file to the ",
+ StyleBox["LibraryResources", "InlineCode"],
+ " directory created earlier: "
+}], "Text",
+ CellID->1450824590,ExpressionUUID->"374f524e-20cf-42f5-86d4-089efda867be"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"With", "[", 
+  RowBox[{
+   RowBox[{"{", 
+    RowBox[{"name", "=", 
+     RowBox[{"\"\<libmy_library.\>\"", "<>", 
+      RowBox[{"System`Dump`LibraryExtension", "[", "]"}]}]}], "}"}], ",", 
+   "\[IndentingNewLine]", 
+   RowBox[{"CopyFile", "[", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"FileNameJoin", "[", 
+      RowBox[{"{", 
+       RowBox[{"$projectDir", ",", 
+        RowBox[{"\"\<my-library/target/debug/\>\"", "<>", "name"}]}], " ", 
+       "}"}], "]"}], ",", "\[IndentingNewLine]", 
+     RowBox[{"FileNameJoin", "[", 
+      RowBox[{"{", 
+       RowBox[{"$projectDir", ",", 
+        RowBox[{"\"\<MyPackage/LibraryResources/\>\"", "<>", "name"}]}], 
+       "}"}], "]"}]}], "\n", "]"}]}], "]"}]], "Input",
+ CellLabel->"In[44]:=",
+ CellID->603917882,ExpressionUUID->"da7244ef-01bb-46c1-981e-a51fea3af91c"],
+
+Cell[BoxData["\<\"/some/directory/you/choose/my-library/target/debug/libmy_\
+library.dylib\"\>"], "Echo",
+ CellID->1677386697,ExpressionUUID->"0dd476e9-8379-4779-95c8-9c22b68632c0"],
+
+Cell[BoxData["$Failed"], "Output",
+ CellLabel->"Out[44]=",
+ CellID->866830757,ExpressionUUID->"3ffe4f10-af77-4867-91b0-e23fc0355d44"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["\<\
+The package is now finished, and we can load our function into the Wolfram \
+Language! Evaluate\
+\>", "Text",
+ CellID->1130586685,ExpressionUUID->"80edbe85-5cca-43e2-b99d-df56a4dac11b"],
+
+Cell[BoxData[{
+ RowBox[{"PacletDirectoryAdd", "[", "$projectDir", "]"}], "\n", 
+ RowBox[{"Needs", "[", "\"\<MyPackage`\>\"", "]"}]}], "Input",
+ CellID->24755907,ExpressionUUID->"64a8fcef-5ff3-4496-b7d6-6a4831dbaeeb"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "You should now be able to call ",
+ StyleBox["MyFunction", "InlineCode"],
+ ":"
+}], "Text",
+ CellID->1227043487,ExpressionUUID->"f5f5f72e-bc11-48fa-bf46-c1ee33465b80"],
+
+Cell[BoxData[
+ RowBox[{"MyFunction", "[", "]"}]], "Input",
+ CellID->2134896712,ExpressionUUID->"1e783700-4dec-4fd1-b6a9-5f553fb94272"]
+}, Open  ]],
+
+Cell[TextData[{
+ "If ",
+ StyleBox["\"Hello, World!\"", "InlineCode"],
+ " was returned, everything is working properly."
+}], "Text",
+ CellID->1023364555,ExpressionUUID->"c4e94be2-e760-491b-a032-f53b9e2ea4ec"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Expressions and Structured Data", "Section",
+ CellID->1989752601,ExpressionUUID->"1bf47c8e-5ce1-412e-9485-763bcaf33d52"],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ StyleBox["Constructing Expressions: The ", "Subsection"],
+ StyleBox["Expr![]", "InlineCode"],
+ StyleBox[" macro", "Subsection"]
+}], "Subsection",
+ CellID->1741422371,ExpressionUUID->"d9e5a366-0b20-4a9e-8b69-928f5571e554"],
+
+Cell["TODO TODO TODO", "Text",
+ CellID->1120891822,ExpressionUUID->"e4c0e5ef-a0bb-42e8-bd60-cb5fa9bb11b1"],
+
+Cell["\<\
+This is equivalent to the building the expression manually using the Expr API:\
+\>", "Text",
+ CellID->209823254,ExpressionUUID->"3fd74544-5fd8-47b2-8ead-ec83ed92aa91"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Working with structured expressions: ",
+ StyleBox["derive(FromExpr)", "InlineCode"]
+}], "Subsection",
+ CellID->976548054,ExpressionUUID->"6b096047-fe75-4943-b785-9a5ddf26db95"],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "The ",
+ StyleBox["derive(FromExpr)", "InlineCode"],
+ " attribute invokes what's known as a Rust \"procedural macro\". This \
+inserts new code, based on the structure which the macro is used to annotate. \
+FromExpr is a "
+}], "Text",
+ CellID->1994375645,ExpressionUUID->"acc5ebd7-fb10-4083-8f1c-cc744b17218b"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"SyntaxHighlight", "[", 
+  RowBox[{
+  "\"\<\\\n#[derive(FromExpr)]\n#[pattern({x_, y_})\nstruct Point {\n    x: \
+i64,\n    y: i64,\n}\n\>\"", ",", "\"\<Rust\>\""}], "]"}]], "Input",
+ CellLabel->"In[30]:=",
+ CellID->154491268,ExpressionUUID->"fab44655-e1a4-43e7-9d7a-b4ce66b08e4d"],
+
+Cell[BoxData[
+ TagBox[GridBox[{
+    {
+     TemplateBox[{
+       StyleBox["\"#\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"[\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"derive\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"(\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"FromExpr\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\")\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"]\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"#\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"[\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"pattern\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"(\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"{x_\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\",\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" y_}\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\")\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"struct\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"Point\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\" {\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"    \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"x\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\": \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"i64\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\",\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"    \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"y\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\": \"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\"i64\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False], 
+       StyleBox["\",\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]},
+    {
+     TemplateBox[{
+       StyleBox["\"}\"", 
+        RGBColor[
+        0.19607843137254902`, 0.19607843137254902`, 0.19607843137254902`, 1.],
+         StripOnInput -> False]},
+      "RowDefault"]}
+   },
+   DefaultBaseStyle->"Column",
+   GridBoxAlignment->{"Columns" -> {{Left}}},
+   GridBoxBackground->{"Columns" -> {{
+        RGBColor[1., 1., 1., 1.]}}},
+   GridBoxItemSize->{"Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}},
+   GridBoxSpacings->{"Columns" -> {{Automatic}}, "Rows" -> {{0.5}}}],
+  "Column"]], "Output",
+ CellLabel->"Out[30]=",
+ CellID->1841630686,ExpressionUUID->"6b1d7217-85af-4055-8d48-c79d9c4525e4"]
+}, {2}]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Their are two levels of validation done when using ",
+ StyleBox["derive(FromExpr)", "InlineCode"],
+ ". The first is checking whether the pattern matches against the expression. \
+The second is calling `FromExpr::from_expr` on the values of the named \
+bindings returned from a successful match."
+}], "Text",
+ CellID->284889278,ExpressionUUID->"85989b4c-dcda-41e7-95ff-85d2a98aefe4"],
+
+Cell[BoxData[
+ RowBox[{"SyntaxHighlight", "[", 
+  RowBox[{
+  "\"\<\\\nuse wl_lang::forms::List;\n\n#[derive(FromExpr)]\n\
+#[pattern(Pattern[points, {___}])\nstruct Line {\n    points: List<Point>,\n}\
+\n\>\"", ",", "\"\<Rust\>\""}], "]"}]], "Input",
+ CellLabel->"In[30]:=",
+ CellID->1306545109,ExpressionUUID->"e4d5a54a-86f4-401d-bf2f-07f325602299"]
+}, Open  ]],
+
+Cell[TextData[{
+ "The [[ ",
+ StyleBox["LINK: ",
+  FontWeight->"Bold"],
+ StyleBox["wl-lang ]]", "InlineCode"],
+ " library contains many existing structures for common Wolfram Language \
+forms."
+}], "Text",
+ CellID->1192390612,ExpressionUUID->"05114311-5e0a-4562-8a2e-98f23ea99b30"],
+
+Cell[CellGroupData[{
+
+Cell["", "Text",
+ CellID->286675678,ExpressionUUID->"2fccd39b-6f20-4fb9-8bef-1bdf5295f751"],
+
+Cell[BoxData[GridBox[{
+   {"      ", "List", "Association", "Rule"},
+   {"      ", "Pattern", "IteratorSpec", "SingleOrList"},
+   {"      ", "XXXX", "XXXX", "XXXX"}
+  }]], "3ColumnTableMod",
+ CellID->182070495,ExpressionUUID->"01395d1d-7ad5-4637-afd7-4401ff075eaf"]
+}, Open  ]],
+
+Cell["\<\
+With the structures defined above, we can now easily write a RustLink program \
+to calculate the length of a line:\
+\>", "Text",
+ CellID->1504777704,ExpressionUUID->"50807c88-46f3-4870-8e83-a80bdc82978e"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[TextData[{
+ "Implementing ",
+ StyleBox["ToExpr", "InlineCode"]
+}], "Subsection",
+ CellID->255735726,ExpressionUUID->"94ebba03-7d99-40e2-a0b8-e456619a9506"],
+
+Cell["TODO TODO TODO", "Text",
+ CellID->2096539476,ExpressionUUID->"c3172601-a6e7-421f-96cf-9befd2183369"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["More About", "TutorialMoreAboutSection",
+ CellID->23220180,ExpressionUUID->"9a73f2a5-cd35-4e11-9064-471a2d1e7195"],
+
+Cell["XXXX", "TutorialMoreAbout",
+ CellID->1567025153,ExpressionUUID->"9ddd1fb1-f559-4260-aa95-2e471f064240"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Related Tutorials", "RelatedTutorialsSection",
+ CellID->415694126,ExpressionUUID->"f8c56921-1aaf-491d-9ba7-952f38bc4577"],
+
+Cell["XXXX", "RelatedTutorials",
+ CellID->806871991,ExpressionUUID->"79948333-5eae-4ac7-8229-396f23e87335"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Related Wolfram Training Courses", "TutorialRelatedLinksSection",
+ CellID->415694148,ExpressionUUID->"80e7cb49-3597-45fd-adc5-ce9cf2d3fb63"],
+
+Cell["XXXX", "TutorialRelatedLinks",
+ CellID->415694149,ExpressionUUID->"e62ed730-a65e-4d68-941f-0050aa707da1"]
+}, Open  ]]
+}, Open  ]]
+},
+WindowSize->{855, 1084},
+WindowMargins->{{977, Automatic}, {Automatic, 242}},
+PrivateNotebookOptions->{"FileOutlineCache"->False},
+TaggingRules->{
+ "Author" -> "connorgray", "CreationDate" -> "04-16-2020 09:46:50", 
+  "SaveDialogDataSavesBlog" -> False, "AnnotationsDeleted" -> False},
+TrackCellChangeTimes->False,
+Magnification:>1.25 Inherited,
+FrontEndVersion->"12.1 for Mac OS X x86 (64-bit) (March 18, 2020)",
+StyleDefinitions->FrontEnd`FileName[{"Wolfram"}, "TutorialPageStyles.nb", 
+  CharacterEncoding -> "UTF-8"],
+ExpressionUUID->"9ad59372-1afe-4da8-a18a-82cd94fd5423"
+]
+

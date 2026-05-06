@@ -1,0 +1,27 @@
+[config]
+default_to_workspace = false
+
+#=======================================
+# Task definitions
+#=======================================
+
+#------------------
+# Development tasks
+#------------------
+
+[tasks.paclet]
+dependencies = ["clean-library-resources", "build-library-resources"]
+script = { file = "./scripts/BuildPaclet.wls"}
+
+#--------------------
+# Building the paclet
+#--------------------
+
+[tasks.clean-library-resources]
+script = '''
+rm -rf ./build/
+'''
+
+[tasks.build-library-resources]
+command = "cargo"
+args = ["build", "--examples"]

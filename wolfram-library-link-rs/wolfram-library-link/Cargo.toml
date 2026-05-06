@@ -1,0 +1,134 @@
+[package]
+name = "wolfram-library-link"
+version = "0.2.10"
+authors = ["Connor Gray <code@connorgray.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+readme = "../README.md"
+repository = "https://github.com/WolframResearch/wolfram-library-link-rs"
+description = "Bindings to Wolfram LibraryLink"
+keywords = ["wolfram-library-link", "wstp", "wolfram", "wolfram-language", "wolfram-engine"]
+categories = ["external-ffi-bindings", "development-tools::ffi"]
+
+include = [
+    "/src",
+    "/examples",
+    # Files in this directory are included in the `wolfram_library_link::docs` module
+    # via `#[doc = include_str!()]`, so these need to be included in the published crate
+    # in order for the docs.rs build to succeed.
+    "/RustLink/Examples/Docs"
+]
+
+[dependencies]
+wolfram-library-link-macros    = { version = "0.2.10", path = "./wolfram-library-link-macros" }
+
+wolfram-library-link-sys       = { version = "0.2.10", path = "../wolfram-library-link-sys" }
+
+wstp         = "0.2.8"
+wolfram-expr = "0.1.0"
+
+once_cell = "1.8.0"
+static_assertions = "1.1.0"
+ref-cast = "1.0.6"
+
+backtrace = { version = "^0.3.46", optional = true }
+inventory = { version = "0.2.1", optional = true }
+process_path = { version = "0.1.3", optional = true }
+
+[dev-dependencies]
+
+[features]
+default = ["panic-failure-backtraces", "automate-function-loading-boilerplate"]
+nightly = []
+
+panic-failure-backtraces = ["backtrace"]
+automate-function-loading-boilerplate = ["inventory", "process_path", "wolfram-library-link-macros/automate-function-loading-boilerplate"]
+
+
+#=======================================
+# Examples
+#=======================================
+
+[[example]]
+name = "basic_types"
+crate-type = ["cdylib"]
+required-features = ["automate-function-loading-boilerplate"]
+
+[[example]]
+name = "numeric_arrays"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "data_store"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "aborts"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "wstp_example" # avoid "libwstp.dylib", which seems too generic.
+path = "examples/wstp.rs"
+crate-type = ["cdylib"]
+required-features = ["automate-function-loading-boilerplate"]
+
+#-----------------------------
+# Raw (unsafe, low-level) APIs
+#-----------------------------
+
+[[example]]
+name = "raw_wstp_function"
+path = "examples/raw/raw_wstp_function.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "raw_librarylink_function"
+path = "examples/raw/raw_librarylink_function.rs"
+crate-type = ["cdylib"]
+
+#------------
+# Expressions
+#------------
+
+[[example]]
+name = "basic_expressions"
+path = "examples/exprs/basic_expressions.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "managed_exprs"
+path = "examples/exprs/managed.rs"
+crate-type = ["cdylib"]
+required-features = ["automate-function-loading-boilerplate"]
+
+#---------------
+# Async examples
+#---------------
+
+[[example]]
+name = "async_file_watcher"
+path = "examples/async/async_file_watcher.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "async_file_watcher_raw"
+path = "examples/async/async_file_watcher_raw.rs"
+crate-type = ["cdylib"]
+
+#---------------
+# Examples from the wolfram_library_link::docs module
+#---------------
+
+[[example]]
+name = "wll_docs"
+path = "examples/docs/main.rs"
+crate-type = ["cdylib"]
+
+#---------------
+# Tests -- see example/tests/README.md
+#---------------
+
+[[example]]
+name = "library_tests"
+path = "examples/tests/main.rs"
+crate-type = ["cdylib"]
