@@ -7,26 +7,13 @@ use static_assertions::assert_not_impl_any;
 
 use crate::{rtl, sys};
 
-#[rustfmt::skip]
-use crate::sys::MNumericArray_Data_Type::{
-    MNumericArray_Type_Bit8 as BIT8_TYPE,
-    MNumericArray_Type_Bit16 as BIT16_TYPE,
-    MNumericArray_Type_Bit32 as BIT32_TYPE,
-    MNumericArray_Type_Bit64 as BIT64_TYPE,
-
-    MNumericArray_Type_UBit8 as UBIT8_TYPE,
-    MNumericArray_Type_UBit16 as UBIT16_TYPE,
-    MNumericArray_Type_UBit32 as UBIT32_TYPE,
-    MNumericArray_Type_UBit64 as UBIT64_TYPE,
-
-    MNumericArray_Type_Real32 as REAL32_TYPE,
-    MNumericArray_Type_Real64 as REAL64_TYPE,
-
-    MNumericArray_Type_Complex_Real32 as COMPLEX_REAL32_TYPE,
-    MNumericArray_Type_Complex_Real64 as COMPLEX_REAL64_TYPE,
-};
-
 use crate::sys::MNumericArray_Convert_Method::*;
+
+// `NumericArrayDataType` (the shared element-type tag enum) lives in `wolfram-expr`.
+// Re-exported from this module so `wolfram_library_link::NumericArrayDataType` keeps
+// resolving to the same path users have been importing. The enum's variant names and
+// `#[repr(u32)]` discriminants exactly match the C ABI `MNumericArray_Type_*` values.
+pub use wolfram_expr::NumericArrayDataType;
 
 /// Native Wolfram [`NumericArray`][ref/NumericArray]<sub>WL</sub>.
 ///
@@ -142,30 +129,6 @@ impl NumericArrayType for sys::mcomplex {
 //======================================
 // Enums
 //======================================
-
-/// The type of the data being stored in a [`NumericArray`].
-///
-/// This is an enumeration of all the types which satisfy [`NumericArrayType`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u32)]
-#[allow(missing_docs)]
-pub enum NumericArrayDataType {
-    Bit8 = BIT8_TYPE as u32,
-    Bit16 = BIT16_TYPE as u32,
-    Bit32 = BIT32_TYPE as u32,
-    Bit64 = BIT64_TYPE as u32,
-
-    UBit8 = UBIT8_TYPE as u32,
-    UBit16 = UBIT16_TYPE as u32,
-    UBit32 = UBIT32_TYPE as u32,
-    UBit64 = UBIT64_TYPE as u32,
-
-    Real32 = REAL32_TYPE as u32,
-    Real64 = REAL64_TYPE as u32,
-
-    ComplexReal32 = COMPLEX_REAL32_TYPE as u32,
-    ComplexReal64 = COMPLEX_REAL64_TYPE as u32,
-}
 
 /// Conversion method used by [`NumericArray::convert_to()`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -826,37 +789,9 @@ fn copy_from_slice_uninit<T>(src: &[T], dest: &mut [MaybeUninit<T>]) {
     }
 }
 
-impl NumericArrayDataType {
-    #[allow(missing_docs)]
-    pub fn as_raw(self) -> sys::numericarray_data_t {
-        self as sys::numericarray_data_t
-    }
-
-    /// Get the string name of this type, suitable for use in
-    /// [`NumericArray`][ref/NumericArray]<code>[<i>data</i>, &quot;<i>type</i>&quot;]</code>.
-    ///
-    /// [ref/NumericArray]: https://reference.wolfram.com/language/ref/NumericArray.html
-    #[rustfmt::skip]
-    pub fn name(&self) -> &'static str {
-        match self {
-            NumericArrayDataType::Bit8  => "Integer8",
-            NumericArrayDataType::Bit16 => "Integer16",
-            NumericArrayDataType::Bit32 => "Integer32",
-            NumericArrayDataType::Bit64 => "Integer64",
-
-            NumericArrayDataType::UBit8  => "UnsignedInteger8",
-            NumericArrayDataType::UBit16 => "UnsignedInteger16",
-            NumericArrayDataType::UBit32 => "UnsignedInteger32",
-            NumericArrayDataType::UBit64 => "UnsignedInteger64",
-
-            NumericArrayDataType::Real32 => "Real32",
-            NumericArrayDataType::Real64 => "Real64",
-
-            NumericArrayDataType::ComplexReal32 => "ComplexReal32",
-            NumericArrayDataType::ComplexReal64 => "ComplexReal64",
-        }
-    }
-}
+// `NumericArrayDataType` inherent methods (`as_raw`, `name`, `from_name`,
+// `TryFrom<u32>`) are provided by `wolfram_expr::NumericArrayDataType` itself —
+// no need to redefine them here.
 
 impl NumericArrayConvertMethod {
     #[allow(missing_docs)]
@@ -915,95 +850,36 @@ impl<T> fmt::Debug for NumericArray<T> {
 // Conversion Impls
 //======================================
 
-impl TryFrom<u32> for NumericArrayDataType {
-    type Error = ();
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        // debug_assert!(u32::try_from(self.tensor_property_type()).is_ok());
-
-        #[rustfmt::skip]
-        let ok = match value {
-            _ if value == BIT8_TYPE as u32 => NumericArrayDataType::Bit8,
-            _ if value == BIT16_TYPE as u32 => NumericArrayDataType::Bit16,
-            _ if value == BIT32_TYPE as u32 => NumericArrayDataType::Bit32,
-            _ if value == BIT64_TYPE as u32 => NumericArrayDataType::Bit64,
-
-            _ if value == UBIT8_TYPE as u32 => NumericArrayDataType::UBit8,
-            _ if value == UBIT16_TYPE as u32 => NumericArrayDataType::UBit16,
-            _ if value == UBIT32_TYPE as u32 => NumericArrayDataType::UBit32,
-            _ if value == UBIT64_TYPE as u32 => NumericArrayDataType::UBit64,
-
-            _ if value == REAL32_TYPE as u32 => NumericArrayDataType::Real32,
-            _ if value == REAL64_TYPE as u32 => NumericArrayDataType::Real64,
-
-            _ if value == COMPLEX_REAL32_TYPE as u32 => NumericArrayDataType::ComplexReal32,
-            _ if value == COMPLEX_REAL64_TYPE as u32 => NumericArrayDataType::ComplexReal64,
-
-            _ => return Err(()),
-        };
-
-        Ok(ok)
-    }
-}
+// `TryFrom<u32> for NumericArrayDataType` is provided by `wolfram_expr` —
+// re-exported via the `pub use` at the top of the module.
 
 //==============================================================================
-// Cross-crate integration with `wolfram-expr`'s portable value-type NumericArray.
+// Cross-crate integration with the value-type `wolfram_expr::NumericArray`.
 //
-// This section provides:
+// `NumericArrayDataType` is a re-export from wolfram-expr (above), so the two
+// enums are now the same type. We only need:
 //   * `wolfram_expr::NumericArrayRead` impl on the runtime-handle `NumericArray<T>`
-//   * Bidirectional conversions between `wll::NumericArrayDataType` and
-//     `wolfram_expr::NumericArrayDataType` (the two parallel enums share the same
-//     C-ABI discriminants — they're the same numbers under the hood)
-//   * `From` / `TryFrom` conversions between the runtime-handle and the value-type
-//     NumericArray
+//   * `From` / `TryFrom` conversions between runtime-handle and value-type
 //
-// The two `NumericArrayDataType` enums and the two element-type traits
-// (`wll::NumericArrayType` here vs `wolfram_expr::NumericArrayElement`) intentionally
-// stay parallel rather than unified — `wll::NumericArrayType` has an impl for
-// `sys::mcomplex` which can't move to `wolfram-expr` (orphan rule: trait would be
-// foreign, type would be foreign-from-sys). Keeping them parallel preserves the
-// existing public API of `wolfram-library-link` byte-for-byte while still letting
-// `Expr` carry portable NumericArray values.
+// The local `NumericArrayType` trait stays — it adds `sys::mcomplex` to the set of
+// valid element types, which can't move to wolfram-expr (orphan rule).
 //==============================================================================
 
-use wolfram_expr::{
-    NumericArray as ExprNumericArray, NumericArrayDataType as ExprDataType,
-    NumericArrayRead as ExprNumericArrayRead,
-};
-
-impl From<NumericArrayDataType> for ExprDataType {
-    fn from(dt: NumericArrayDataType) -> ExprDataType {
-        // Both enums share the same C-ABI discriminants — `as u32` reads the same
-        // value out of both. `try_from` cannot fail by construction.
-        ExprDataType::try_from(dt as u32).expect("NumericArrayDataType discriminant mismatch")
-    }
-}
-
-impl From<ExprDataType> for NumericArrayDataType {
-    fn from(dt: ExprDataType) -> NumericArrayDataType {
-        NumericArrayDataType::try_from(dt as u32)
-            .expect("NumericArrayDataType discriminant mismatch")
-    }
-}
+use wolfram_expr::{NumericArray as ExprNumericArray, NumericArrayRead as ExprNumericArrayRead};
 
 impl<T> ExprNumericArrayRead for NumericArray<T> {
-    fn data_type(&self) -> ExprDataType {
-        let local: NumericArrayDataType = self.data_type();
-        local.into()
+    fn data_type(&self) -> NumericArrayDataType {
+        NumericArray::data_type(self)
     }
 
     fn dimensions(&self) -> &[usize] {
-        // Reuse the existing inherent method — same behavior, no extra runtime call.
         NumericArray::dimensions(self)
     }
 
     fn as_bytes(&self) -> &[u8] {
-        let local_dt: NumericArrayDataType = self.data_type();
-        let elem_size = ExprDataType::from(local_dt).size_in_bytes();
-        let len = self.flattened_length() * elem_size;
+        let len = self.flattened_length() * self.data_type().size_in_bytes();
         let ptr = self.data_ptr() as *const u8;
-        // SAFETY: NumericArray's runtime buffer is at least `len` bytes long; lifetime
-        // tied to `&self` so the pointer remains valid for the duration.
+        // SAFETY: runtime buffer is at least `len` bytes; lifetime tied to `&self`.
         unsafe { std::slice::from_raw_parts(ptr, len) }
     }
 }
@@ -1012,37 +888,33 @@ impl<T> ExprNumericArrayRead for NumericArray<T> {
 /// [`wolfram_expr::NumericArray`]. Allocates and copies the byte buffer.
 impl<T: NumericArrayType> From<&NumericArray<T>> for ExprNumericArray {
     fn from(arr: &NumericArray<T>) -> ExprNumericArray {
-        let dt: ExprDataType = NumericArray::<T>::data_type(arr).into();
-        let dims: Vec<usize> = NumericArray::<T>::dimensions(arr).to_vec();
-        let bytes_slice: &[u8] = ExprNumericArrayRead::as_bytes(arr);
-        let bytes: std::sync::Arc<[u8]> = std::sync::Arc::from(bytes_slice);
-        ExprNumericArray::new(dt, dims, bytes)
+        ExprNumericArray::new(
+            arr.data_type(),
+            NumericArray::dimensions(arr).to_vec(),
+            std::sync::Arc::from(ExprNumericArrayRead::as_bytes(arr)),
+        )
     }
 }
 
-/// Copy a runtime-handle type-erased [`NumericArray`] into a portable owned
-/// [`wolfram_expr::NumericArray`].
 impl From<&NumericArray<()>> for ExprNumericArray {
     fn from(arr: &NumericArray<()>) -> ExprNumericArray {
-        let dt: ExprDataType = NumericArray::<()>::data_type(arr).into();
-        let dims: Vec<usize> = NumericArray::<()>::dimensions(arr).to_vec();
-        let bytes_slice: &[u8] = ExprNumericArrayRead::as_bytes(arr);
-        let bytes: std::sync::Arc<[u8]> = std::sync::Arc::from(bytes_slice);
-        ExprNumericArray::new(dt, dims, bytes)
+        ExprNumericArray::new(
+            arr.data_type(),
+            NumericArray::dimensions(arr).to_vec(),
+            std::sync::Arc::from(ExprNumericArrayRead::as_bytes(arr)),
+        )
     }
 }
 
-/// Allocate a fresh runtime-handle (type-erased) [`NumericArray`] from a portable
-/// owned [`wolfram_expr::NumericArray`]. Calls into the LibraryLink runtime to
-/// allocate the underlying buffer; copies the bytes from the source value.
+/// Allocate a fresh type-erased runtime-handle [`NumericArray`] from a portable
+/// owned [`wolfram_expr::NumericArray`]; copies the bytes through the runtime.
 impl From<&ExprNumericArray> for NumericArray<()> {
     fn from(src: &ExprNumericArray) -> NumericArray<()> {
-        let local_dt: NumericArrayDataType = src.data_type().into();
         let dims = ExprNumericArrayRead::dimensions(src);
         unsafe {
             let mut raw: sys::MNumericArray = std::ptr::null_mut();
-            let err: sys::errcode_t = rtl::MNumericArray_new(
-                local_dt.as_raw(),
+            let err = rtl::MNumericArray_new(
+                src.data_type().as_raw() as sys::numericarray_data_t,
                 i64::try_from(dims.len()).expect("rank overflows i64"),
                 dims.as_ptr() as *mut sys::mint,
                 &mut raw,
@@ -1058,23 +930,16 @@ impl From<&ExprNumericArray> for NumericArray<()> {
     }
 }
 
-/// Allocate a fresh runtime-handle typed [`NumericArray<T>`] from a portable owned
-/// [`wolfram_expr::NumericArray`]. Errors if the source's element type tag does
-/// not match `T::TYPE`.
+/// Allocate a fresh typed runtime-handle [`NumericArray<T>`] from a portable owned
+/// [`wolfram_expr::NumericArray`]; errors if `T::TYPE` doesn't match the source tag.
 impl<T: NumericArrayType> TryFrom<&ExprNumericArray> for NumericArray<T> {
-    type Error = ExprDataType;
+    type Error = NumericArrayDataType;
 
-    fn try_from(src: &ExprNumericArray) -> Result<NumericArray<T>, ExprDataType> {
-        let src_dt = src.data_type();
-        let expected: ExprDataType = T::TYPE.into();
-        if src_dt != expected {
-            return Err(src_dt);
+    fn try_from(src: &ExprNumericArray) -> Result<NumericArray<T>, NumericArrayDataType> {
+        if src.data_type() != T::TYPE {
+            return Err(src.data_type());
         }
         let untyped: NumericArray<()> = src.into();
-        // Element type matches by check above; transmuting via `from_raw` is safe.
-        unsafe {
-            let raw = untyped.into_raw();
-            Ok(NumericArray::<T>::from_raw(raw))
-        }
+        unsafe { Ok(NumericArray::<T>::from_raw(untyped.into_raw())) }
     }
 }

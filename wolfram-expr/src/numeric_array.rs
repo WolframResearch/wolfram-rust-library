@@ -77,6 +77,12 @@ impl NumericArrayDataType {
         }
     }
 
+    /// The raw `u32` discriminant matching the C ABI `MNumericArray_Data_Type` enum.
+    /// Equivalent to `self as u32` (the type is `#[repr(u32)]`).
+    pub const fn as_raw(self) -> u32 {
+        self as u32
+    }
+
     /// Inverse of [`name()`][Self::name]. Returns `None` for unknown strings.
     pub fn from_name(s: &str) -> Option<Self> {
         Some(match s {
