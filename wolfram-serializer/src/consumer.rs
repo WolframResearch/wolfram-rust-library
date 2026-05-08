@@ -7,8 +7,6 @@
 
 use crate::Error;
 use wolfram_expr::{Association, Expr, NumericArray, PackedArray, RuleEntry, Symbol};
-
-#[cfg(feature = "bignum")]
 use wolfram_expr::{BigInteger, BigReal};
 
 /// Visitor for WXF deserialization. Each `consume_*` method handles a wire token and
@@ -55,11 +53,9 @@ pub trait WolframConsumer {
     fn consume_packed_array(&mut self, arr: PackedArray) -> Result<Self::Value, Error>;
 
     /// Handle a BigInteger.
-    #[cfg(feature = "bignum")]
     fn consume_big_integer(&mut self, n: BigInteger) -> Result<Self::Value, Error>;
 
     /// Handle a BigReal.
-    #[cfg(feature = "bignum")]
     fn consume_big_real(&mut self, r: BigReal) -> Result<Self::Value, Error>;
 }
 
@@ -125,13 +121,9 @@ impl WolframConsumer for ExprConsumer {
     fn consume_packed_array(&mut self, arr: PackedArray) -> Result<Expr, Error> {
         Ok(Expr::from(arr))
     }
-
-    #[cfg(feature = "bignum")]
     fn consume_big_integer(&mut self, n: BigInteger) -> Result<Expr, Error> {
         Ok(Expr::from(n))
     }
-
-    #[cfg(feature = "bignum")]
     fn consume_big_real(&mut self, r: BigReal) -> Result<Expr, Error> {
         Ok(Expr::from(r))
     }

@@ -1,127 +1,52 @@
-//! Arbitrary-precision number types — gated behind `feature = "bignum"`.
+//! Arbitrary-precision number types — string-preserving, no arithmetic.
 //!
-//! WXF carries `BigInteger` and `BigReal` tokens for numbers outside the range/
-//! precision of `i64` and `f64`. This module wraps those types so they can become
-//! variants of [`ExprKind`][crate::ExprKind].
+//! Both [`BigInteger`] and [`BigReal`] are thin newtypes around a digit `String`
+//! exactly as it appears on the WXF wire. They preserve the textual representation
+//! losslessly so the value round-trips byte-for-byte through serialization, but
+//! they do **not** parse the value into a Rust arithmetic type. If you want to
+//! compute on a deserialized BigInteger, parse it yourself:
+//!
+//! ```ignore
+//! let bi = expr.try_as_big_integer().unwrap();
+//! let value: num_bigint::BigInt = bi.0.parse().unwrap();
+//! let result = value * 2;
+//! let back = BigInteger::new(result.to_string());
+//! ```
+//!
+//! This keeps `wolfram-expr` dependency-free with respect to bignum crates —
+//! arithmetic is a higher-level concern.
 
-use num_bigint::BigInt;
-
-/// Arbitrary-precision integer — Wolfram Language `BigInteger`.
-///
-/// Wraps [`num_bigint::BigInt`]. Available when the `bignum` feature is enabled.
+/// Wolfram Language `BigInteger` — arbitrary-precision integer carried as its
+/// textual decimal representation (e.g. `"99999999999999999999999"`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BigInteger(pub BigInt);
+pub struct BigInteger(pub String);
 
 impl BigInteger {
-    /// Construct from a [`BigInt`].
-    pub fn new(value: BigInt) -> Self {
-        BigInteger(value)
+    /// Construct from any string-like value containing the decimal digits.
+    pub fn new(digits: impl Into<String>) -> Self {
+        BigInteger(digits.into())
     }
 
-    /// Parse from a decimal-digit string. Returns `None` on parse failure.
-    pub fn parse(digits: &str) -> Option<Self> {
-        digits.parse::<BigInt>().ok().map(BigInteger)
-    }
-
-    /// Borrow the inner `BigInt`.
-    pub fn as_bigint(&self) -> &BigInt {
+    /// The underlying digit string, e.g. `"-123"` or `"99999999999999999999"`.
+    pub fn as_str(&self) -> &str {
         &self.0
     }
-
-    /// Consume into the inner `BigInt`.
-    pub fn into_bigint(self) -> BigInt {
-        self.0
-    }
-
-    /// Render as a decimal-digit string.
-    pub fn to_decimal_string(&self) -> String {
-        self.0.to_str_radix(10)
-    }
 }
 
-impl From<BigInt> for BigInteger {
-    fn from(value: BigInt) -> Self {
-        BigInteger(value)
-    }
-}
-
-impl From<i64> for BigInteger {
-    fn from(value: i64) -> Self {
-        BigInteger(BigInt::from(value))
-    }
-}
-
-/// Arbitrary-precision real — Wolfram Language `BigReal`.
-///
-/// No widely-adopted Rust crate matches Wolfram's BigReal semantics (which carry
-/// both a value and a precision). The wire representation in WXF is a digit string
-/// like `"3.14159265358979323846`50."` — we preserve it as `digits` (a `String`)
-/// for lossless WXF round-trip plus an optional `precision` annotation.
+/// Wolfram Language `BigReal` — arbitrary-precision real carried as its WL
+/// textual representation, including any precision/accuracy markers
+/// (e.g. `"3.14159265358979323846`50."`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BigReal {
-    /// The textual representation, including any precision marker (e.g. `` `50 ``).
-    pub digits: String,
-}
+pub struct BigReal(pub String);
 
 impl BigReal {
-    /// Construct from the WXF wire representation (a digit string).
+    /// Construct from any string-like value containing the WL textual representation.
     pub fn new(digits: impl Into<String>) -> Self {
-        BigReal {
-            digits: digits.into(),
-        }
+        BigReal(digits.into())
     }
 
-    /// Borrow the digit string.
+    /// The underlying digit string with any precision/accuracy markers preserved.
     pub fn as_str(&self) -> &str {
-        &self.digits
-    }
-
-    /// Consume into the digit string.
-    pub fn into_string(self) -> String {
-        self.digits
-    }
-}
-
-impl From<String> for BigReal {
-    fn from(digits: String) -> Self {
-        BigReal { digits }
-    }
-}
-
-impl From<&str> for BigReal {
-    fn from(digits: &str) -> Self {
-        BigReal {
-            digits: digits.to_owned(),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn big_integer_parse_and_render() {
-        let huge = "12345678901234567890123456789012345678901234567890";
-        let n = BigInteger::parse(huge).unwrap();
-        assert_eq!(n.to_decimal_string(), huge);
-    }
-
-    #[test]
-    fn big_integer_from_i64() {
-        let n: BigInteger = 42i64.into();
-        assert_eq!(n.to_decimal_string(), "42");
-    }
-
-    #[test]
-    fn big_integer_negative() {
-        let n = BigInteger::parse("-99999999999999999999").unwrap();
-        assert_eq!(n.to_decimal_string(), "-99999999999999999999");
-    }
-
-    #[test]
-    fn big_real_construct() {
-        let r = BigReal::new("3.14159265358979323846`50.");
-        assert_eq!(r.as_str(), "3.14159265358979323846`50.");
+        &self.0
     }
 }

@@ -201,16 +201,12 @@ fn rejects_truncated_header() {
 fn rejects_wrong_version() {
     assert!(import(b"7:", Format::Wxf).is_err());
 }
-
-#[cfg(feature = "bignum")]
 #[test]
 fn big_integer_roundtrip() {
     use wolfram_expr::BigInteger;
-    let huge = BigInteger::parse("99999999999999999999999999999999999999999").unwrap();
+    let huge = BigInteger::new("99999999999999999999999999999999999999999");
     roundtrip(Expr::from(huge));
 }
-
-#[cfg(feature = "bignum")]
 #[test]
 fn big_real_roundtrip() {
     use wolfram_expr::BigReal;

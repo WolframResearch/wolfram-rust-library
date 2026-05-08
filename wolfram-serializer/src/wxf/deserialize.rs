@@ -6,8 +6,6 @@ use std::io::{Cursor, Read};
 use flate2::read::ZlibDecoder;
 
 use wolfram_expr::{NumericArray, PackedArray, PackedArrayDataType};
-
-#[cfg(feature = "bignum")]
 use wolfram_expr::{BigInteger, BigReal};
 
 use crate::consumer::WolframConsumer;
@@ -165,38 +163,16 @@ fn parse_one<R: Read, C: WolframConsumer>(r: &mut R, c: &mut C) -> Result<C::Val
         TOKEN_BIG_INTEGER => {
             let len = read_varint(r)? as usize;
             let bytes = read_exact_n(r, len)?;
-            let s = std::str::from_utf8(&bytes)
+            let s = String::from_utf8(bytes)
                 .map_err(|_| Error::InvalidWxf("BigInteger payload not valid UTF-8".into()))?;
-            #[cfg(feature = "bignum")]
-            {
-                let bi = BigInteger::parse(s)
-                    .ok_or_else(|| Error::InvalidWxf(format!("invalid BigInteger digits: {:?}", s)))?;
-                c.consume_big_integer(bi)
-            }
-            #[cfg(not(feature = "bignum"))]
-            {
-                Err(Error::InvalidWxf(format!(
-                    "BigInteger ({:?}) requires the `bignum` feature to deserialize",
-                    s
-                )))
-            }
+            c.consume_big_integer(BigInteger::new(s))
         }
         TOKEN_BIG_REAL => {
             let len = read_varint(r)? as usize;
             let bytes = read_exact_n(r, len)?;
-            let s = std::str::from_utf8(&bytes)
+            let s = String::from_utf8(bytes)
                 .map_err(|_| Error::InvalidWxf("BigReal payload not valid UTF-8".into()))?;
-            #[cfg(feature = "bignum")]
-            {
-                c.consume_big_real(BigReal::new(s))
-            }
-            #[cfg(not(feature = "bignum"))]
-            {
-                Err(Error::InvalidWxf(format!(
-                    "BigReal ({:?}) requires the `bignum` feature to deserialize",
-                    s
-                )))
-            }
+            c.consume_big_real(BigReal::new(s))
         }
         TOKEN_RULE | TOKEN_RULE_DELAYED => Err(Error::InvalidWxf(format!(
             "unexpected Rule/RuleDelayed token outside Association: {:?}",

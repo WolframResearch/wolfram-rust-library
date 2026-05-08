@@ -150,18 +150,14 @@ fn display_of_new_variants_is_non_empty() {
     assert!(format!("{}", na).contains("NumericArray"));
     assert!(format!("{}", pa).contains("PackedArray"));
 }
-
-#[cfg(feature = "bignum")]
 #[test]
 fn big_integer_variant_roundtrip() {
     use crate::BigInteger;
-    let huge = BigInteger::parse("999999999999999999999999999999").unwrap();
+    let huge = BigInteger::new("999999999999999999999999999999");
     let expr = Expr::from(huge.clone());
     assert!(matches!(expr.kind(), ExprKind::BigInteger(_)));
     assert_eq!(expr.try_as_big_integer(), Some(&huge));
 }
-
-#[cfg(feature = "bignum")]
 #[test]
 fn big_real_variant_roundtrip() {
     use crate::BigReal;

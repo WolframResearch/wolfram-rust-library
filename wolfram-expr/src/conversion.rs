@@ -82,7 +82,6 @@ impl Expr {
     }
 
     /// If this is a [`BigInteger`] expression, return that. Otherwise return None.
-    #[cfg(feature = "bignum")]
     pub fn try_as_big_integer(&self) -> Option<&BigInteger> {
         match self.kind() {
             ExprKind::BigInteger(ref n) => Some(n),
@@ -91,7 +90,6 @@ impl Expr {
     }
 
     /// If this is a [`BigReal`] expression, return that. Otherwise return None.
-    #[cfg(feature = "bignum")]
     pub fn try_as_big_real(&self) -> Option<&BigReal> {
         match self.kind() {
             ExprKind::BigReal(ref r) => Some(r),
@@ -271,8 +269,6 @@ impl From<PackedArray> for Expr {
         }
     }
 }
-
-#[cfg(feature = "bignum")]
 impl From<BigInteger> for Expr {
     fn from(n: BigInteger) -> Expr {
         Expr {
@@ -280,8 +276,6 @@ impl From<BigInteger> for Expr {
         }
     }
 }
-
-#[cfg(feature = "bignum")]
 impl From<BigReal> for Expr {
     fn from(r: BigReal) -> Expr {
         Expr {

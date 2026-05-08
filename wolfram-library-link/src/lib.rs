@@ -280,7 +280,6 @@ pub use wolfram_expr::{
     PackedArrayElement,
 };
 pub use wolfram_expr::NumericArray as OwnedNumericArray;
-#[cfg(feature = "bignum")]
 pub use wolfram_expr::{BigInteger, BigReal};
 
 

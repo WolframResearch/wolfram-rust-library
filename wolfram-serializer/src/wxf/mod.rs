@@ -9,8 +9,6 @@ use std::io::Write;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
-
-#[cfg(feature = "bignum")]
 use wolfram_expr::{BigInteger, BigReal};
 
 use crate::serializer::{Serializer, ToWolfram};
@@ -187,14 +185,9 @@ impl<'w, W: Write> Serializer for WxfSerializer<'w, W> {
         self.out.write_all(bytes)?;
         Ok(())
     }
-
-    #[cfg(feature = "bignum")]
     fn serialize_big_integer(&mut self, n: &BigInteger) -> Result<(), Error> {
-        let s = n.to_decimal_string();
-        write_length_prefixed_bytes(self.out, TOKEN_BIG_INTEGER, s.as_bytes())
+        write_length_prefixed_bytes(self.out, TOKEN_BIG_INTEGER, n.as_str().as_bytes())
     }
-
-    #[cfg(feature = "bignum")]
     fn serialize_big_real(&mut self, r: &BigReal) -> Result<(), Error> {
         write_length_prefixed_bytes(self.out, TOKEN_BIG_REAL, r.as_str().as_bytes())
     }

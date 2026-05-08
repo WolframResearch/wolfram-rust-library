@@ -11,8 +11,6 @@ mod conversion;
 mod numeric_array;
 mod packed_array;
 mod ptr_cmp;
-
-#[cfg(feature = "bignum")]
 mod bignum;
 
 pub mod symbol;
@@ -43,8 +41,6 @@ pub use self::numeric_array::{
     NumericArray, NumericArrayDataType, NumericArrayElement, NumericArrayRead,
 };
 pub use self::packed_array::{PackedArray, PackedArrayDataType, PackedArrayElement};
-
-#[cfg(feature = "bignum")]
 pub use self::bignum::{BigInteger, BigReal};
 
 #[cfg(feature = "unstable_parse")]
@@ -318,9 +314,7 @@ pub enum ExprKind<E = Expr> {
     Association(Association),
     NumericArray(NumericArray),
     PackedArray(PackedArray),
-    #[cfg(feature = "bignum")]
     BigInteger(BigInteger),
-    #[cfg(feature = "bignum")]
     BigReal(BigReal),
 }
 
@@ -484,9 +478,7 @@ impl fmt::Display for ExprKind {
                     arr.data_type().name(),
                 )
             },
-            #[cfg(feature = "bignum")]
-            ExprKind::BigInteger(ref n) => write!(f, "{}", n.to_decimal_string()),
-            #[cfg(feature = "bignum")]
+            ExprKind::BigInteger(ref n) => write!(f, "{}", n.as_str()),
             ExprKind::BigReal(ref r) => write!(f, "{}", r.as_str()),
         }
     }

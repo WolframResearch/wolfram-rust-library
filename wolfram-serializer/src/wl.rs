@@ -4,8 +4,6 @@
 use std::io::Write;
 
 use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
-
-#[cfg(feature = "bignum")]
 use wolfram_expr::{BigInteger, BigReal};
 
 use crate::serializer::{Serializer, ToWolfram};
@@ -172,14 +170,10 @@ impl<'w, W: Write> Serializer for WlSerializer<'w, W> {
         self.out.write_all(b"]")?;
         Ok(())
     }
-
-    #[cfg(feature = "bignum")]
     fn serialize_big_integer(&mut self, n: &BigInteger) -> Result<(), Error> {
-        self.out.write_all(n.to_decimal_string().as_bytes())?;
+        self.out.write_all(n.as_str().as_bytes())?;
         Ok(())
     }
-
-    #[cfg(feature = "bignum")]
     fn serialize_big_real(&mut self, r: &BigReal) -> Result<(), Error> {
         self.out.write_all(r.as_str().as_bytes())?;
         Ok(())

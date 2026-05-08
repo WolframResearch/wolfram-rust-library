@@ -9,11 +9,6 @@ description = "Serialize and deserialize Wolfram expressions to/from WL InputFor
 keywords = ["wolfram", "wxf", "wolfram-language", "serialization", "mathematica"]
 categories = ["encoding"]
 
-[features]
-default = []
-# Forward to wolfram-expr/bignum to enable BigInteger / BigReal serialization.
-bignum = ["wolfram-expr/bignum"]
-
 [dependencies]
 wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
 # zlib for the optional WXF compressed payload (`8C:` header). Pure-Rust backend

@@ -18,11 +18,5 @@ default = []
 # expression parsing on top of it.
 unstable_parse = []
 
-# Enable arbitrary-precision number variants (BigInteger, BigReal) on ExprKind. Pulls
-# `num-bigint` for the integer side. Off by default to keep the lean baseline lean.
-bignum = ["dep:num-bigint", "dep:num-traits"]
-
 [dependencies]
 ordered-float = "3.4.0"
-num-bigint = { version = "0.4", optional = true }
-num-traits = { version = "0.2", optional = true }

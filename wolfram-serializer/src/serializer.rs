@@ -6,8 +6,6 @@ use wolfram_expr::{
     ArrayBuf, Association, Expr, ExprKind, NumericArray, NumericArrayDataType,
     NumericArrayElement, PackedArray, PackedArrayDataType, Symbol,
 };
-
-#[cfg(feature = "bignum")]
 use wolfram_expr::{BigInteger, BigReal};
 
 /// Format-specific serializer: knows how to lay out atoms and compounds for a particular
@@ -71,11 +69,9 @@ pub trait Serializer {
     //---- arbitrary precision (feature-gated) ----
 
     /// Write a BigInteger.
-    #[cfg(feature = "bignum")]
     fn serialize_big_integer(&mut self, n: &BigInteger) -> Result<(), Error>;
 
     /// Write a BigReal.
-    #[cfg(feature = "bignum")]
     fn serialize_big_real(&mut self, r: &BigReal) -> Result<(), Error>;
 }
 
@@ -266,15 +262,11 @@ impl ToWolfram for Association {
         s.serialize_association(&entries)
     }
 }
-
-#[cfg(feature = "bignum")]
 impl ToWolfram for BigInteger {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
         s.serialize_big_integer(self)
     }
 }
-
-#[cfg(feature = "bignum")]
 impl ToWolfram for BigReal {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
         s.serialize_big_real(self)
@@ -309,9 +301,7 @@ impl ToWolfram for Expr {
                 ArrayBuf::dimensions(arr),
                 ArrayBuf::as_bytes(arr),
             ),
-            #[cfg(feature = "bignum")]
             ExprKind::BigInteger(n) => s.serialize_big_integer(n),
-            #[cfg(feature = "bignum")]
             ExprKind::BigReal(r) => s.serialize_big_real(r),
             other => Err(Error::Consumer(format!(
                 "ToWolfram for Expr: unhandled ExprKind variant: {:?}",
