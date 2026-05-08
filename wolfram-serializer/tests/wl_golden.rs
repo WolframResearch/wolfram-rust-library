@@ -1,6 +1,6 @@
 //! WL InputForm golden output tests.
 
-use wolfram_expr::{Association, ByteArray, Expr, NumericArray, Symbol};
+use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
 use wolfram_serializer::{export, Format};
 
 fn wl(expr: &Expr) -> String {
@@ -44,8 +44,8 @@ fn list_via_normal() {
 #[test]
 fn association_arrows() {
     let mut a = Association::new();
-    a.insert(Expr::from("a"), Expr::from(1));
-    a.insert_delayed(Expr::from("b"), Expr::from(2));
+    a.insert(Expr::from("a"), RuleEntry::rule(Expr::from(1)));
+    a.insert(Expr::from("b"), RuleEntry::rule_delayed(Expr::from(2)));
     // BTreeMap ordering: "a" before "b"
     assert_eq!(wl(&Expr::from(a)), r#"<|"a" -> 1, "b" :> 2|>"#);
 }

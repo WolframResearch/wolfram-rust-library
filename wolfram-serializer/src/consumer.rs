@@ -110,10 +110,11 @@ impl WolframConsumer for ExprConsumer {
         &mut self,
         entries: Vec<(Expr, Expr, bool)>,
     ) -> Result<Expr, Error> {
-        let mut a = Association::new();
-        for (k, v, delayed) in entries {
-            a.insert_entry(k, RuleEntry { value: v, delayed });
-        }
+        // Collect into the BTreeMap directly — single allocation.
+        let a: Association = entries
+            .into_iter()
+            .map(|(k, v, delayed)| (k, RuleEntry { value: v, delayed }))
+            .collect();
         Ok(Expr::from(a))
     }
 

@@ -8,7 +8,7 @@
 
 use std::process::Command;
 
-use wolfram_expr::{Association, ByteArray, Expr, NumericArray, Symbol};
+use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
 use wolfram_serializer::{export, import, Format};
 
 fn wolframscript_available() -> bool {
@@ -233,8 +233,8 @@ fn import_struct_check() {
         return;
     }
     let mut a = Association::new();
-    a.insert(Expr::from("a"), Expr::from(1));
-    a.insert_delayed(Expr::from("b"), Expr::from(2));
+    a.insert(Expr::from("a"), RuleEntry::rule(Expr::from(1)));
+    a.insert(Expr::from("b"), RuleEntry::rule_delayed(Expr::from(2)));
     let expected = Expr::from(a);
 
     let bytes_from_wl = wl_to_wxf(r#"<|"a" -> 1, "b" :> 2|>"#);
