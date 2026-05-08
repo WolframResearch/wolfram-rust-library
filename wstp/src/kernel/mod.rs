@@ -77,6 +77,9 @@ pub struct WolframKernelProcess {
 
 /// Wolfram Kernel process error.
 #[derive(Debug)]
+// The wrapped String is read via the derived Debug impl when the error is
+// printed — Rust's dead-code analysis discounts that, hence the allow.
+#[allow(dead_code)]
 pub struct Error(String);
 
 impl From<WstpError> for Error {

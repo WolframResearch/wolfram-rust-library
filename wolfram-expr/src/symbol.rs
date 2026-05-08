@@ -195,19 +195,19 @@ impl Symbol {
     }
 
     /// Get a borrowed [`SymbolRef`] from this [`Symbol`].
-    pub fn as_symbol_ref(&self) -> SymbolRef {
+    pub fn as_symbol_ref(&self) -> SymbolRef<'_> {
         let Symbol(arc_string) = self;
 
         SymbolRef(arc_string.as_str())
     }
 
     /// Get the context path part of a symbol as an [`ContextRef`].
-    pub fn context(&self) -> ContextRef {
+    pub fn context(&self) -> ContextRef<'_> {
         self.as_symbol_ref().context()
     }
 
     /// Get the symbol name part of a symbol as a [`SymbolNameRef`].
-    pub fn symbol_name(&self) -> SymbolNameRef {
+    pub fn symbol_name(&self) -> SymbolNameRef<'_> {
         self.as_symbol_ref().symbol_name()
     }
 }
@@ -223,7 +223,7 @@ impl SymbolName {
     }
 
     /// Get a borrowed [`SymbolNameRef`] from this `SymbolName`.
-    pub fn as_symbol_name_ref(&self) -> SymbolNameRef {
+    pub fn as_symbol_name_ref(&self) -> SymbolNameRef<'_> {
         SymbolNameRef(self.as_str())
     }
 }
@@ -303,7 +303,7 @@ impl Context {
     /// assert!(components[1].as_str() == "Sub");
     /// assert!(components[2].as_str() == "Module");
     /// ```
-    pub fn components(&self) -> Vec<SymbolNameRef> {
+    pub fn components(&self) -> Vec<SymbolNameRef<'_>> {
         let Context(string) = self;
 
         let comps: Vec<SymbolNameRef> = string
@@ -320,7 +320,7 @@ impl Context {
     }
 
     /// Get a borrowed [`ContextRef`] from this `Context`.
-    pub fn as_context_ref(&self) -> ContextRef {
+    pub fn as_context_ref(&self) -> ContextRef<'_> {
         ContextRef(self.as_str())
     }
 
@@ -349,7 +349,7 @@ impl RelativeContext {
     /// assert!(components[0].as_str() == "Sub");
     /// assert!(components[1].as_str() == "Module");
     /// ```
-    pub fn components(&self) -> Vec<SymbolNameRef> {
+    pub fn components(&self) -> Vec<SymbolNameRef<'_>> {
         let RelativeContext(string) = self;
 
         let comps: Vec<SymbolNameRef> = string

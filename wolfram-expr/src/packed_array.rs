@@ -38,8 +38,9 @@ pub struct PackedArrayDataType(NumericArrayDataType);
 
 /// The 8 packed-compatible variants of [`NumericArrayDataType`] re-exported as
 /// associated constants — gives users `PackedArrayDataType::Integer8` syntax
-/// (and pattern matching) without re-declaring the variant list.
-#[allow(non_upper_case_globals)]
+/// (and pattern matching) without re-declaring the variant list. Each constant
+/// is documented by its corresponding [`NumericArrayDataType`] variant.
+#[allow(non_upper_case_globals, missing_docs)]
 impl PackedArrayDataType {
     pub const Integer8: Self = Self(NumericArrayDataType::Integer8);
     pub const Integer16: Self = Self(NumericArrayDataType::Integer16);

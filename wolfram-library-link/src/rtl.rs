@@ -3,6 +3,10 @@
 //! Attempting to call these bindings will result in a panic if
 //! [`initialize()`][crate::initialize] has not been called.
 
+// The bindings here mirror C function signatures verbatim (parameter names and
+// all), so camelCase identifiers like `asyncTaskID` are unavoidable.
+#![allow(non_snake_case)]
+
 use std::{ffi::c_void, os::raw::c_int};
 
 use once_cell::sync::Lazy;

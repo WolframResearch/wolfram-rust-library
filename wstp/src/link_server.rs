@@ -270,7 +270,7 @@ impl LinkServer {
     ///
     /// The returned iterator will never return None. Iterating over it is equivalent to
     /// calling [`LinkServer::accept`] in a loop.
-    pub fn incoming(&self) -> Incoming {
+    pub fn incoming(&self) -> Incoming<'_> {
         Incoming { server: self }
     }
 

@@ -142,11 +142,6 @@ fn use_pregenerated_bindings(
         panic!("<See printed error>");
     }
 
-    println!(
-        "cargo:warning=info: using pre-generated bindings for WSTP ({wolfram_version}, {target_system_id}): {}",
-        bindings_path.display()
-    );
-
     bindings_path
 }
 
@@ -174,11 +169,6 @@ fn link_to_wstp(app: Option<&WolframApp>) {
     let static_lib = wolfram_app_discovery::build_scripts::wstp_static_library_path(app)
         .expect("unable to get WSTP static library path")
         .into_path_buf();
-
-    println!(
-        "cargo:warning=info: linking to WSTP static lib from: {}",
-        static_lib.display()
-    );
 
     link_wstp_statically(&static_lib);
 

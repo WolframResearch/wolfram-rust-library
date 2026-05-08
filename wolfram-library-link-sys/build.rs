@@ -93,11 +93,6 @@ fn make_bindings_path(wolfram_version: WolframVersion, system_id: SystemID) -> P
         .join(system_id.as_str())
         .join("LibraryLink_bindings.rs");
 
-    println!(
-        "cargo:warning=info: using LibraryLink bindings from: {}",
-        bindings_path.display()
-    );
-
     let absolute_bindings_path =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join(&bindings_path);
 
