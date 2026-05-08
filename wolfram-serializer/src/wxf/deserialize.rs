@@ -206,23 +206,11 @@ fn parse_packed_array<R: Read>(r: &mut R) -> Result<PackedArray, Error> {
     let dt = array_type_from_wxf(type_byte).ok_or_else(|| {
         Error::InvalidWxf(format!("unknown PackedArray element type: 0x{:02X}", type_byte))
     })?;
-    // Bridge to PackedArrayDataType (PackedArray's narrower set):
-    let pdt = match dt {
-        wolfram_expr::NumericArrayDataType::Integer8 => PackedArrayDataType::Integer8,
-        wolfram_expr::NumericArrayDataType::Integer16 => PackedArrayDataType::Integer16,
-        wolfram_expr::NumericArrayDataType::Integer32 => PackedArrayDataType::Integer32,
-        wolfram_expr::NumericArrayDataType::Integer64 => PackedArrayDataType::Integer64,
-        wolfram_expr::NumericArrayDataType::Real32 => PackedArrayDataType::Real32,
-        wolfram_expr::NumericArrayDataType::Real64 => PackedArrayDataType::Real64,
-        wolfram_expr::NumericArrayDataType::ComplexReal32 => PackedArrayDataType::ComplexReal32,
-        wolfram_expr::NumericArrayDataType::ComplexReal64 => PackedArrayDataType::ComplexReal64,
-        other => {
-            return Err(Error::InvalidWxf(format!(
-                "PackedArray does not support element type {:?}",
-                other
-            )))
-        }
-    };
+    // PackedArray's element-type set is a strict subset of NumericArray's —
+    // try_new validates and rejects the unsigned-integer variants.
+    let pdt = PackedArrayDataType::try_new(dt).ok_or_else(|| {
+        Error::InvalidWxf(format!("PackedArray does not support element type {:?}", dt))
+    })?;
     let rank = read_varint(r)? as usize;
     let mut dims = Vec::with_capacity(rank);
     for _ in 0..rank {

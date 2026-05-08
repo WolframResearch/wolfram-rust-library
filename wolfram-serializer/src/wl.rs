@@ -152,21 +152,8 @@ impl<'w, W: Write> Serializer for WlSerializer<'w, W> {
         _dimensions: &[usize],
         bytes: &[u8],
     ) -> Result<(), Error> {
-        // Bridge PackedArrayDataType → NumericArrayDataType for shared writer.
-        // (We use data_type as a proxy for the element width; NumericArrayDataType
-        // is a strict superset.)
-        let dt: NumericArrayDataType = match data_type {
-            PackedArrayDataType::Integer8 => NumericArrayDataType::Integer8,
-            PackedArrayDataType::Integer16 => NumericArrayDataType::Integer16,
-            PackedArrayDataType::Integer32 => NumericArrayDataType::Integer32,
-            PackedArrayDataType::Integer64 => NumericArrayDataType::Integer64,
-            PackedArrayDataType::Real32 => NumericArrayDataType::Real32,
-            PackedArrayDataType::Real64 => NumericArrayDataType::Real64,
-            PackedArrayDataType::ComplexReal32 => NumericArrayDataType::ComplexReal32,
-            PackedArrayDataType::ComplexReal64 => NumericArrayDataType::ComplexReal64,
-        };
         self.out.write_all(b"Developer`ToPackedArray[")?;
-        write_array_data_as_list(self, dt, bytes)?;
+        write_array_data_as_list(self, data_type.into_numeric(), bytes)?;
         self.out.write_all(b"]")?;
         Ok(())
     }

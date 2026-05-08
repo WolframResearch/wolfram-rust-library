@@ -166,18 +166,7 @@ impl<'w, W: Write> Serializer for WxfSerializer<'w, W> {
         bytes: &[u8],
     ) -> Result<(), Error> {
         self.out.write_all(&[TOKEN_PACKED_ARRAY])?;
-        // Bridge PackedArrayDataType → NumericArrayDataType for the wire byte.
-        let na_dt: NumericArrayDataType = match data_type {
-            PackedArrayDataType::Integer8 => NumericArrayDataType::Integer8,
-            PackedArrayDataType::Integer16 => NumericArrayDataType::Integer16,
-            PackedArrayDataType::Integer32 => NumericArrayDataType::Integer32,
-            PackedArrayDataType::Integer64 => NumericArrayDataType::Integer64,
-            PackedArrayDataType::Real32 => NumericArrayDataType::Real32,
-            PackedArrayDataType::Real64 => NumericArrayDataType::Real64,
-            PackedArrayDataType::ComplexReal32 => NumericArrayDataType::ComplexReal32,
-            PackedArrayDataType::ComplexReal64 => NumericArrayDataType::ComplexReal64,
-        };
-        self.out.write_all(&[array_type_to_wxf(na_dt)])?;
+        self.out.write_all(&[array_type_to_wxf(data_type.into_numeric())])?;
         write_varint(self.out, dimensions.len() as u64)?;
         for d in dimensions {
             write_varint(self.out, *d as u64)?;

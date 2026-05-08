@@ -11,53 +11,91 @@
 //!
 //! [ref/PackedArray]: https://reference.wolfram.com/language/ref/Developer/PackedArrayQ.html
 
+use std::convert::TryFrom;
+
 use crate::array_buf::{ArrayBuf, ArrayElement, ArrayTag};
 use crate::NumericArrayDataType;
 
 /// Element-type tag for a [`PackedArray`].
 ///
-/// Subset of [`NumericArrayDataType`][crate::NumericArrayDataType] — only the types
-/// that the Wolfram Language treats as valid packed-array element types.
+/// Validating newtype wrapper around [`NumericArrayDataType`] — guaranteed by
+/// construction to hold only a packed-compatible variant (no unsigned-integer
+/// variants). This makes the "packed-array element types are a strict subset
+/// of numeric-array element types" relationship a type-level invariant: the
+/// 8 valid variants are exposed below as associated constants, and there's
+/// no other way to construct a `PackedArrayDataType` directly.
+///
+/// Pattern matching works through the constants:
+/// ```ignore
+/// match pdt {
+///     PackedArrayDataType::Integer8 => ...,
+///     PackedArrayDataType::Real64 => ...,
+///     // etc.
+/// }
+/// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-#[allow(missing_docs)]
-pub enum PackedArrayDataType {
-    Integer8 = 0,
-    Integer16 = 1,
-    Integer32 = 2,
-    Integer64 = 3,
-    Real32 = 4,
-    Real64 = 5,
-    ComplexReal32 = 6,
-    ComplexReal64 = 7,
+pub struct PackedArrayDataType(NumericArrayDataType);
+
+/// The 8 packed-compatible variants of [`NumericArrayDataType`] re-exported as
+/// associated constants — gives users `PackedArrayDataType::Integer8` syntax
+/// (and pattern matching) without re-declaring the variant list.
+#[allow(non_upper_case_globals)]
+impl PackedArrayDataType {
+    pub const Integer8: Self = Self(NumericArrayDataType::Integer8);
+    pub const Integer16: Self = Self(NumericArrayDataType::Integer16);
+    pub const Integer32: Self = Self(NumericArrayDataType::Integer32);
+    pub const Integer64: Self = Self(NumericArrayDataType::Integer64);
+    pub const Real32: Self = Self(NumericArrayDataType::Real32);
+    pub const Real64: Self = Self(NumericArrayDataType::Real64);
+    pub const ComplexReal32: Self = Self(NumericArrayDataType::ComplexReal32);
+    pub const ComplexReal64: Self = Self(NumericArrayDataType::ComplexReal64);
 }
 
 impl PackedArrayDataType {
-    /// Element size in bytes.
-    pub fn size_in_bytes(&self) -> usize {
-        match *self {
-            PackedArrayDataType::Integer8 => 1,
-            PackedArrayDataType::Integer16 => 2,
-            PackedArrayDataType::Integer32 | PackedArrayDataType::Real32 => 4,
-            PackedArrayDataType::Integer64
-            | PackedArrayDataType::Real64
-            | PackedArrayDataType::ComplexReal32 => 8,
-            PackedArrayDataType::ComplexReal64 => 16,
+    /// Try to wrap a [`NumericArrayDataType`] as a packed-array data type.
+    /// Returns `None` for the unsigned-integer variants, which packed arrays
+    /// don't support.
+    pub const fn try_new(dt: NumericArrayDataType) -> Option<Self> {
+        if dt.is_packed_compatible() {
+            Some(Self(dt))
+        } else {
+            None
         }
     }
 
-    /// Wolfram Language name (e.g. `"Integer32"`, `"Real64"`).
+    /// The underlying [`NumericArrayDataType`].
+    pub const fn into_numeric(self) -> NumericArrayDataType {
+        self.0
+    }
+
+    /// Wolfram Language name (e.g. `"Integer32"`, `"Real64"`). Delegates to
+    /// [`NumericArrayDataType::name`].
     pub fn name(&self) -> &'static str {
-        match *self {
-            PackedArrayDataType::Integer8 => "Integer8",
-            PackedArrayDataType::Integer16 => "Integer16",
-            PackedArrayDataType::Integer32 => "Integer32",
-            PackedArrayDataType::Integer64 => "Integer64",
-            PackedArrayDataType::Real32 => "Real32",
-            PackedArrayDataType::Real64 => "Real64",
-            PackedArrayDataType::ComplexReal32 => "ComplexReal32",
-            PackedArrayDataType::ComplexReal64 => "ComplexReal64",
-        }
+        self.0.name()
+    }
+
+    /// Element size in bytes. Delegates to [`NumericArrayDataType::size_in_bytes`].
+    pub fn size_in_bytes(&self) -> usize {
+        self.0.size_in_bytes()
+    }
+
+    /// Inverse of [`name`][Self::name]. Returns `None` for unknown strings or for
+    /// names that resolve to a non-packed-compatible variant.
+    pub fn from_name(s: &str) -> Option<Self> {
+        Self::try_new(NumericArrayDataType::from_name(s)?)
+    }
+}
+
+impl From<PackedArrayDataType> for NumericArrayDataType {
+    fn from(pdt: PackedArrayDataType) -> Self {
+        pdt.0
+    }
+}
+
+impl TryFrom<NumericArrayDataType> for PackedArrayDataType {
+    type Error = ();
+    fn try_from(dt: NumericArrayDataType) -> Result<Self, ()> {
+        Self::try_new(dt).ok_or(())
     }
 }
 
@@ -84,24 +122,13 @@ impl ArrayElement<PackedArrayDataType> for crate::complex::Complex64 { const TAG
 
 impl ArrayTag for PackedArrayDataType {
     fn size_in_bytes(self) -> usize {
-        Self::size_in_bytes(&self)
+        self.0.size_in_bytes()
     }
     fn name(self) -> &'static str {
-        Self::name(&self)
+        self.0.name()
     }
     fn to_numeric_array_data_type(self) -> NumericArrayDataType {
-        // PackedArray's element types are a strict subset of NumericArray's —
-        // the conversion is lossless.
-        match self {
-            PackedArrayDataType::Integer8 => NumericArrayDataType::Integer8,
-            PackedArrayDataType::Integer16 => NumericArrayDataType::Integer16,
-            PackedArrayDataType::Integer32 => NumericArrayDataType::Integer32,
-            PackedArrayDataType::Integer64 => NumericArrayDataType::Integer64,
-            PackedArrayDataType::Real32 => NumericArrayDataType::Real32,
-            PackedArrayDataType::Real64 => NumericArrayDataType::Real64,
-            PackedArrayDataType::ComplexReal32 => NumericArrayDataType::ComplexReal32,
-            PackedArrayDataType::ComplexReal64 => NumericArrayDataType::ComplexReal64,
-        }
+        self.0
     }
 }
 

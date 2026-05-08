@@ -90,6 +90,19 @@ impl NumericArrayDataType {
         self as u32
     }
 
+    /// Whether this variant is valid as a [`PackedArrayDataType`][crate::PackedArrayDataType] —
+    /// i.e. is also a packed-array element type. PackedArray's element-type set
+    /// is the strict subset that excludes the unsigned-integer variants.
+    pub const fn is_packed_compatible(self) -> bool {
+        !matches!(
+            self,
+            NumericArrayDataType::UnsignedInteger8
+                | NumericArrayDataType::UnsignedInteger16
+                | NumericArrayDataType::UnsignedInteger32
+                | NumericArrayDataType::UnsignedInteger64
+        )
+    }
+
     /// Inverse of [`name()`][Self::name]. Returns `None` for unknown strings.
     pub fn from_name(s: &str) -> Option<Self> {
         Some(match s {
