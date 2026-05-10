@@ -12,7 +12,6 @@
 
 #![warn(missing_docs)]
 
-pub mod consumer;
 pub mod from_wolfram;
 pub mod serializer;
 pub mod wl;
@@ -34,9 +33,9 @@ use std::io::Write;
 use wolfram_expr::Expr;
 pub use wolfram_expr::NumericArrayDataType;
 
-pub use crate::consumer::{ExprConsumer, WolframConsumer};
 pub use crate::from_wolfram::FromWolfram;
 pub use crate::serializer::{Serializer, ToWolfram};
+pub use crate::wxf::cursor::WxfCursor;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
 pub use wolfram_serializer_macros::{FromWolfram, ToWolfram};
@@ -179,35 +178,26 @@ pub fn to_wxf<T: ToWolfram + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
     export(value, Format::Wxf)
 }
 
-/// Deserialize WXF bytes into a typed `T` via [`FromWolfram`]. Reads the wire
-/// stream into an intermediate [`Expr`], then dispatches to
-/// `<T as FromWolfram>::from_wolfram`.
+/// Deserialize WXF bytes directly into a typed `T` via [`FromWolfram`].
+/// Streaming: no intermediate [`Expr`] tree is built unless `T == Expr` (in
+/// which case [`Expr::from_cursor`][FromWolfram::from_cursor] does the
+/// equivalent recursive descent).
 pub fn from_wxf<T: FromWolfram>(bytes: &[u8]) -> Result<T, Error> {
-    let expr = import(bytes, Format::Wxf)?;
-    T::from_wolfram(&expr)
+    let mut cursor = WxfCursor::new(bytes)?;
+    T::from_cursor(&mut cursor)
 }
 
-/// Deserialize `bytes` using `format`, returning an [`Expr`]. Uses the default
-/// [`ExprConsumer`].
+/// Deserialize `bytes` using `format`, returning an [`Expr`]. Drives a
+/// [`WxfCursor`] through `<Expr as FromWolfram>::from_cursor` — the same
+/// recursive descent that the old `ExprConsumer` produced.
 ///
-/// `format = Format::Wl` returns [`Error::UnsupportedImportFormat`] — text WL parsing
-/// is not implemented in V1.
+/// `format = Format::Wl` returns [`Error::UnsupportedImportFormat`] — text WL
+/// parsing is not implemented in V1.
 pub fn import(bytes: &[u8], format: Format) -> Result<Expr, Error> {
-    let mut c = ExprConsumer;
-    import_with(bytes, format, &mut c)
-}
-
-/// Deserialize `bytes` using `format` and a custom consumer. Returns the consumer's
-/// [`Value`][WolframConsumer::Value].
-pub fn import_with<C: WolframConsumer>(
-    bytes: &[u8],
-    format: Format,
-    consumer: &mut C,
-) -> Result<C::Value, Error> {
     match format {
         Format::Wl => Err(Error::UnsupportedImportFormat),
-        // The wire header (`8:` vs `8C:`) self-describes whether the payload is
-        // compressed, so both variants route through the same deserializer.
-        Format::Wxf | Format::WxfCompressed(_) => wxf::deserialize(bytes, consumer),
+        // The wire header (`8:` vs `8C:`) self-describes whether the payload
+        // is compressed, so both variants route through the same cursor.
+        Format::Wxf | Format::WxfCompressed(_) => from_wxf::<Expr>(bytes),
     }
 }

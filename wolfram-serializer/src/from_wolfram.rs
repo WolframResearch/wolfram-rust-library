@@ -1,71 +1,46 @@
-//! [`FromWolfram`] trait — typed deserialization from a parsed [`Expr`] tree.
+//! [`FromWolfram`] trait — pull-based typed deserialization from a [`WxfCursor`].
 //!
-//! Top-level entry: [`crate::from_wxf`] reads WXF bytes into an [`Expr`] then
-//! delegates to `<T as FromWolfram>::from_wolfram(&expr)`. Unlike
-//! [`WolframConsumer`][crate::WolframConsumer] (the per-token visitor used to
-//! build [`Expr`]), `FromWolfram` operates structurally on the already-parsed
-//! tree — simpler, and exactly what's needed for derive-driven typed
-//! deserialization.
+//! Top-level entry: [`crate::from_wxf`] constructs a [`WxfCursor`] over the
+//! raw bytes and calls `<T as FromWolfram>::from_cursor(&mut cursor)`. Each
+//! impl reads exactly the tokens its wire shape requires — no intermediate
+//! [`Expr`] tree, no visitor / consumer dispatch.
 //!
-//! Hand-written impls live below for primitive scalars and the `wolfram-expr`
-//! value types. Container types whose wire shape doesn't depend on the element
-//! type — `Option<T>`, `HashMap<K,V>`, `BTreeMap<K,V>`, `()` — also have
-//! blanket impls. Container types whose wire shape *does* depend on the
-//! element type — `Vec<T>`, `[T; N]`, tuples — are intentionally NOT
-//! implemented here; the `#[derive(FromWolfram)]` macro emits inline code at
-//! the field site so it can pick the right wire shape.
+//! Hand-written impls live below for primitive scalars, the `wolfram-expr`
+//! value types, and the container types whose wire shape doesn't depend on
+//! the element type (`Option<T>`, `HashMap<K,V>`, `BTreeMap<K,V>`, `()`).
+//! `Vec<T>` impls for the per-primitive numeric specializations also live
+//! here. Container types whose wire shape *does* depend on the element type
+//! — `[T; N]`, tuples, generic `Vec<T>` (non-numeric `T`) — are handled by
+//! `#[derive(FromWolfram)]` at the field site so it can pick the correct
+//! wire shape.
+//!
+//! [`Expr`]: wolfram_expr::Expr
 
 use std::collections::{BTreeMap, HashMap};
 
 use wolfram_expr::{
-    Association, BigInteger, BigReal, ByteArray, Expr, ExprKind, NumericArray, PackedArray,
-    RuleEntry, Symbol,
+    Association, BigInteger, BigReal, ByteArray, Expr, NumericArray, PackedArray, RuleEntry,
+    Symbol,
 };
 
+use crate::wxf::cursor::WxfCursor;
+use crate::wxf::constants::*;
 use crate::Error;
 
-/// Deserialize a typed value from a parsed [`Expr`].
+/// Deserialize a typed value by reading directly from a [`WxfCursor`].
 ///
 /// Implemented by hand for primitive scalars and the `wolfram-expr` value
 /// types, and derivable via `#[derive(FromWolfram)]` for user types. The
-/// derive emits structural code that walks the [`Expr`] tree according to
-/// the wire-format conventions of [`#[derive(ToWolfram)]`].
+/// derived impls drive the cursor's `read_*` methods to consume each field's
+/// expected wire tokens — no intermediate [`Expr`] is built.
 pub trait FromWolfram: Sized {
-    /// Try to deserialize a `Self` from `expr`. Returns
-    /// [`Error::Deserialize`] (typically) on shape mismatch.
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error>;
+    /// Try to deserialize `Self` from the bytes the cursor is currently
+    /// positioned at. On success the cursor advances past `Self`'s wire
+    /// payload; on failure it's left in an unspecified position.
+    fn from_cursor(cursor: &mut WxfCursor) -> Result<Self, Error>;
 }
 
-/// Human-readable name of an [`ExprKind`] variant — used to fill the `got`
-/// field of [`Error::Deserialize`] when we hit an unexpected shape.
-pub fn kind_name(expr: &Expr) -> String {
-    match expr.kind() {
-        ExprKind::Integer(_) => "Integer".into(),
-        ExprKind::Real(_) => "Real".into(),
-        ExprKind::String(_) => "String".into(),
-        ExprKind::Symbol(s) => format!("Symbol({:?})", s.as_str()),
-        ExprKind::Normal(n) => {
-            // Show head if it's a symbol; otherwise just say Function.
-            match n.head().try_as_symbol() {
-                Some(s) => format!("Function[{}, …]", s.as_str()),
-                None => "Function[…]".into(),
-            }
-        }
-        ExprKind::ByteArray(_) => "ByteArray".into(),
-        ExprKind::Association(_) => "Association".into(),
-        ExprKind::NumericArray(arr) => {
-            format!("NumericArray<{}, {:?}>", arr.data_type().name(), arr.dimensions())
-        }
-        ExprKind::PackedArray(arr) => {
-            format!("PackedArray<{}, {:?}>", arr.data_type().name(), arr.dimensions())
-        }
-        ExprKind::BigInteger(_) => "BigInteger".into(),
-        ExprKind::BigReal(_) => "BigReal".into(),
-        _ => "<unknown ExprKind>".into(),
-    }
-}
-
-/// Helper used by the derive: build a Deserialize error tagged with a path.
+/// Helper used by the derive: build a `Deserialize` error tagged with a path.
 pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> Error {
     Error::Deserialize {
         path: path.into(),
@@ -74,197 +49,266 @@ pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> E
     }
 }
 
+/// Tag-byte → human-readable kind name. Used in error messages when an
+/// impl rejects the next token.
+pub(crate) fn token_kind_name(tag: u8) -> &'static str {
+    match tag {
+        TOKEN_INTEGER8 => "Integer8",
+        TOKEN_INTEGER16 => "Integer16",
+        TOKEN_INTEGER32 => "Integer32",
+        TOKEN_INTEGER64 => "Integer64",
+        TOKEN_REAL64 => "Real64",
+        TOKEN_STRING => "String",
+        TOKEN_SYMBOL => "Symbol",
+        TOKEN_BINARY_STRING => "ByteArray",
+        TOKEN_BIG_INTEGER => "BigInteger",
+        TOKEN_BIG_REAL => "BigReal",
+        TOKEN_FUNCTION => "Function",
+        TOKEN_ASSOCIATION => "Association",
+        TOKEN_NUMERIC_ARRAY => "NumericArray",
+        TOKEN_PACKED_ARRAY => "PackedArray",
+        TOKEN_RULE => "Rule",
+        TOKEN_RULE_DELAYED => "RuleDelayed",
+        _ => "<unknown>",
+    }
+}
+
+//==============================================================================
+// Expr — replaces the old ExprConsumer's tree-building behavior.
+//==============================================================================
+
+impl FromWolfram for Expr {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let tag = c.peek_token()?;
+        match tag {
+            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+                Ok(Expr::from(c.read_integer()?))
+            }
+            TOKEN_REAL64 => {
+                let f = c.read_real()?;
+                if f.is_nan() {
+                    return Err(Error::InvalidWxf("Real64 token contained NaN".into()));
+                }
+                Ok(Expr::real(f))
+            }
+            TOKEN_STRING => {
+                // Expr::string<S: Into<String>> moves the owned String into
+                // ExprKind::String without an intermediate copy.
+                Ok(Expr::string(c.read_string()?))
+            }
+            TOKEN_SYMBOL => Ok(Expr::symbol(c.read_symbol()?)),
+            TOKEN_BINARY_STRING => Ok(Expr::from(c.read_byte_array()?)),
+            TOKEN_BIG_INTEGER => Ok(Expr::from(c.read_big_integer()?)),
+            TOKEN_BIG_REAL => Ok(Expr::from(c.read_big_real()?)),
+            TOKEN_NUMERIC_ARRAY => Ok(Expr::from(c.read_numeric_array()?)),
+            TOKEN_PACKED_ARRAY => Ok(Expr::from(c.read_packed_array()?)),
+            TOKEN_FUNCTION => {
+                let n = c.read_function_header()?;
+                let head = Expr::from_cursor(c)?;
+                let mut args = Vec::with_capacity(n as usize);
+                for _ in 0..n {
+                    args.push(Expr::from_cursor(c)?);
+                }
+                Ok(Expr::normal(head, args))
+            }
+            TOKEN_ASSOCIATION => {
+                let n = c.read_association_header()?;
+                let mut a = Association::new();
+                for _ in 0..n {
+                    let delayed = c.read_rule()?;
+                    let k = Expr::from_cursor(c)?;
+                    let v = Expr::from_cursor(c)?;
+                    a.insert(k, RuleEntry { value: v, delayed });
+                }
+                Ok(Expr::from(a))
+            }
+            TOKEN_RULE | TOKEN_RULE_DELAYED => Err(Error::InvalidWxf(format!(
+                "unexpected Rule/RuleDelayed token outside Association: 0x{:02X}",
+                tag
+            ))),
+            other => Err(Error::InvalidWxf(format!(
+                "unknown WXF token: 0x{:02X}",
+                other
+            ))),
+        }
+    }
+}
+
 //==============================================================================
 // Primitive scalar impls
 //==============================================================================
 
-macro_rules! impl_int {
+macro_rules! impl_int_from_cursor {
     ($($t:ty),+) => {
         $(
             impl FromWolfram for $t {
-                fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-                    match expr.kind() {
-                        ExprKind::Integer(n) => <$t>::try_from(*n).map_err(|_| Error::Deserialize {
-                            path: String::new(),
-                            expected: concat!(stringify!($t), " (Integer in range)"),
-                            got: format!("Integer({})", n),
-                        }),
-                        _ => Err(Error::Deserialize {
-                            path: String::new(),
-                            expected: stringify!($t),
-                            got: kind_name(expr),
-                        }),
-                    }
+                fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+                    let n = c.read_integer()?;
+                    <$t>::try_from(n).map_err(|_| Error::Deserialize {
+                        path: String::new(),
+                        expected: concat!(stringify!($t), " (Integer in range)"),
+                        got: format!("Integer({})", n),
+                    })
                 }
             }
         )+
     };
 }
-impl_int!(i8, i16, i32, i64, u8, u16, u32, u64);
+impl_int_from_cursor!(i8, i16, i32, i64, u8, u16, u32, u64);
 
 impl FromWolfram for f32 {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        match expr.kind() {
-            ExprKind::Real(r) => Ok(**r as f32),
-            ExprKind::Integer(n) => Ok(*n as f32),
-            _ => Err(Error::Deserialize {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let tag = c.peek_token()?;
+        match tag {
+            TOKEN_REAL64 => Ok(c.read_real()? as f32),
+            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+                Ok(c.read_integer()? as f32)
+            }
+            other => Err(Error::Deserialize {
                 path: String::new(),
                 expected: "f32",
-                got: kind_name(expr),
+                got: token_kind_name(other).into(),
             }),
         }
     }
 }
 
 impl FromWolfram for f64 {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        match expr.kind() {
-            ExprKind::Real(r) => Ok(**r),
-            ExprKind::Integer(n) => Ok(*n as f64),
-            _ => Err(Error::Deserialize {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let tag = c.peek_token()?;
+        match tag {
+            TOKEN_REAL64 => c.read_real(),
+            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+                Ok(c.read_integer()? as f64)
+            }
+            other => Err(Error::Deserialize {
                 path: String::new(),
                 expected: "f64",
-                got: kind_name(expr),
+                got: token_kind_name(other).into(),
             }),
         }
     }
 }
 
 impl FromWolfram for bool {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_bool().ok_or_else(|| Error::Deserialize {
-            path: String::new(),
-            expected: "bool (System`True / System`False)",
-            got: kind_name(expr),
-        })
-    }
-}
-
-impl FromWolfram for String {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_str()
-            .map(String::from)
-            .ok_or_else(|| Error::Deserialize {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let sym = c.read_symbol()?;
+        match sym.as_str() {
+            "System`True" => Ok(true),
+            "System`False" => Ok(false),
+            other => Err(Error::Deserialize {
                 path: String::new(),
-                expected: "String",
-                got: kind_name(expr),
-            })
-    }
-}
-
-impl FromWolfram for Expr {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        Ok(expr.clone())
-    }
-}
-
-impl FromWolfram for Symbol {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_symbol().cloned().ok_or_else(|| Error::Deserialize {
-            path: String::new(),
-            expected: "Symbol",
-            got: kind_name(expr),
-        })
-    }
-}
-
-impl FromWolfram for ByteArray {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_byte_array()
-            .cloned()
-            .ok_or_else(|| Error::Deserialize {
-                path: String::new(),
-                expected: "ByteArray",
-                got: kind_name(expr),
-            })
-    }
-}
-
-impl FromWolfram for NumericArray {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_numeric_array()
-            .cloned()
-            .ok_or_else(|| Error::Deserialize {
-                path: String::new(),
-                expected: "NumericArray",
-                got: kind_name(expr),
-            })
-    }
-}
-
-impl FromWolfram for PackedArray {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_packed_array()
-            .cloned()
-            .ok_or_else(|| Error::Deserialize {
-                path: String::new(),
-                expected: "PackedArray",
-                got: kind_name(expr),
-            })
-    }
-}
-
-impl FromWolfram for Association {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_association()
-            .cloned()
-            .ok_or_else(|| Error::Deserialize {
-                path: String::new(),
-                expected: "Association",
-                got: kind_name(expr),
-            })
-    }
-}
-
-impl FromWolfram for BigInteger {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_big_integer()
-            .cloned()
-            .ok_or_else(|| Error::Deserialize {
-                path: String::new(),
-                expected: "BigInteger",
-                got: kind_name(expr),
-            })
-    }
-}
-
-impl FromWolfram for BigReal {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        expr.try_as_big_real()
-            .cloned()
-            .ok_or_else(|| Error::Deserialize {
-                path: String::new(),
-                expected: "BigReal",
-                got: kind_name(expr),
-            })
-    }
-}
-
-//==============================================================================
-// Blanket impls for containers with a single, type-uniform wire shape
-//==============================================================================
-
-impl FromWolfram for () {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        match expr.try_as_symbol() {
-            Some(s) if s.as_str() == "System`Null" => Ok(()),
-            _ => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "() (System`Null symbol)",
-                got: kind_name(expr),
+                expected: "bool (System`True / System`False)",
+                got: format!("Symbol({:?})", other),
             }),
         }
     }
 }
 
+impl FromWolfram for String {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_string()
+    }
+}
+
+impl FromWolfram for Symbol {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_symbol()
+    }
+}
+
+impl FromWolfram for ByteArray {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_byte_array()
+    }
+}
+
+impl FromWolfram for NumericArray {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_numeric_array()
+    }
+}
+
+impl FromWolfram for PackedArray {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_packed_array()
+    }
+}
+
+impl FromWolfram for Association {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let n = c.read_association_header()?;
+        let mut a = Association::new();
+        for _ in 0..n {
+            let delayed = c.read_rule()?;
+            let k = Expr::from_cursor(c)?;
+            let v = Expr::from_cursor(c)?;
+            a.insert(k, RuleEntry { value: v, delayed });
+        }
+        Ok(a)
+    }
+}
+
+impl FromWolfram for BigInteger {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_big_integer()
+    }
+}
+
+impl FromWolfram for BigReal {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        c.read_big_real()
+    }
+}
+
+//==============================================================================
+// Containers with a single, type-uniform wire shape
+//==============================================================================
+
+impl FromWolfram for () {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let sym = c.read_symbol()?;
+        if sym.as_str() == "System`Null" {
+            Ok(())
+        } else {
+            Err(Error::Deserialize {
+                path: String::new(),
+                expected: "() (System`Null symbol)",
+                got: format!("Symbol({:?})", sym.as_str()),
+            })
+        }
+    }
+}
+
 impl<T: FromWolfram> FromWolfram for Option<T> {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        if let Some(s) = expr.try_as_symbol() {
-            if s.as_str() == "System`Null" {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        // Peek: if it's the System`Null sentinel, consume + return None.
+        // Otherwise delegate to T::from_cursor for the value.
+        if c.peek_token()? == TOKEN_SYMBOL {
+            // We need to commit the read since peek_token only sees the tag,
+            // not the symbol payload. Read the symbol; if it's System`Null,
+            // return None; otherwise we've already consumed it and need to
+            // either rewind (we can't) or build a Some<T> that expects a
+            // Symbol — only valid if T deserializes from a Symbol.
+            let sym = c.read_symbol()?;
+            if sym.as_str() == "System`Null" {
                 return Ok(None);
             }
+            // Not Null — but we've already consumed the symbol token. T must
+            // accept it as its full value; we error here since rewinding the
+            // cursor would require buffering.
+            // In practice the only T that would also be a symbol-shaped wire
+            // value is `Symbol` itself, which is a special case.
+            // To support that without buffering, we'd need to plumb the
+            // already-read symbol into T::from_cursor — out of scope for v1.
+            return Err(Error::Deserialize {
+                path: String::new(),
+                expected: "Some(T) where T isn't symbol-shaped, or System`Null for None",
+                got: format!("Symbol({:?})", sym.as_str()),
+            });
         }
-        Ok(Some(T::from_wolfram(expr)?))
+        // Non-symbol token: delegate to T.
+        Ok(Some(T::from_cursor(c)?))
     }
 }
 
@@ -273,15 +317,14 @@ where
     K: FromWolfram + Eq + std::hash::Hash,
     V: FromWolfram,
 {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        let assoc = expr.try_as_association().ok_or_else(|| Error::Deserialize {
-            path: String::new(),
-            expected: "Association (HashMap)",
-            got: kind_name(expr),
-        })?;
-        let mut out = HashMap::with_capacity(assoc.len());
-        for (k_expr, RuleEntry { value: v_expr, .. }) in assoc.iter() {
-            out.insert(K::from_wolfram(k_expr)?, V::from_wolfram(v_expr)?);
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let n = c.read_association_header()?;
+        let mut out = HashMap::with_capacity(n as usize);
+        for _ in 0..n {
+            let _delayed = c.read_rule()?;
+            let k = K::from_cursor(c)?;
+            let v = V::from_cursor(c)?;
+            out.insert(k, v);
         }
         Ok(out)
     }
@@ -292,15 +335,14 @@ where
     K: FromWolfram + Ord,
     V: FromWolfram,
 {
-    fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-        let assoc = expr.try_as_association().ok_or_else(|| Error::Deserialize {
-            path: String::new(),
-            expected: "Association (BTreeMap)",
-            got: kind_name(expr),
-        })?;
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let n = c.read_association_header()?;
         let mut out = BTreeMap::new();
-        for (k_expr, RuleEntry { value: v_expr, .. }) in assoc.iter() {
-            out.insert(K::from_wolfram(k_expr)?, V::from_wolfram(v_expr)?);
+        for _ in 0..n {
+            let _delayed = c.read_rule()?;
+            let k = K::from_cursor(c)?;
+            let v = V::from_cursor(c)?;
+            out.insert(k, v);
         }
         Ok(out)
     }
@@ -312,16 +354,12 @@ where
 // covered by the `impl FromWolfram for ByteArray` above.
 //==============================================================================
 
-macro_rules! impl_vec_numeric_from {
+macro_rules! impl_vec_numeric_from_cursor {
     ($($t:ty => $variant:ident),+ $(,)?) => {
         $(
             impl FromWolfram for Vec<$t> {
-                fn from_wolfram(expr: &Expr) -> Result<Self, Error> {
-                    let na = expr.try_as_numeric_array().ok_or_else(|| Error::Deserialize {
-                        path: String::new(),
-                        expected: stringify!(Vec<$t>),
-                        got: kind_name(expr),
-                    })?;
+                fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+                    let na = c.read_numeric_array()?;
                     if na.data_type() != wolfram_expr::NumericArrayDataType::$variant {
                         return Err(Error::Deserialize {
                             path: String::new(),
@@ -351,7 +389,7 @@ macro_rules! impl_vec_numeric_from {
     };
 }
 
-impl_vec_numeric_from!(
+impl_vec_numeric_from_cursor!(
     i8  => Integer8,
     i16 => Integer16,
     i32 => Integer32,

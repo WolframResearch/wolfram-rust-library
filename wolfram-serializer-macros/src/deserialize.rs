@@ -1,10 +1,14 @@
 //! Expansion for `#[derive(FromWolfram)]`.
 //!
-//! Mirror image of `serialize.rs`: walks the same `FieldKind` taxonomy but
-//! emits code that *reads* an `Expr` tree into a typed value. Top-level
-//! container shape determines what we expect on the wire (Association /
-//! Function[Symbol(name), …] / Symbol(name)); each field's emit path is
-//! the inverse of `serialize::expand_field_value`.
+//! Cursor-driven counterpart of `serialize.rs`. Each generated impl drives a
+//! [`WxfCursor`][wolfram_serializer::WxfCursor]: read the expected token kind
+//! for the container shape, then read each field's payload directly via
+//! `<FieldType as FromWolfram>::from_cursor` (or, for the wire-shape-varying
+//! types — Vec, fixed-size array, tuple — inline cursor reads driven by the
+//! field's `FieldKind`).
+//!
+//! No intermediate [`Expr`][wolfram_expr::Expr] tree is built; the cursor
+//! advances exactly as much as the type's wire payload requires.
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
@@ -34,8 +38,8 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics ::wolfram_serializer::FromWolfram for #name #ty_generics #where_clause {
-            fn from_wolfram(
-                __expr: &::wolfram_expr::Expr,
+            fn from_cursor(
+                __c: &mut ::wolfram_serializer::WxfCursor,
             ) -> ::core::result::Result<Self, ::wolfram_serializer::Error> {
                 #body
             }
@@ -55,79 +59,98 @@ fn expand_struct(
 ) -> Result<TokenStream> {
     match &data.fields {
         Fields::Named(named) => {
-            // Expect an Association; look up each field by its (renamed) key.
+            // Expect Association header → loop reading rules (rule, key,
+            // value). For each known key, dispatch the value through the
+            // field's FieldKind; for unknown keys, skip the value.
             let fields: Vec<&syn::Field> = named.named.iter().collect();
-            let extracts = expand_named_field_extracts(name_str, &fields)?;
-            let idents: Vec<&syn::Ident> = fields
-                .iter()
-                .map(|f| f.ident.as_ref().expect("named field"))
-                .collect();
+            // Build (key_string, ident, FieldKind, span) per field.
+            let mut field_keys: Vec<String> = Vec::with_capacity(fields.len());
+            let mut field_idents: Vec<&syn::Ident> = Vec::with_capacity(fields.len());
+            for f in &fields {
+                let attrs = parse_field_attrs(&f.attrs)?;
+                let id = f.ident.as_ref().expect("named field");
+                field_keys.push(attrs.rename.unwrap_or_else(|| id.to_string()));
+                field_idents.push(id);
+            }
+            // Per-field `Option<T>` slots that get filled as keys arrive.
+            let slot_decls = fields.iter().zip(&field_idents).map(|(f, id)| {
+                let ty = &f.ty;
+                let slot = format_ident!("__slot_{}", id);
+                quote_spanned! { f.ty.span() =>
+                    let mut #slot: ::core::option::Option<#ty> = ::core::option::Option::None;
+                }
+            });
+            // Match arms: known key → fill slot.
+            let key_arms = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
+                let slot = format_ident!("__slot_{}", id);
+                let path = format!("{}.{}", name_str, id);
+                let span = f.ty.span();
+                let extract = expand_field_extract(&f.ty, &path, span);
+                quote_spanned! { span =>
+                    #k => {
+                        #slot = ::core::option::Option::Some(#extract);
+                    }
+                }
+            });
+            // Unwrap each slot at the end.
+            let unwraps = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
+                let slot = format_ident!("__slot_{}", id);
+                let path = format!("{}.{}", name_str, id);
+                let span = f.ty.span();
+                quote_spanned! { span =>
+                    let #id = #slot.ok_or_else(|| ::wolfram_serializer::from_wolfram::err_at(
+                        #path,
+                        "Association entry",
+                        format!("missing key {:?}", #k),
+                    ))?;
+                }
+            });
             Ok(quote! {
-                let __assoc = __expr.try_as_association().ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #name_str,
-                        "Association",
-                        ::wolfram_serializer::from_wolfram::kind_name(__expr),
-                    )
-                })?;
-                #extracts
-                ::core::result::Result::Ok(#name { #(#idents),* })
+                let __n = __c.read_association_header()?;
+                #(#slot_decls)*
+                for _ in 0..__n {
+                    let _delayed = __c.read_rule()?;
+                    let __key = __c.read_string()?;
+                    match __key.as_str() {
+                        #(#key_arms)*
+                        _ => __c.skip()?, // unknown key: discard the value
+                    }
+                }
+                #(#unwraps)*
+                ::core::result::Result::Ok(#name { #(#field_idents),* })
             })
         }
         Fields::Unnamed(unnamed) => {
             // Expect Function[Symbol("Global`Name"), arg0, arg1, ...]
             let symbol = qualify_symbol(name_str, attrs);
             let fields: Vec<&syn::Field> = unnamed.unnamed.iter().collect();
-            let mut extracts = Vec::with_capacity(fields.len());
-            let mut bindings = Vec::with_capacity(fields.len());
-            for (i, f) in fields.iter().enumerate() {
-                let ident = format_ident!("__arg{}", i);
+            let arity = fields.len();
+            let extracts = fields.iter().enumerate().map(|(i, f)| {
+                let bind = format_ident!("__a{}", i);
                 let path = format!("{}.{}", name_str, i);
                 let span = f.ty.span();
-                let extract = expand_field_extract(
-                    &quote! { &__args[#i] },
-                    &f.ty,
-                    &ident,
-                    &path,
-                    span,
-                )?;
-                extracts.push(quote_spanned! { span =>
-                    let #ident = #extract;
-                });
-                bindings.push(quote! { #ident });
-            }
-            let arity = fields.len();
+                let extract = expand_field_extract(&f.ty, &path, span);
+                quote_spanned! { span => let #bind = #extract; }
+            });
+            let bindings = (0..arity).map(|i| format_ident!("__a{}", i));
             Ok(quote! {
-                let __normal = __expr.try_as_normal().ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #name_str,
-                        "Function[Symbol(...), …]",
-                        ::wolfram_serializer::from_wolfram::kind_name(__expr),
-                    )
-                })?;
-                let __head = __normal.head().try_as_symbol().ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #name_str,
-                        "Function head as Symbol",
-                        ::wolfram_serializer::from_wolfram::kind_name(__normal.head()),
-                    )
-                })?;
+                let __arity = __c.read_function_header()?;
+                if __arity != #arity as u64 {
+                    return ::core::result::Result::Err(
+                        ::wolfram_serializer::from_wolfram::err_at(
+                            #name_str,
+                            concat!("Function with ", stringify!(#arity), " arguments"),
+                            format!("Function with {} arguments", __arity),
+                        ),
+                    );
+                }
+                let __head = __c.read_symbol()?;
                 if __head.as_str() != #symbol {
                     return ::core::result::Result::Err(
                         ::wolfram_serializer::from_wolfram::err_at(
                             #name_str,
                             concat!("Function head ", stringify!(#symbol)),
                             format!("Symbol({:?})", __head.as_str()),
-                        ),
-                    );
-                }
-                let __args = __normal.elements();
-                if __args.len() != #arity {
-                    return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wolfram::err_at(
-                            #name_str,
-                            concat!("Function with ", stringify!(#arity), " arguments"),
-                            format!("Function with {} arguments", __args.len()),
                         ),
                     );
                 }
@@ -138,13 +161,7 @@ fn expand_struct(
         Fields::Unit => {
             let symbol = qualify_symbol(name_str, attrs);
             Ok(quote! {
-                let __sym = __expr.try_as_symbol().ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #name_str,
-                        concat!("Symbol(", stringify!(#symbol), ")"),
-                        ::wolfram_serializer::from_wolfram::kind_name(__expr),
-                    )
-                })?;
+                let __sym = __c.read_symbol()?;
                 if __sym.as_str() != #symbol {
                     return ::core::result::Result::Err(
                         ::wolfram_serializer::from_wolfram::err_at(
@@ -160,88 +177,34 @@ fn expand_struct(
     }
 }
 
-/// Build the per-field extract statements for a named struct or enum
-/// struct-variant. The Association `__assoc` must be in scope. Yields a
-/// sequence of `let <field_ident> = …;` bindings.
-fn expand_named_field_extracts(
-    container_path: &str,
-    fields: &[&syn::Field],
-) -> Result<TokenStream> {
-    let mut out = TokenStream::new();
-    for f in fields {
-        let f_attrs = parse_field_attrs(&f.attrs)?;
-        let ident = f.ident.as_ref().expect("named field");
-        let key = f_attrs.rename.clone().unwrap_or_else(|| ident.to_string());
-        let path = format!("{}.{}", container_path, ident);
-        let span = f.ty.span();
-        let extract = expand_field_extract(
-            &quote! { &__entry.value },
-            &f.ty,
-            ident,
-            &path,
-            span,
-        )?;
-        out.extend(quote_spanned! { span =>
-            let #ident = {
-                let __entry = __assoc.get(&::wolfram_expr::Expr::from(#key)).ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #path,
-                        "Association entry",
-                        "missing key".into(),
-                    )
-                })?;
-                #extract
-            };
-        });
-    }
-    Ok(out)
-}
-
-/// For one field, produce an *expression* (not statement!) that evaluates to
-/// the typed field value, given that `expr_path` (a `&Expr`) is in scope.
-fn expand_field_extract(
-    expr_path: &TokenStream,
-    ty: &syn::Type,
-    _field_ident: &syn::Ident,
-    err_path: &str,
-    span: Span,
-) -> Result<TokenStream> {
+/// Build the cursor-read expression for a single field. Returns an
+/// expression that, when evaluated, reads the next value off `__c` and
+/// produces a value of the field's type. Errors propagate via `?`.
+fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStream {
     let kind = classify(ty);
-
     match kind {
-        FieldKind::VecOfU8 => Ok(quote_spanned! { span => {
-            let __ba = (#expr_path).try_as_byte_array().ok_or_else(|| {
-                ::wolfram_serializer::from_wolfram::err_at(
-                    #err_path,
-                    "ByteArray",
-                    ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                )
-            })?;
-            __ba.as_slice().to_vec()
-        }}),
-        FieldKind::VecOfNumeric { elem_ty, dt } => Ok(quote_spanned! { span => {
-            let __na = (#expr_path).try_as_numeric_array().ok_or_else(|| {
-                ::wolfram_serializer::from_wolfram::err_at(
-                    #err_path,
-                    "NumericArray",
-                    ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                )
-            })?;
-            if __na.data_type() != #dt {
+        FieldKind::VecOfU8 => quote_spanned! { span =>
+            __c.read_byte_array()?
+        },
+        FieldKind::VecOfNumeric { elem_ty, dt } => quote_spanned! { span => {
+            let __na = __c.read_numeric_array()?;
+            if ::wolfram_expr::NumericArrayRead::data_type(&__na) != #dt {
                 return ::core::result::Result::Err(
                     ::wolfram_serializer::from_wolfram::err_at(
                         #err_path,
                         "NumericArray with matching element type",
-                        format!("NumericArray<{:?}>", __na.data_type()),
+                        format!("NumericArray<{}>",
+                                ::wolfram_expr::NumericArrayRead::data_type(&__na).name()),
                     ),
                 );
             }
-            if __na.dimensions().len() != 1 {
+            if ::wolfram_expr::NumericArrayRead::dimensions(&__na).len() != 1 {
                 return ::core::result::Result::Err(
                     ::wolfram_serializer::from_wolfram::err_at(
                         #err_path,
                         "1-D NumericArray",
-                        format!("NumericArray with rank {}", __na.dimensions().len()),
+                        format!("NumericArray with rank {}",
+                                ::wolfram_expr::NumericArrayRead::dimensions(&__na).len()),
                     ),
                 );
             }
@@ -249,25 +212,30 @@ fn expand_field_extract(
                 ::wolfram_serializer::from_wolfram::err_at(
                     #err_path,
                     "NumericArray element-type slice",
-                    format!("element-type mismatch: {:?}", __na.data_type()),
+                    "element-type mismatch".into(),
                 )
             })?;
             __slice.to_vec()
-        }}),
-        FieldKind::VecOfOther { elem_ty } => Ok(quote_spanned! { span => {
-            let __normal = (#expr_path).try_as_normal().ok_or_else(|| {
-                ::wolfram_serializer::from_wolfram::err_at(
-                    #err_path,
-                    "Function[List, …]",
-                    ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                )
-            })?;
-            let mut __out: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(__normal.elements().len());
-            for __elem in __normal.elements() {
-                __out.push(<#elem_ty as ::wolfram_serializer::FromWolfram>::from_wolfram(__elem)?);
+        }},
+        FieldKind::VecOfOther { elem_ty } => quote_spanned! { span => {
+            // Wire shape: Function[Symbol("System`List"), …elements…].
+            let __n = __c.read_function_header()?;
+            let __head = __c.read_symbol()?;
+            if __head.as_str() != "System`List" {
+                return ::core::result::Result::Err(
+                    ::wolfram_serializer::from_wolfram::err_at(
+                        #err_path,
+                        "Function[List, …]",
+                        format!("Function[Symbol({:?}), …]", __head.as_str()),
+                    ),
+                );
+            }
+            let mut __out: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(__n as usize);
+            for _ in 0..__n {
+                __out.push(<#elem_ty as ::wolfram_serializer::FromWolfram>::from_cursor(__c)?);
             }
             __out
-        }}),
+        }},
         FieldKind::NumericTensor {
             elem_ty,
             dt,
@@ -280,44 +248,31 @@ fn expand_field_extract(
             let rank = dims.len();
             let dim_check = quote_spanned! { span =>
                 let __expected_dims: [usize; #rank] = [ #(#dim_lits),* ];
-                if __na.dimensions() != &__expected_dims[..] {
+                if ::wolfram_expr::NumericArrayRead::dimensions(&__na) != &__expected_dims[..] {
                     return ::core::result::Result::Err(
                         ::wolfram_serializer::from_wolfram::err_at(
                             #err_path,
                             "NumericArray with matching dimensions",
-                            format!("NumericArray with dims {:?}", __na.dimensions()),
+                            format!("NumericArray with dims {:?}",
+                                    ::wolfram_expr::NumericArrayRead::dimensions(&__na)),
                         ),
                     );
                 }
             };
-            // For both array-rooted and tuple-rooted, we read a contiguous
-            // `&[T]` slice in row-major order. Reconstruction differs:
-            // - Array-rooted: `[T; N]` / `[[T; M]; N]` etc. — copy bytes
-            //   directly into a stack-allocated array of the target type.
-            // - Tuple-rooted: build the tuple by indexing into the slice.
             if let Some(_paths) = &tuple_paths {
-                // Build the tuple from the flat slice in the same row-major
-                // order the serialize side wrote it.
-                // Construct the tuple by walking `paths` and assembling
-                // nested tuples from the bottom up. Simpler approach: emit a
-                // chained `(s[0], s[1], (s[2], s[3]), …)` matching the
-                // original shape. We do that by walking the original_ty
-                // shape recursively and emitting a constructor expression.
+                // Tuple-rooted tensor — build the tuple by indexing the flat
+                // slice in row-major order (mirrors how serialize.rs walked
+                // dotted paths to flatten it for the wire).
                 let tup_ctor = build_tuple_ctor_from_slice(original_ty, &mut 0);
-                Ok(quote_spanned! { span => {
-                    let __na = (#expr_path).try_as_numeric_array().ok_or_else(|| {
-                        ::wolfram_serializer::from_wolfram::err_at(
-                            #err_path,
-                            "NumericArray",
-                            ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                        )
-                    })?;
-                            if __na.data_type() != #dt {
+                quote_spanned! { span => {
+                    let __na = __c.read_numeric_array()?;
+                    if ::wolfram_expr::NumericArrayRead::data_type(&__na) != #dt {
                         return ::core::result::Result::Err(
                             ::wolfram_serializer::from_wolfram::err_at(
                                 #err_path,
                                 "NumericArray with matching element type",
-                                format!("NumericArray<{:?}>", __na.data_type()),
+                                format!("NumericArray<{}>",
+                                        ::wolfram_expr::NumericArrayRead::data_type(&__na).name()),
                             ),
                         );
                     }
@@ -326,7 +281,7 @@ fn expand_field_extract(
                         ::wolfram_serializer::from_wolfram::err_at(
                             #err_path,
                             "NumericArray element-type slice",
-                            format!("element-type mismatch: {:?}", __na.data_type()),
+                            "element-type mismatch".into(),
                         )
                     })?;
                     if __slice.len() != #total_leaves {
@@ -339,24 +294,21 @@ fn expand_field_extract(
                         );
                     }
                     #tup_ctor
-                }})
+                }}
             } else {
-                // Array-rooted: byte-copy into a stack array of the target
-                // type. The original type is e.g. `[i32; 4]` or `[[f64; 3]; 2]`.
-                Ok(quote_spanned! { span => {
-                    let __na = (#expr_path).try_as_numeric_array().ok_or_else(|| {
-                        ::wolfram_serializer::from_wolfram::err_at(
-                            #err_path,
-                            "NumericArray",
-                            ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                        )
-                    })?;
-                            if __na.data_type() != #dt {
+                // Array-rooted tensor — `[T; N]` and friends have defined
+                // contiguous layout, so byte-copy from the slice into a
+                // stack-allocated default-initialized output of the field
+                // type.
+                quote_spanned! { span => {
+                    let __na = __c.read_numeric_array()?;
+                    if ::wolfram_expr::NumericArrayRead::data_type(&__na) != #dt {
                         return ::core::result::Result::Err(
                             ::wolfram_serializer::from_wolfram::err_at(
                                 #err_path,
                                 "NumericArray with matching element type",
-                                format!("NumericArray<{:?}>", __na.data_type()),
+                                format!("NumericArray<{}>",
+                                        ::wolfram_expr::NumericArrayRead::data_type(&__na).name()),
                             ),
                         );
                     }
@@ -365,7 +317,7 @@ fn expand_field_extract(
                         ::wolfram_serializer::from_wolfram::err_at(
                             #err_path,
                             "NumericArray element-type slice",
-                            format!("element-type mismatch: {:?}", __na.data_type()),
+                            "element-type mismatch".into(),
                         )
                     })?;
                     if __slice.len() != #total_leaves {
@@ -392,71 +344,70 @@ fn expand_field_extract(
                     };
                     __out_bytes.copy_from_slice(__src_bytes);
                     __out
-                }})
+                }}
             }
         }
         FieldKind::TupleHetero { tup } => {
             // Heterogeneous tuple — expect Function[List, …] with arity = tup.elems.len().
             let arity = tup.elems.len();
             let elem_extracts = tup.elems.iter().enumerate().map(|(i, t)| {
-                let synth = format_ident!("__t{}", i);
                 let inner_path = format!("{}.{}", err_path, i);
                 let span = t.span();
-                let extract =
-                    expand_field_extract(&quote! { &__elems[#i] }, t, &synth, &inner_path, span)
-                        .unwrap_or_else(|e| e.to_compile_error());
-                quote_spanned! { span => #extract }
+                expand_field_extract(t, &inner_path, span)
             });
-            Ok(quote_spanned! { span => {
-                let __normal = (#expr_path).try_as_normal().ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #err_path,
-                        "Function[List, …]",
-                        ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                    )
-                })?;
-                let __elems = __normal.elements();
-                if __elems.len() != #arity {
+            quote_spanned! { span => {
+                let __n = __c.read_function_header()?;
+                let __head = __c.read_symbol()?;
+                if __head.as_str() != "System`List" {
+                    return ::core::result::Result::Err(
+                        ::wolfram_serializer::from_wolfram::err_at(
+                            #err_path,
+                            "Function[List, …]",
+                            format!("Function[Symbol({:?}), …]", __head.as_str()),
+                        ),
+                    );
+                }
+                if __n != #arity as u64 {
                     return ::core::result::Result::Err(
                         ::wolfram_serializer::from_wolfram::err_at(
                             #err_path,
                             "Function[List, …] with matching arity",
-                            format!("got {} elements", __elems.len()),
+                            format!("got {} elements", __n),
                         ),
                     );
                 }
                 ( #(#elem_extracts),* )
-            }})
+            }}
         }
         FieldKind::ArrayHetero { arr, len } => {
-            // Heterogeneous fixed-size array — expect Function[List, …] with
-            // exactly `len` elements; build a `[T; N]` from them.
+            // Heterogeneous fixed-size array — expect Function[List, …]
+            // with `len` elements.
             let elem_ty = &arr.elem;
-            Ok(quote_spanned! { span => {
-                let __normal = (#expr_path).try_as_normal().ok_or_else(|| {
-                    ::wolfram_serializer::from_wolfram::err_at(
-                        #err_path,
-                        "Function[List, …]",
-                        ::wolfram_serializer::from_wolfram::kind_name(#expr_path),
-                    )
-                })?;
-                let __elems = __normal.elements();
-                if __elems.len() != #len {
+            quote_spanned! { span => {
+                let __n = __c.read_function_header()?;
+                let __head = __c.read_symbol()?;
+                if __head.as_str() != "System`List" {
+                    return ::core::result::Result::Err(
+                        ::wolfram_serializer::from_wolfram::err_at(
+                            #err_path,
+                            "Function[List, …]",
+                            format!("Function[Symbol({:?}), …]", __head.as_str()),
+                        ),
+                    );
+                }
+                if __n != #len as u64 {
                     return ::core::result::Result::Err(
                         ::wolfram_serializer::from_wolfram::err_at(
                             #err_path,
                             "Function[List, …] with matching length",
-                            format!("got {} elements", __elems.len()),
+                            format!("got {} elements", __n),
                         ),
                     );
                 }
-                let __vals: ::std::vec::Vec<#elem_ty> = {
-                    let mut __v = ::std::vec::Vec::with_capacity(#len);
-                    for __e in __elems {
-                        __v.push(<#elem_ty as ::wolfram_serializer::FromWolfram>::from_wolfram(__e)?);
-                    }
-                    __v
-                };
+                let mut __vals: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(#len);
+                for _ in 0..#len {
+                    __vals.push(<#elem_ty as ::wolfram_serializer::FromWolfram>::from_cursor(__c)?);
+                }
                 <[#elem_ty; #len]>::try_from(__vals.as_slice()).map_err(|_| {
                     ::wolfram_serializer::from_wolfram::err_at(
                         #err_path,
@@ -464,17 +415,16 @@ fn expand_field_extract(
                         "length mismatch".into(),
                     )
                 })?
-            }})
+            }}
         }
-        FieldKind::Other => Ok(quote_spanned! { span => {
-            <#ty as ::wolfram_serializer::FromWolfram>::from_wolfram(#expr_path)?
-        }}),
+        FieldKind::Other => quote_spanned! { span => {
+            <#ty as ::wolfram_serializer::FromWolfram>::from_cursor(__c)?
+        }},
     }
 }
 
-/// Recursively build a tuple constructor expression from a flat slice
-/// `__slice: &[T]`. Tracks an in-out cursor `idx` that marks the next slot to
-/// consume. Used for tuple-rooted numeric tensors.
+/// Recursively build a tuple constructor from a flat `__slice: &[T]`. Tracks
+/// an in-out cursor `idx` marking the next leaf slot to consume.
 fn build_tuple_ctor_from_slice(ty: &syn::Type, idx: &mut usize) -> TokenStream {
     match ty {
         syn::Type::Tuple(tup) => {
@@ -498,11 +448,14 @@ fn build_tuple_ctor_from_slice(ty: &syn::Type, idx: &mut usize) -> TokenStream {
 //==============================================================================
 
 fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<TokenStream> {
-    // The matcher dispatches on the incoming Expr's shape:
-    // - try_as_symbol() with name == "Global`UnitVariant" → unit variant
-    // - try_as_normal() with head == "Global`TupleVariant" → tuple variant
-    // - try_as_normal() with head == "Global`StructVariant" → struct variant
-    //   (with a single Association argument)
+    // Peek the next token to decide which family of variant shapes to expect:
+    //   TOKEN_SYMBOL    → unit variant   (read symbol, match name → no-arg variant)
+    //   TOKEN_FUNCTION  → tuple/struct variant (read header, read head symbol, dispatch)
+    //
+    // This requires the cursor's peek_token + a manual read of the symbol /
+    // function header. For unit variants we read the symbol and dispatch on
+    // its name. For function variants, after reading the header + head, we
+    // dispatch on the head symbol and continue reading the args.
     let mut unit_arms = Vec::new();
     let mut function_arms = Vec::new();
 
@@ -513,9 +466,6 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
         let v_path = format!("{}::{}", name_str, v_name);
         match &v.fields {
             Fields::Unit => {
-                // Each unit-variant arm short-circuits the function with
-                // `return Ok(...)` so the surrounding match's arms can all be
-                // `()` and the type-check passes.
                 unit_arms.push(quote! {
                     #v_symbol => return ::core::result::Result::Ok(#name :: #v_name),
                 });
@@ -527,29 +477,20 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                 let mut extracts = Vec::with_capacity(arity);
                 for (i, f) in fields.iter().enumerate() {
                     let bind = format_ident!("__a{}", i);
-                    let span = f.ty.span();
                     let path = format!("{}.{}", v_path, i);
-                    let extract = expand_field_extract(
-                        &quote! { &__args[#i] },
-                        &f.ty,
-                        &bind,
-                        &path,
-                        span,
-                    )?;
-                    extracts.push(quote_spanned! { span =>
-                        let #bind = #extract;
-                    });
+                    let span = f.ty.span();
+                    let extract = expand_field_extract(&f.ty, &path, span);
+                    extracts.push(quote_spanned! { span => let #bind = #extract; });
                     bindings.push(quote! { #bind });
                 }
                 function_arms.push(quote! {
                     #v_symbol => {
-                        let __args = __normal.elements();
-                        if __args.len() != #arity {
+                        if __arity != #arity as u64 {
                             return ::core::result::Result::Err(
                                 ::wolfram_serializer::from_wolfram::err_at(
                                     #v_path,
                                     concat!("Function with ", stringify!(#arity), " arguments"),
-                                    format!("Function with {} arguments", __args.len()),
+                                    format!("Function with {} arguments", __arity),
                                 ),
                             );
                         }
@@ -560,32 +501,63 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
             }
             Fields::Named(named) => {
                 let fields: Vec<&syn::Field> = named.named.iter().collect();
-                let extracts = expand_named_field_extracts(&v_path, &fields)?;
-                let idents: Vec<&syn::Ident> = fields
-                    .iter()
-                    .map(|f| f.ident.as_ref().expect("named field"))
-                    .collect();
+                let mut field_keys: Vec<String> = Vec::with_capacity(fields.len());
+                let mut field_idents: Vec<&syn::Ident> = Vec::with_capacity(fields.len());
+                for f in &fields {
+                    let attrs = parse_field_attrs(&f.attrs)?;
+                    let id = f.ident.as_ref().expect("named field");
+                    field_keys.push(attrs.rename.unwrap_or_else(|| id.to_string()));
+                    field_idents.push(id);
+                }
+                let slot_decls = fields.iter().zip(&field_idents).map(|(f, id)| {
+                    let ty = &f.ty;
+                    let slot = format_ident!("__slot_{}", id);
+                    quote_spanned! { f.ty.span() =>
+                        let mut #slot: ::core::option::Option<#ty> = ::core::option::Option::None;
+                    }
+                });
+                let key_arms = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
+                    let slot = format_ident!("__slot_{}", id);
+                    let path = format!("{}.{}", v_path, id);
+                    let span = f.ty.span();
+                    let extract = expand_field_extract(&f.ty, &path, span);
+                    quote_spanned! { span => #k => { #slot = ::core::option::Option::Some(#extract); } }
+                });
+                let unwraps = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
+                    let slot = format_ident!("__slot_{}", id);
+                    let path = format!("{}.{}", v_path, id);
+                    let span = f.ty.span();
+                    quote_spanned! { span =>
+                        let #id = #slot.ok_or_else(|| ::wolfram_serializer::from_wolfram::err_at(
+                            #path,
+                            "Association entry",
+                            format!("missing key {:?}", #k),
+                        ))?;
+                    }
+                });
                 function_arms.push(quote! {
                     #v_symbol => {
-                        let __args = __normal.elements();
-                        if __args.len() != 1 {
+                        if __arity != 1 {
                             return ::core::result::Result::Err(
                                 ::wolfram_serializer::from_wolfram::err_at(
                                     #v_path,
                                     "Function with 1 Association argument",
-                                    format!("Function with {} arguments", __args.len()),
+                                    format!("Function with {} arguments", __arity),
                                 ),
                             );
                         }
-                        let __assoc = __args[0].try_as_association().ok_or_else(|| {
-                            ::wolfram_serializer::from_wolfram::err_at(
-                                #v_path,
-                                "Association in Function argument",
-                                ::wolfram_serializer::from_wolfram::kind_name(&__args[0]),
-                            )
-                        })?;
-                        #extracts
-                        return ::core::result::Result::Ok(#name :: #v_name { #(#idents),* });
+                        let __inner_n = __c.read_association_header()?;
+                        #(#slot_decls)*
+                        for _ in 0..__inner_n {
+                            let _delayed = __c.read_rule()?;
+                            let __key = __c.read_string()?;
+                            match __key.as_str() {
+                                #(#key_arms)*
+                                _ => __c.skip()?,
+                            }
+                        }
+                        #(#unwraps)*
+                        return ::core::result::Result::Ok(#name :: #v_name { #(#field_idents),* });
                     }
                 });
             }
@@ -593,25 +565,43 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
     }
 
     Ok(quote! {
-        if let ::core::option::Option::Some(__sym) = __expr.try_as_symbol() {
+        let __tag = __c.peek_token()?;
+        if __tag == ::wolfram_serializer::wxf::constants::TOKEN_SYMBOL {
+            let __sym = __c.read_symbol()?;
             match __sym.as_str() {
                 #(#unit_arms)*
-                _ => {}
+                _ => {
+                    return ::core::result::Result::Err(
+                        ::wolfram_serializer::from_wolfram::err_at(
+                            #name_str,
+                            "matching enum unit-variant symbol",
+                            format!("Symbol({:?})", __sym.as_str()),
+                        ),
+                    );
+                }
             }
         }
-        if let ::core::option::Option::Some(__normal) = __expr.try_as_normal() {
-            if let ::core::option::Option::Some(__head) = __normal.head().try_as_symbol() {
-                match __head.as_str() {
-                    #(#function_arms)*
-                    _ => {}
+        if __tag == ::wolfram_serializer::wxf::constants::TOKEN_FUNCTION {
+            let __arity = __c.read_function_header()?;
+            let __head = __c.read_symbol()?;
+            match __head.as_str() {
+                #(#function_arms)*
+                _ => {
+                    return ::core::result::Result::Err(
+                        ::wolfram_serializer::from_wolfram::err_at(
+                            #name_str,
+                            "matching enum function-variant head",
+                            format!("Symbol({:?})", __head.as_str()),
+                        ),
+                    );
                 }
             }
         }
         ::core::result::Result::Err(
             ::wolfram_serializer::from_wolfram::err_at(
                 #name_str,
-                "matching enum variant",
-                ::wolfram_serializer::from_wolfram::kind_name(__expr),
+                "Symbol or Function for enum variant",
+                format!("token 0x{:02X}", __tag),
             ),
         )
     })

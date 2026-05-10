@@ -1,7 +1,7 @@
-//! WXF binary wire format — serializer + deserializer.
+//! WXF binary wire format — serializer + cursor-based reader.
 
 pub mod constants;
-pub mod deserialize;
+pub mod cursor;
 pub mod varint;
 
 use std::io::Write;
@@ -17,7 +17,7 @@ use crate::{CompressionLevel, Error};
 use self::constants::*;
 use self::varint::write_varint;
 
-pub use self::deserialize::deserialize;
+pub use self::cursor::WxfCursor;
 
 /// Serialize `value` with a `8C:` (zlib-compressed) WXF header.
 ///
