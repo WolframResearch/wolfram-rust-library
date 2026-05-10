@@ -1,14 +1,14 @@
-//! WXF self-roundtrip tests: export → import → equal.
+//! WXF self-roundtrip tests: serialize → deserialize → equal.
 
 use wolfram_expr::{
     Association, ByteArray, Complex32, Complex64, Expr, NumericArray, NumericArrayDataType,
     PackedArray, PackedArrayDataType, RuleEntry, Symbol,
 };
-use wolfram_serializer::{export, import, CompressionLevel, Format};
+use wolfram_serializer::{serialize, deserialize, CompressionLevel, Format};
 
 fn roundtrip(expr: Expr) {
-    let bytes = export(&expr, Format::Wxf).expect("export Wxf");
-    let parsed = import(&bytes, Format::Wxf).expect("import Wxf");
+    let bytes = serialize(&expr, Format::Wxf).expect("serialize Wxf");
+    let parsed = deserialize(&bytes, Format::Wxf).expect("deserialize Wxf");
     assert_eq!(parsed, expr, "roundtrip mismatch");
 }
 
@@ -129,18 +129,18 @@ fn empty_function() {
 
 #[test]
 fn vec_u8_serializes_as_byte_array() {
-    let bytes = wolfram_serializer::export(&vec![1u8, 2, 3, 0xff], wolfram_serializer::Format::Wxf)
+    let bytes = wolfram_serializer::serialize(&vec![1u8, 2, 3, 0xff], wolfram_serializer::Format::Wxf)
         .unwrap();
-    let parsed = wolfram_serializer::import(&bytes, wolfram_serializer::Format::Wxf).unwrap();
+    let parsed = wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
     assert!(matches!(parsed.kind(), wolfram_expr::ExprKind::ByteArray(_)));
     assert_eq!(parsed.try_as_byte_array().unwrap().as_slice(), &[1u8, 2, 3, 0xff]);
 }
 
 #[test]
 fn vec_i32_serializes_as_numeric_array() {
-    let bytes = wolfram_serializer::export(&vec![10i32, 20, 30, 40], wolfram_serializer::Format::Wxf)
+    let bytes = wolfram_serializer::serialize(&vec![10i32, 20, 30, 40], wolfram_serializer::Format::Wxf)
         .unwrap();
-    let parsed = wolfram_serializer::import(&bytes, wolfram_serializer::Format::Wxf).unwrap();
+    let parsed = wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
     let arr = parsed.try_as_numeric_array().expect("expected NumericArray");
     assert_eq!(arr.data_type(), NumericArrayDataType::Integer32);
     assert_eq!(arr.dimensions(), &[4]);
@@ -149,9 +149,9 @@ fn vec_i32_serializes_as_numeric_array() {
 
 #[test]
 fn vec_f64_serializes_as_numeric_array() {
-    let bytes = wolfram_serializer::export(&vec![1.5f64, 2.5, 3.5], wolfram_serializer::Format::Wxf)
+    let bytes = wolfram_serializer::serialize(&vec![1.5f64, 2.5, 3.5], wolfram_serializer::Format::Wxf)
         .unwrap();
-    let parsed = wolfram_serializer::import(&bytes, wolfram_serializer::Format::Wxf).unwrap();
+    let parsed = wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
     let arr = parsed.try_as_numeric_array().expect("expected NumericArray");
     assert_eq!(arr.data_type(), NumericArrayDataType::Real64);
     assert_eq!(arr.try_as_slice::<f64>(), Some([1.5, 2.5, 3.5].as_slice()));
@@ -195,13 +195,13 @@ fn empty_association() {
 
 #[test]
 fn rejects_truncated_header() {
-    assert!(import(b"", Format::Wxf).is_err());
-    assert!(import(b"8", Format::Wxf).is_err());
+    assert!(deserialize(b"", Format::Wxf).is_err());
+    assert!(deserialize(b"8", Format::Wxf).is_err());
 }
 
 #[test]
 fn rejects_wrong_version() {
-    assert!(import(b"7:", Format::Wxf).is_err());
+    assert!(deserialize(b"7:", Format::Wxf).is_err());
 }
 #[test]
 fn big_integer_roundtrip() {
@@ -232,16 +232,16 @@ fn compressible_expr() -> Expr {
 #[test]
 fn compressed_header_is_8c_colon() {
     let expr = compressible_expr();
-    let bytes = export(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
+    let bytes = serialize(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
     assert_eq!(&bytes[..3], b"8C:", "compressed header should start with 8C:");
 }
 
 #[test]
 fn compressed_payload_is_smaller() {
     let expr = compressible_expr();
-    let plain = export(&expr, Format::Wxf).unwrap();
+    let plain = serialize(&expr, Format::Wxf).unwrap();
     let compressed =
-        export(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
+        serialize(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
     assert!(
         compressed.len() < plain.len(),
         "compressed ({} B) should be smaller than plain ({} B)",
@@ -261,9 +261,9 @@ fn compressed_roundtrips_at_every_level() {
         CompressionLevel::Level(9),
         CompressionLevel::Level(42), // clamps to 9
     ] {
-        let bytes = export(&expr, Format::WxfCompressed(level)).unwrap();
-        // import auto-detects the 8C: header — no separate format needed.
-        let parsed: Expr = import(&bytes, Format::Wxf).unwrap();
+        let bytes = serialize(&expr, Format::WxfCompressed(level)).unwrap();
+        // deserialize auto-detects the 8C: header — no separate format needed.
+        let parsed: Expr = deserialize(&bytes, Format::Wxf).unwrap();
         assert_eq!(parsed, expr, "roundtrip mismatch at level {:?}", level);
     }
 }
@@ -271,12 +271,12 @@ fn compressed_roundtrips_at_every_level() {
 #[test]
 fn compressed_and_plain_decode_equally() {
     let expr = compressible_expr();
-    let plain_bytes = export(&expr, Format::Wxf).unwrap();
+    let plain_bytes = serialize(&expr, Format::Wxf).unwrap();
     let compressed_bytes =
-        export(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
+        serialize(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
 
-    let from_plain: Expr = import(&plain_bytes, Format::Wxf).unwrap();
-    let from_compressed: Expr = import(&compressed_bytes, Format::Wxf).unwrap();
+    let from_plain: Expr = deserialize(&plain_bytes, Format::Wxf).unwrap();
+    let from_compressed: Expr = deserialize(&compressed_bytes, Format::Wxf).unwrap();
     assert_eq!(from_plain, from_compressed);
     assert_eq!(from_plain, expr);
 }

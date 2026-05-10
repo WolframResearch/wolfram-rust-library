@@ -3,7 +3,7 @@
 //! For each fixture:
 //!   1. The bytes were produced once by `BinarySerialize[expr]` in a real
 //!      Wolfram kernel via `tests/fixtures/generate.wls`.
-//!   2. We import them with our deserializer and check the resulting [`Expr`]
+//!   2. We deserialize them with our deserializer and check the resulting [`Expr`]
 //!      structurally matches a hand-constructed expected value.
 //!
 //! This proves that our parser handles the kernel's exact wire output —
@@ -13,16 +13,16 @@
 //! you add a test case or want to refresh against a newer kernel.
 
 use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
-use wolfram_serializer::{import, Format};
+use wolfram_serializer::{deserialize, Format};
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;
 
-/// Helper: import a kernel-produced WXF byte sequence and assert it parses to
+/// Helper: deserialize a kernel-produced WXF byte sequence and assert it parses to
 /// `expected`.
 #[track_caller]
 fn assert_parses_to(bytes: &[u8], expected: Expr) {
-    let parsed: Expr = import(bytes, Format::Wxf).expect("import kernel WXF");
+    let parsed: Expr = deserialize(bytes, Format::Wxf).expect("deserialize kernel WXF");
     assert_eq!(parsed, expected);
 }
 
@@ -45,7 +45,7 @@ fn string() {
 #[test]
 fn symbol() {
     // The kernel strips the System` context on the wire — `Plus` arrives bare
-    // and our importer stores it as a context-less Symbol (it does NOT silently
+    // and the cursor stores it as a context-less Symbol (it does NOT silently
     // re-add System`). User-package symbols like `MyPkg`x` keep their context.
     assert_parses_to(
         fix::SYMBOL_PLUS,
@@ -119,8 +119,8 @@ fn compressed_range_100() {
     // Kernel size-optimizes Range[100] into PackedArray[..., "Integer8"]
     // wrapped in an `8C:` zlib-compressed payload — exercises both the
     // compression handling and packed-array decoding.
-    let parsed: Expr = import(fix::COMPRESSED_RANGE_100, Format::Wxf)
-        .expect("import compressed kernel WXF");
+    let parsed: Expr = deserialize(fix::COMPRESSED_RANGE_100, Format::Wxf)
+        .expect("deserialize compressed kernel WXF");
     let arr = parsed
         .try_as_packed_array()
         .expect("Range[100] should land as a PackedArray");

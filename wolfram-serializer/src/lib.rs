@@ -2,10 +2,10 @@
 //! from Wolfram Language `InputForm` text and the WXF binary wire format.
 //!
 //! Mirrors the architectural pattern of [`wolframclient.serializers`][wolframclient]
-//! in Python: a single [`export`] entry point produces bytes (WL or WXF), a single
-//! [`import`] entry point reads WXF bytes back into [`Expr`].
+//! in Python: a single [`serialize`] entry point produces bytes (WL or WXF), a single
+//! [`deserialize`] entry point reads WXF bytes back into [`Expr`].
 //!
-//! WL parsing (text → Expr) is out of V1 scope: [`import`] called with [`Format::Wl`]
+//! WL parsing (text → Expr) is out of V1 scope: [`deserialize`] called with [`Format::Wl`]
 //! returns [`Error::UnsupportedImportFormat`].
 //!
 //! [wolframclient]: https://github.com/WolframResearch/WolframClientForPython
@@ -40,9 +40,9 @@ pub use crate::wxf::cursor::WxfCursor;
 // macro / type namespaces.
 pub use wolfram_serializer_macros::{FromWolfram, ToWolfram};
 
-/// Output format selector for [`export`] / [`import`].
+/// Output format selector for [`serialize`] / [`deserialize`].
 ///
-/// `import` only needs `Format::Wxf` — the WXF wire header (`8:` vs `8C:`)
+/// `deserialize` only needs `Format::Wxf` — the WXF wire header (`8:` vs `8C:`)
 /// self-describes whether the payload is compressed, so deserialization
 /// transparently auto-detects.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -79,12 +79,12 @@ impl CompressionLevel {
     }
 }
 
-/// Errors returned by [`export`] / [`import`].
+/// Errors returned by [`serialize`] / [`deserialize`].
 #[derive(Debug)]
 pub enum Error {
     /// Wraps an underlying [`std::io::Error`] from a writer or reader.
     Io(std::io::Error),
-    /// `import(_, Format::Wl)` — WL parsing is not implemented in V1.
+    /// `deserialize(_, Format::Wl)` — WL parsing is not implemented in V1.
     UnsupportedImportFormat,
     /// WXF byte stream is malformed (header mismatch, unexpected token,
     /// truncation, …) or an unhandled internal serialize/deserialize state.
@@ -109,7 +109,7 @@ impl std::fmt::Display for Error {
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::UnsupportedImportFormat => write!(
                 f,
-                "import(): the requested Format does not support deserialization"
+                "deserialize(): the requested Format does not support deserialization"
             ),
             Error::InvalidWxf(msg) => write!(f, "invalid WXF: {}", msg),
             Error::Deserialize {
@@ -145,14 +145,14 @@ impl From<std::io::Error> for Error {
 //==============================================================================
 
 /// Serialize `value` using `format`, returning the bytes.
-pub fn export<T: ToWolfram + ?Sized>(value: &T, format: Format) -> Result<Vec<u8>, Error> {
+pub fn serialize<T: ToWolfram + ?Sized>(value: &T, format: Format) -> Result<Vec<u8>, Error> {
     let mut out = Vec::new();
-    export_to(value, format, &mut out)?;
+    serialize_to(value, format, &mut out)?;
     Ok(out)
 }
 
 /// Serialize `value` using `format`, writing to `writer`.
-pub fn export_to<T, W>(value: &T, format: Format, writer: &mut W) -> Result<(), Error>
+pub fn serialize_to<T, W>(value: &T, format: Format, writer: &mut W) -> Result<(), Error>
 where
     T: ToWolfram + ?Sized,
     W: Write,
@@ -171,9 +171,9 @@ where
 }
 
 /// Serialize `value` to WXF bytes (uncompressed). Convenience shim over
-/// [`export(value, Format::Wxf)`][export].
+/// [`serialize(value, Format::Wxf)`][serialize].
 pub fn to_wxf<T: ToWolfram + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
-    export(value, Format::Wxf)
+    serialize(value, Format::Wxf)
 }
 
 /// Deserialize WXF bytes directly into a typed `T` via [`FromWolfram`].
@@ -191,7 +191,7 @@ pub fn from_wxf<T: FromWolfram>(bytes: &[u8]) -> Result<T, Error> {
 ///
 /// `format = Format::Wl` returns [`Error::UnsupportedImportFormat`] — text WL
 /// parsing is not implemented in V1.
-pub fn import(bytes: &[u8], format: Format) -> Result<Expr, Error> {
+pub fn deserialize(bytes: &[u8], format: Format) -> Result<Expr, Error> {
     match format {
         Format::Wl => Err(Error::UnsupportedImportFormat),
         // The wire header (`8:` vs `8C:`) self-describes whether the payload

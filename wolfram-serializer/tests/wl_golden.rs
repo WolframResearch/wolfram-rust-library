@@ -1,10 +1,10 @@
 //! WL InputForm golden output tests.
 
 use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
-use wolfram_serializer::{export, Format};
+use wolfram_serializer::{serialize, Format};
 
 fn wl(expr: &Expr) -> String {
-    let bytes = export(expr, Format::Wl).expect("export Wl");
+    let bytes = serialize(expr, Format::Wl).expect("serialize Wl");
     String::from_utf8(bytes).expect("WL output is UTF-8")
 }
 

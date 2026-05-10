@@ -3,7 +3,7 @@
 //! coverage matrix lives in `tests/derive.rs` once the deserialize side
 //! also lands.
 
-use wolfram_serializer::{from_wxf, import, to_wxf, Format, FromWolfram, ToWolfram};
+use wolfram_serializer::{from_wxf, deserialize, to_wxf, Format, FromWolfram, ToWolfram};
 
 #[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
 struct Frame {
@@ -56,7 +56,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
         tag: Some(7),
     };
     let bytes = to_wxf(&f).unwrap();
-    let expr = import(&bytes, Format::Wxf).unwrap();
+    let expr = deserialize(&bytes, Format::Wxf).unwrap();
     let assoc = expr.try_as_association().expect("Frame should be Association");
 
     // payload → ByteArray
@@ -90,7 +90,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
 fn point_tuple_struct_emits_function() {
     let p = Point(1.5, 2.5);
     let bytes = to_wxf(&p).unwrap();
-    let expr = import(&bytes, Format::Wxf).unwrap();
+    let expr = deserialize(&bytes, Format::Wxf).unwrap();
     let normal = expr.try_as_normal().expect("Point should be Function[…]");
     let head = normal.head().try_as_symbol().unwrap().as_str();
     assert_eq!(head, "Global`Point");
@@ -101,7 +101,7 @@ fn point_tuple_struct_emits_function() {
 fn marker_unit_struct_emits_symbol() {
     let m = Marker;
     let bytes = to_wxf(&m).unwrap();
-    let expr = import(&bytes, Format::Wxf).unwrap();
+    let expr = deserialize(&bytes, Format::Wxf).unwrap();
     let s = expr.try_as_symbol().expect("Marker should be Symbol");
     assert_eq!(s.as_str(), "Global`Marker");
 }
@@ -116,7 +116,7 @@ fn tensor_fields_become_numeric_arrays() {
         hetero: (42i64, "hello".into()),
     };
     let bytes = to_wxf(&t).unwrap();
-    let expr = import(&bytes, Format::Wxf).unwrap();
+    let expr = deserialize(&bytes, Format::Wxf).unwrap();
     let assoc = expr.try_as_association().unwrap();
 
     let fixed = &assoc.get(&wolfram_expr::Expr::from("fixed")).unwrap().value;
@@ -239,7 +239,7 @@ fn enum_variants_emit_proper_shapes() {
 
     // Unit variant: 1-entry Association with only "Enum".
     let bytes = to_wxf(&Shape::Origin).unwrap();
-    let s = import(&bytes, Format::Wxf).unwrap();
+    let s = deserialize(&bytes, Format::Wxf).unwrap();
     let assoc = s.try_as_association().expect("Association");
     assert_eq!(assoc.len(), 1);
     let v = &assoc.get(&Expr::from("Enum")).unwrap().value;
@@ -247,7 +247,7 @@ fn enum_variants_emit_proper_shapes() {
 
     // Tuple variant (1 arg): "Data" → List of args.
     let bytes = to_wxf(&Shape::Square(2.0)).unwrap();
-    let s = import(&bytes, Format::Wxf).unwrap();
+    let s = deserialize(&bytes, Format::Wxf).unwrap();
     let data = assert_enum_key(&s, "Square");
     let list = data.try_as_normal().expect("Data is a List Function");
     assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
@@ -255,7 +255,7 @@ fn enum_variants_emit_proper_shapes() {
 
     // Tuple variant (2 args): "Data" → List of 2 args.
     let bytes = to_wxf(&Shape::Rect(1.0, 2.0)).unwrap();
-    let s = import(&bytes, Format::Wxf).unwrap();
+    let s = deserialize(&bytes, Format::Wxf).unwrap();
     let data = assert_enum_key(&s, "Rect");
     let list = data.try_as_normal().unwrap();
     assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
@@ -263,7 +263,7 @@ fn enum_variants_emit_proper_shapes() {
 
     // Struct variant: "Data" → inner Association of named fields.
     let bytes = to_wxf(&Shape::Circle { radius: 3.0 }).unwrap();
-    let s = import(&bytes, Format::Wxf).unwrap();
+    let s = deserialize(&bytes, Format::Wxf).unwrap();
     let data = assert_enum_key(&s, "Circle");
     let inner = data.try_as_association().expect("Data is an Association");
     assert!(inner.get(&Expr::from("radius")).is_some());
