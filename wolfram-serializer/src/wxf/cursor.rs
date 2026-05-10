@@ -1,21 +1,19 @@
 //! Pull-based WXF reader.
 //!
-//! [`WxfCursor`] wraps an `&[u8]` byte stream (uncompressing transparently when
-//! the wire begins with the `8C:` zlib header) and exposes typed `read_*`
-//! methods for each WXF token shape. Consumers — both the [`Expr`] tree
-//! builder and the typed `from_cursor` impls emitted by
-//! `#[derive(FromWolfram)]` — drive the cursor directly: peek the next token,
-//! consume it, build their value. No intermediate visitor / consumer trait.
+//! [`WxfCursor`] is a position-indexed slice of decoded WXF payload bytes
+//! (gzip already decompressed if the input had an `8C:` header) plus a
+//! cursor `pos`. Each `read_*` method consumes its specific token byte +
+//! payload by advancing `pos`. [`peek_token`][WxfCursor::peek_token] looks
+//! at `bytes[pos]` without advancing.
 //!
-//! The cursor is the single canonical source of WXF parsing logic: token-byte
-//! recognition, varint length prefixes, UTF-8 enforcement, and zlib transparency
-//! all live here. Higher-level types only deal in *kinds* (was that an
-//! Integer? a Function? an Association?) and rely on the cursor to advance the
-//! stream the right number of bytes.
-//!
-//! [`Expr`]: wolfram_expr::Expr
+//! No `Read` trait dance, no lookahead buffer — input is fully in memory by
+//! the time we get here (the public API takes `&[u8]`), so position-based
+//! slice access is the most direct mapping. For `8C:` payloads we
+//! decompress once at construction; the cost is one extra allocation in
+//! exchange for losing all the streaming-Read complexity.
 
-use std::io::{Cursor, Read};
+use std::borrow::Cow;
+use std::io::Read;
 
 use flate2::read::ZlibDecoder;
 
@@ -26,138 +24,133 @@ use wolfram_expr::{
 use crate::Error;
 
 use super::constants::*;
-use super::varint::read_varint;
 
-/// Pull-based reader over a WXF byte stream.
-///
-/// Construct with [`new`][Self::new] which validates the `8:` / `8C:` header
-/// and wraps the payload in a zlib decoder if compressed.  Each `read_*`
-/// method consumes its specific token byte plus payload and returns the
-/// decoded value.  Use [`peek_token`][Self::peek_token] to look ahead one
-/// byte without advancing.
+/// Position-indexed reader over a decoded WXF byte stream.
 pub struct WxfCursor<'a> {
-    reader: WxfReader<'a>,
-    /// 1-byte lookahead buffer used by [`peek_token`]. `Some` means we
-    /// peeked but haven't consumed; the next read pulls from here first.
-    peeked: Option<u8>,
-}
-
-/// Owns either a plain or a gzip-decoded byte stream — both implement
-/// [`Read`], which is all the cursor's internals need.
-enum WxfReader<'a> {
-    Plain(Cursor<&'a [u8]>),
-    Compressed(ZlibDecoder<Cursor<&'a [u8]>>),
-}
-
-impl<'a> Read for WxfReader<'a> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            WxfReader::Plain(c) => c.read(buf),
-            WxfReader::Compressed(d) => d.read(buf),
-        }
-    }
+    /// Decoded payload bytes (header stripped, gzip already applied).
+    /// Borrowed when the input was uncompressed; owned when we had to
+    /// decompress an `8C:` payload.
+    bytes: Cow<'a, [u8]>,
+    /// Read position in `bytes`. Reads consume forward; never rewinds.
+    pos: usize,
 }
 
 impl<'a> WxfCursor<'a> {
-    /// Construct a cursor over `bytes`. Validates the `8:` (uncompressed) or
-    /// `8C:` (zlib-compressed) header. After return, the cursor is positioned
-    /// at the first token byte.
-    pub fn new(bytes: &'a [u8]) -> Result<Self, Error> {
-        let mut cur = Cursor::new(bytes);
-        let mut header = [0u8; 2];
-        cur.read_exact(&mut header)
-            .map_err(|_| Error::InvalidWxf("byte stream too short for WXF header".into()))?;
-        if header[0] != WXF_VERSION {
+    /// Construct from raw WXF bytes. Validates the `8:` / `8C:` header.
+    /// For compressed payloads, decompresses once upfront.
+    pub fn new(input: &'a [u8]) -> Result<Self, Error> {
+        if input.len() < 2 {
+            return Err(Error::InvalidWxf("byte stream too short for WXF header".into()));
+        }
+        if input[0] != WXF_VERSION {
             return Err(Error::InvalidWxf(format!(
                 "WXF header version mismatch: expected {:?}, got {:?}",
-                WXF_VERSION as char, header[0] as char
+                WXF_VERSION as char, input[0] as char
             )));
         }
-        if header[1] == WXF_HEADER_COMPRESS {
-            // `8C:` — read the trailing `:` then wrap the rest in a zlib reader.
-            let mut sep = [0u8; 1];
-            cur.read_exact(&mut sep)
-                .map_err(|_| Error::InvalidWxf("WXF compressed header truncated".into()))?;
-            if sep[0] != WXF_HEADER_SEPARATOR {
+        if input[1] == WXF_HEADER_COMPRESS {
+            // `8C:` — verify the trailing `:`, then zlib-decompress the rest.
+            if input.len() < 3 {
+                return Err(Error::InvalidWxf("WXF compressed header truncated".into()));
+            }
+            if input[2] != WXF_HEADER_SEPARATOR {
                 return Err(Error::InvalidWxf(format!(
                     "WXF compressed header: expected ':' after 'C', got {:?}",
-                    sep[0] as char
+                    input[2] as char
                 )));
             }
+            let mut decoded = Vec::new();
+            ZlibDecoder::new(&input[3..])
+                .read_to_end(&mut decoded)
+                .map_err(|e| Error::InvalidWxf(format!("zlib decompress failed: {}", e)))?;
             return Ok(Self {
-                reader: WxfReader::Compressed(ZlibDecoder::new(cur)),
-                peeked: None,
+                bytes: Cow::Owned(decoded),
+                pos: 0,
             });
         }
-        if header[1] != WXF_HEADER_SEPARATOR {
+        if input[1] != WXF_HEADER_SEPARATOR {
             return Err(Error::InvalidWxf(format!(
                 "WXF header separator mismatch: expected ':' or 'C', got {:?}",
-                header[1] as char
+                input[1] as char
             )));
         }
         Ok(Self {
-            reader: WxfReader::Plain(cur),
-            peeked: None,
+            bytes: Cow::Borrowed(&input[2..]),
+            pos: 0,
         })
     }
 
-    //==============================================================================
-    // Low-level byte plumbing
-    //==============================================================================
+    //---- low-level reads ------------------------------------------------
 
-    /// Peek the next token byte without consuming it. Subsequent calls return
-    /// the same byte until a `read_*` consumes it.
-    pub fn peek_token(&mut self) -> Result<u8, Error> {
-        if let Some(b) = self.peeked {
-            return Ok(b);
-        }
-        let b = self.read_byte()?;
-        self.peeked = Some(b);
+    /// Look at the next byte without consuming it. Token-byte boundary callers.
+    pub fn peek_token(&self) -> Result<u8, Error> {
+        self.bytes
+            .get(self.pos)
+            .copied()
+            .ok_or_else(|| Error::InvalidWxf("unexpected EOF".into()))
+    }
+
+    /// Consume one byte, advancing position by 1.
+    fn read_byte(&mut self) -> Result<u8, Error> {
+        let b = self.peek_token()?;
+        self.pos += 1;
         Ok(b)
     }
 
-    fn read_byte(&mut self) -> Result<u8, Error> {
-        if let Some(b) = self.peeked.take() {
-            return Ok(b);
+    /// Consume `N` bytes as a fixed-size array (used for integer / real
+    /// payloads where the width is known at compile time).
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Error> {
+        let end = self.pos.checked_add(N).ok_or_else(|| {
+            Error::InvalidWxf("byte count overflow when reading payload".into())
+        })?;
+        if end > self.bytes.len() {
+            return Err(Error::InvalidWxf(format!(
+                "unexpected EOF reading {} bytes",
+                N
+            )));
         }
-        let mut buf = [0u8; 1];
-        self.reader
-            .read_exact(&mut buf)
-            .map_err(|_| Error::InvalidWxf("unexpected EOF".into()))?;
-        Ok(buf[0])
+        let mut buf = [0u8; N];
+        buf.copy_from_slice(&self.bytes[self.pos..end]);
+        self.pos = end;
+        Ok(buf)
     }
 
+    /// Consume `n` bytes into an owned `Vec<u8>`. Used for length-prefixed
+    /// payloads (strings, byte arrays, numeric arrays) where the width is
+    /// determined at runtime.
     fn read_n(&mut self, n: usize) -> Result<Vec<u8>, Error> {
-        let mut out = vec![0u8; n];
-        // If we have a peeked byte, place it at index 0.
-        if let Some(b) = self.peeked.take() {
-            if n == 0 {
-                // A peeked byte is "next"; if caller asked for 0 bytes, push
-                // it back so subsequent reads still see it.
-                self.peeked = Some(b);
-                return Ok(out);
-            }
-            out[0] = b;
-            self.reader
-                .read_exact(&mut out[1..])
-                .map_err(|_| Error::InvalidWxf(format!("unexpected EOF reading {} bytes", n)))?;
-        } else {
-            self.reader
-                .read_exact(&mut out)
-                .map_err(|_| Error::InvalidWxf(format!("unexpected EOF reading {} bytes", n)))?;
+        let end = self.pos.checked_add(n).ok_or_else(|| {
+            Error::InvalidWxf("byte count overflow when reading payload".into())
+        })?;
+        if end > self.bytes.len() {
+            return Err(Error::InvalidWxf(format!(
+                "unexpected EOF reading {} bytes",
+                n
+            )));
         }
+        let out = self.bytes[self.pos..end].to_vec();
+        self.pos = end;
         Ok(out)
     }
 
-    fn read_varint_inline(&mut self) -> Result<u64, Error> {
-        // `read_varint` takes any `&mut R: Read`; bridge through a tiny
-        // adapter that respects the peeked-byte buffer.
-        let mut adapter = ReadAdapter { c: self };
-        read_varint(&mut adapter)
+    /// Read a WXF varint (LE-base-128 with continuation bit).
+    fn read_varint(&mut self) -> Result<u64, Error> {
+        let mut result: u64 = 0;
+        let mut shift: u32 = 0;
+        loop {
+            let b = self.read_byte()?;
+            result |= u64::from(b & 0x7F) << shift;
+            if b & 0x80 == 0 {
+                return Ok(result);
+            }
+            shift += 7;
+            if shift >= 64 {
+                return Err(Error::InvalidWxf("varint exceeds 64 bits".into()));
+            }
+        }
     }
 
-    /// Consume the next token byte expecting it to equal `expected`. Errors
-    /// with a contextual message otherwise.
+    /// Consume the next byte expecting it to equal `expected`.
     fn expect_token(&mut self, expected: u8, ctx: &'static str) -> Result<(), Error> {
         let got = self.read_byte()?;
         if got != expected {
@@ -169,42 +162,16 @@ impl<'a> WxfCursor<'a> {
         Ok(())
     }
 
-    //==============================================================================
-    // Atom reads
-    //==============================================================================
+    //---- atom reads -----------------------------------------------------
 
     /// Consume an `Integer8`/`Integer16`/`Integer32`/`Integer64` token + payload.
     pub fn read_integer(&mut self) -> Result<i64, Error> {
         let tag = self.read_byte()?;
         match tag {
-            TOKEN_INTEGER8 => {
-                let mut b = [0u8; 1];
-                self.reader
-                    .read_exact(&mut b)
-                    .map_err(|_| Error::InvalidWxf("EOF in Integer8 payload".into()))?;
-                Ok(i64::from(i8::from_le_bytes(b)))
-            }
-            TOKEN_INTEGER16 => {
-                let mut b = [0u8; 2];
-                self.reader
-                    .read_exact(&mut b)
-                    .map_err(|_| Error::InvalidWxf("EOF in Integer16 payload".into()))?;
-                Ok(i64::from(i16::from_le_bytes(b)))
-            }
-            TOKEN_INTEGER32 => {
-                let mut b = [0u8; 4];
-                self.reader
-                    .read_exact(&mut b)
-                    .map_err(|_| Error::InvalidWxf("EOF in Integer32 payload".into()))?;
-                Ok(i64::from(i32::from_le_bytes(b)))
-            }
-            TOKEN_INTEGER64 => {
-                let mut b = [0u8; 8];
-                self.reader
-                    .read_exact(&mut b)
-                    .map_err(|_| Error::InvalidWxf("EOF in Integer64 payload".into()))?;
-                Ok(i64::from_le_bytes(b))
-            }
+            TOKEN_INTEGER8 => Ok(i64::from(i8::from_le_bytes(self.read_array::<1>()?))),
+            TOKEN_INTEGER16 => Ok(i64::from(i16::from_le_bytes(self.read_array::<2>()?))),
+            TOKEN_INTEGER32 => Ok(i64::from(i32::from_le_bytes(self.read_array::<4>()?))),
+            TOKEN_INTEGER64 => Ok(i64::from_le_bytes(self.read_array::<8>()?)),
             other => Err(Error::InvalidWxf(format!(
                 "expected an Integer token, got 0x{:02X}",
                 other
@@ -215,27 +182,22 @@ impl<'a> WxfCursor<'a> {
     /// Consume a `Real64` token + 8 LE bytes.
     pub fn read_real(&mut self) -> Result<f64, Error> {
         self.expect_token(TOKEN_REAL64, "read_real")?;
-        let mut b = [0u8; 8];
-        self.reader
-            .read_exact(&mut b)
-            .map_err(|_| Error::InvalidWxf("EOF in Real64 payload".into()))?;
-        Ok(f64::from_le_bytes(b))
+        Ok(f64::from_le_bytes(self.read_array::<8>()?))
     }
 
     /// Consume a `String` token + varint length + UTF-8 payload.
     pub fn read_string(&mut self) -> Result<String, Error> {
         self.expect_token(TOKEN_STRING, "read_string")?;
-        let len = self.read_varint_inline()? as usize;
+        let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         String::from_utf8(bytes)
             .map_err(|_| Error::InvalidWxf("String payload not valid UTF-8".into()))
     }
 
-    /// Consume a `Symbol` token + varint length + UTF-8 name + parse it through
-    /// [`Symbol::try_from_wxf_name_owned`].
+    /// Consume a `Symbol` token + varint length + UTF-8 name + parse it.
     pub fn read_symbol(&mut self) -> Result<Symbol, Error> {
         self.expect_token(TOKEN_SYMBOL, "read_symbol")?;
-        let len = self.read_varint_inline()? as usize;
+        let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         let name = String::from_utf8(bytes)
             .map_err(|_| Error::InvalidWxf("Symbol payload not valid UTF-8".into()))?;
@@ -246,14 +208,14 @@ impl<'a> WxfCursor<'a> {
     /// Consume a `BinaryString` (ByteArray) token + varint length + bytes.
     pub fn read_byte_array(&mut self) -> Result<Vec<u8>, Error> {
         self.expect_token(TOKEN_BINARY_STRING, "read_byte_array")?;
-        let len = self.read_varint_inline()? as usize;
+        let len = self.read_varint()? as usize;
         self.read_n(len)
     }
 
     /// Consume a `BigInteger` token + varint length + UTF-8 digit string.
     pub fn read_big_integer(&mut self) -> Result<BigInteger, Error> {
         self.expect_token(TOKEN_BIG_INTEGER, "read_big_integer")?;
-        let len = self.read_varint_inline()? as usize;
+        let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         let s = String::from_utf8(bytes)
             .map_err(|_| Error::InvalidWxf("BigInteger payload not valid UTF-8".into()))?;
@@ -263,7 +225,7 @@ impl<'a> WxfCursor<'a> {
     /// Consume a `BigReal` token + varint length + UTF-8 digit string.
     pub fn read_big_real(&mut self) -> Result<BigReal, Error> {
         self.expect_token(TOKEN_BIG_REAL, "read_big_real")?;
-        let len = self.read_varint_inline()? as usize;
+        let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         let s = String::from_utf8(bytes)
             .map_err(|_| Error::InvalidWxf("BigReal payload not valid UTF-8".into()))?;
@@ -271,17 +233,20 @@ impl<'a> WxfCursor<'a> {
     }
 
     /// Consume a `NumericArray` token + element-type byte + dim count + dims +
-    /// flat byte buffer. Returns the fully assembled [`NumericArray`].
+    /// flat byte buffer.
     pub fn read_numeric_array(&mut self) -> Result<NumericArray, Error> {
         self.expect_token(TOKEN_NUMERIC_ARRAY, "read_numeric_array")?;
         let type_byte = self.read_byte()?;
         let dt = array_type_from_wxf(type_byte).ok_or_else(|| {
-            Error::InvalidWxf(format!("unknown NumericArray element type: 0x{:02X}", type_byte))
+            Error::InvalidWxf(format!(
+                "unknown NumericArray element type: 0x{:02X}",
+                type_byte
+            ))
         })?;
-        let rank = self.read_varint_inline()? as usize;
+        let rank = self.read_varint()? as usize;
         let mut dims = Vec::with_capacity(rank);
         for _ in 0..rank {
-            dims.push(self.read_varint_inline()? as usize);
+            dims.push(self.read_varint()? as usize);
         }
         let elem_count: usize = dims.iter().product();
         let byte_count = elem_count * dt.size_in_bytes();
@@ -295,17 +260,21 @@ impl<'a> WxfCursor<'a> {
         self.expect_token(TOKEN_PACKED_ARRAY, "read_packed_array")?;
         let type_byte = self.read_byte()?;
         let dt = array_type_from_wxf(type_byte).ok_or_else(|| {
-            Error::InvalidWxf(format!("unknown PackedArray element type: 0x{:02X}", type_byte))
+            Error::InvalidWxf(format!(
+                "unknown PackedArray element type: 0x{:02X}",
+                type_byte
+            ))
         })?;
-        // PackedArray's element-type set is a strict subset of NumericArray's;
-        // try_new validates and rejects the unsigned-integer variants.
         let pdt = PackedArrayDataType::try_new(dt).ok_or_else(|| {
-            Error::InvalidWxf(format!("PackedArray does not support element type {:?}", dt))
+            Error::InvalidWxf(format!(
+                "PackedArray does not support element type {:?}",
+                dt
+            ))
         })?;
-        let rank = self.read_varint_inline()? as usize;
+        let rank = self.read_varint()? as usize;
         let mut dims = Vec::with_capacity(rank);
         for _ in 0..rank {
-            dims.push(self.read_varint_inline()? as usize);
+            dims.push(self.read_varint()? as usize);
         }
         let elem_count: usize = dims.iter().product();
         let byte_count = elem_count * pdt.size_in_bytes();
@@ -313,26 +282,24 @@ impl<'a> WxfCursor<'a> {
         Ok(PackedArray::new(pdt, dims, bytes))
     }
 
-    //==============================================================================
-    // Compound headers — caller reads contents next
-    //==============================================================================
+    //---- compound headers (caller reads contents next) -------------------
 
-    /// Consume a `Function` token + varint arity. Caller must next read the
-    /// head value, then `arity` argument values.
+    /// Consume a `Function` token + varint arity. Caller next reads the head
+    /// value, then `arity` argument values.
     pub fn read_function_header(&mut self) -> Result<u64, Error> {
         self.expect_token(TOKEN_FUNCTION, "read_function_header")?;
-        self.read_varint_inline()
+        self.read_varint()
     }
 
-    /// Consume an `Association` token + varint entry count. Caller must next
-    /// read `count` (rule, key, value) triplets.
+    /// Consume an `Association` token + varint entry count. Caller next reads
+    /// `count` (rule, key, value) triplets.
     pub fn read_association_header(&mut self) -> Result<u64, Error> {
         self.expect_token(TOKEN_ASSOCIATION, "read_association_header")?;
-        self.read_varint_inline()
+        self.read_varint()
     }
 
-    /// Consume one `Rule` (`-`) or `RuleDelayed` (`:`) token; returns the
-    /// `delayed` flag (`false` for plain Rule, `true` for RuleDelayed).
+    /// Consume one `Rule` (`-`) or `RuleDelayed` (`:`) byte; returns the
+    /// `delayed` flag.
     pub fn read_rule(&mut self) -> Result<bool, Error> {
         let tag = self.read_byte()?;
         match tag {
@@ -345,9 +312,8 @@ impl<'a> WxfCursor<'a> {
         }
     }
 
-    /// Recursively skip one value at the cursor's current position. Useful
-    /// when the deriver encounters an unknown Association key and needs to
-    /// advance past its value to continue.
+    /// Recursively skip one value at the cursor's current position. Used by
+    /// the derive when an unknown Association key is encountered.
     pub fn skip(&mut self) -> Result<(), Error> {
         let tag = self.peek_token()?;
         match tag {
@@ -401,29 +367,5 @@ impl<'a> WxfCursor<'a> {
             }
         }
         Ok(())
-    }
-}
-
-/// Tiny `Read` adapter for [`read_varint`] calls — needed because the
-/// cursor's internal reader sits behind a peeked-byte buffer that
-/// `read_varint` can't see directly.
-struct ReadAdapter<'a, 'b> {
-    c: &'b mut WxfCursor<'a>,
-}
-
-impl<'a, 'b> Read for ReadAdapter<'a, 'b> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
-        if let Some(b) = self.c.peeked.take() {
-            buf[0] = b;
-            if buf.len() == 1 {
-                return Ok(1);
-            }
-            let rest = self.c.reader.read(&mut buf[1..])?;
-            return Ok(1 + rest);
-        }
-        self.c.reader.read(buf)
     }
 }
