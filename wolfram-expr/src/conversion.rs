@@ -10,28 +10,6 @@ impl Expr {
         }
     }
 
-    /// If this is a [`True`](http://reference.wolfram.com/language/ref/True.html)
-    /// or [`False`](http://reference.wolfram.com/language/ref/False.html) symbol,
-    /// return that. Otherwise return None.
-    pub fn try_as_bool(&self) -> Option<bool> {
-        let s = self.try_as_symbol()?;
-        if s.as_str() == "System`True" {
-            return Some(true);
-        }
-        if s.as_str() == "System`False" {
-            return Some(false);
-        }
-        None
-    }
-
-    /// If this is a [`ExprKind::String`] expression, return that. Otherwise return None.
-    pub fn try_as_str(&self) -> Option<&str> {
-        match self.kind() {
-            ExprKind::String(ref string) => Some(string.as_str()),
-            _ => None,
-        }
-    }
-
     /// If this is a [`Symbol`] expression, return that. Otherwise return None.
     pub fn try_as_symbol(&self) -> Option<&Symbol> {
         match self.kind() {
@@ -77,22 +55,6 @@ impl Expr {
     pub fn try_as_packed_array(&self) -> Option<&PackedArray> {
         match self.kind() {
             ExprKind::PackedArray(ref a) => Some(a),
-            _ => None,
-        }
-    }
-
-    /// If this is a [`BigInteger`] expression, return that. Otherwise return None.
-    pub fn try_as_big_integer(&self) -> Option<&BigInteger> {
-        match self.kind() {
-            ExprKind::BigInteger(ref n) => Some(n),
-            _ => None,
-        }
-    }
-
-    /// If this is a [`BigReal`] expression, return that. Otherwise return None.
-    pub fn try_as_big_real(&self) -> Option<&BigReal> {
-        match self.kind() {
-            ExprKind::BigReal(ref r) => Some(r),
             _ => None,
         }
     }

@@ -7,7 +7,7 @@
 //! compute on a deserialized BigInteger, parse it yourself:
 //!
 //! ```ignore
-//! let bi = expr.try_as_big_integer().unwrap();
+//! let bi = match expr.kind() { ExprKind::BigInteger(n) => n, _ => unreachable!() };
 //! let value: num_bigint::BigInt = bi.0.parse().unwrap();
 //! let result = value * 2;
 //! let back = BigInteger::new(result.to_string());

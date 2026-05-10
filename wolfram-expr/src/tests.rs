@@ -66,7 +66,6 @@ fn byte_array_variant_roundtrip() {
     assert_eq!(expr.try_as_byte_array(), Some(&ba));
     // Other try_as_ methods return None on this variant:
     assert_eq!(expr.try_as_numeric_array(), None);
-    assert_eq!(expr.try_as_str(), None);
     assert_eq!(expr.try_as_number(), None);
     assert!(expr.tag().is_none());
 }
@@ -155,14 +154,18 @@ fn big_integer_variant_roundtrip() {
     use crate::BigInteger;
     let huge = BigInteger::new("999999999999999999999999999999");
     let expr = Expr::from(huge.clone());
-    assert!(matches!(expr.kind(), ExprKind::BigInteger(_)));
-    assert_eq!(expr.try_as_big_integer(), Some(&huge));
+    match expr.kind() {
+        ExprKind::BigInteger(n) => assert_eq!(n, &huge),
+        other => panic!("expected BigInteger, got {:?}", other),
+    }
 }
 #[test]
 fn big_real_variant_roundtrip() {
     use crate::BigReal;
     let r = BigReal::new("3.14159265358979323846`50.");
     let expr = Expr::from(r.clone());
-    assert!(matches!(expr.kind(), ExprKind::BigReal(_)));
-    assert_eq!(expr.try_as_big_real(), Some(&r));
+    match expr.kind() {
+        ExprKind::BigReal(s) => assert_eq!(s, &r),
+        other => panic!("expected BigReal, got {:?}", other),
+    }
 }

@@ -5,7 +5,6 @@
 //! `#[wolfram(rename = "fieldName")]` overrides the default snake_case key
 //! used in Association entries.
 
-use proc_macro2::Span;
 use syn::{Attribute, Error, Lit, Meta, NestedMeta, Result};
 
 /// Container/variant-level attributes parsed from `#[wolfram(...)]`.
@@ -98,7 +97,3 @@ pub(crate) fn qualify_symbol(ident_str: &str, container: &ContainerAttrs) -> Str
         .unwrap_or_else(|| format!("Global`{}", ident_str))
 }
 
-#[allow(dead_code)]
-pub(crate) fn err(span: Span, msg: &str) -> Error {
-    Error::new(span, msg)
-}

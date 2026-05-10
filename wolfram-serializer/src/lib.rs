@@ -86,10 +86,9 @@ pub enum Error {
     Io(std::io::Error),
     /// `import(_, Format::Wl)` — WL parsing is not implemented in V1.
     UnsupportedImportFormat,
-    /// WXF byte stream is malformed (header mismatch, unexpected token, truncation, …).
+    /// WXF byte stream is malformed (header mismatch, unexpected token,
+    /// truncation, …) or an unhandled internal serialize/deserialize state.
     InvalidWxf(String),
-    /// A consumer rejected a value with a domain-specific error.
-    Consumer(String),
     /// Type mismatch during typed deserialization via [`FromWolfram`].
     /// `path` is a dotted accessor (e.g. `"Frame.payload"`); `expected` and
     /// `got` describe the WXF / `ExprKind` shape the deserializer wanted vs.
@@ -113,7 +112,6 @@ impl std::fmt::Display for Error {
                 "import(): the requested Format does not support deserialization"
             ),
             Error::InvalidWxf(msg) => write!(f, "invalid WXF: {}", msg),
-            Error::Consumer(msg) => write!(f, "consumer error: {}", msg),
             Error::Deserialize {
                 path,
                 expected,

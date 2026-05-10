@@ -342,7 +342,7 @@ impl ToWolfram for Expr {
             ),
             ExprKind::BigInteger(n) => s.serialize_big_integer(n),
             ExprKind::BigReal(r) => s.serialize_big_real(r),
-            other => Err(Error::Consumer(format!(
+            other => Err(Error::InvalidWxf(format!(
                 "ToWolfram for Expr: unhandled ExprKind variant: {:?}",
                 other
             ))),
