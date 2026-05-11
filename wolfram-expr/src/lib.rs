@@ -451,12 +451,12 @@ impl fmt::Display for ExprKind {
             },
             ExprKind::Association(ref assoc) => {
                 write!(f, "<|")?;
-                for (i, (k, entry)) in assoc.iter().enumerate() {
+                for (i, entry) in assoc.iter().enumerate() {
                     if i != 0 {
                         write!(f, ", ")?;
                     }
                     let arrow = if entry.delayed { ":>" } else { "->" };
-                    write!(f, "{} {} {}", k, arrow, entry.value)?;
+                    write!(f, "{} {} {}", entry.key, arrow, entry.value)?;
                 }
                 write!(f, "|>")
             },

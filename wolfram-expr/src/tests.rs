@@ -74,15 +74,22 @@ fn byte_array_variant_roundtrip() {
 fn association_variant_roundtrip() {
     use crate::RuleEntry;
     let mut a = Association::new();
-    a.insert(Expr::from("k1"), RuleEntry::rule(Expr::from(1)));
-    a.insert(Expr::from("k2"), RuleEntry::rule_delayed(Expr::from(2)));
+    a.push(RuleEntry::rule(Expr::from("k1"), Expr::from(1)));
+    a.push(RuleEntry::rule_delayed(Expr::from("k2"), Expr::from(2)));
     let expr = Expr::from(a.clone());
     assert!(matches!(expr.kind(), ExprKind::Association(_)));
     assert_eq!(expr.try_as_association(), Some(&a));
     let extracted = expr.try_as_association().unwrap();
-    assert_eq!(extracted.get(&Expr::from("k1")).map(|e| &e.value), Some(&Expr::from(1)));
-    assert!(!extracted.get(&Expr::from("k1")).unwrap().delayed);
-    assert!(extracted.get(&Expr::from("k2")).unwrap().delayed);
+    let mut it = extracted.iter();
+    let e0 = it.next().unwrap();
+    assert_eq!(e0.key, Expr::from("k1"));
+    assert_eq!(e0.value, Expr::from(1));
+    assert!(!e0.delayed);
+    let e1 = it.next().unwrap();
+    assert_eq!(e1.key, Expr::from("k2"));
+    assert_eq!(e1.value, Expr::from(2));
+    assert!(e1.delayed);
+    assert!(it.next().is_none());
 }
 
 #[test]
@@ -139,7 +146,7 @@ fn display_of_new_variants_is_non_empty() {
     let assoc = {
         use crate::RuleEntry;
         let mut a = Association::new();
-        a.insert(Expr::from("k"), RuleEntry::rule(Expr::from(1)));
+        a.push(RuleEntry::rule(Expr::from("k"), Expr::from(1)));
         Expr::from(a)
     };
     let na = Expr::from(NumericArray::from_slice::<u8>(vec![1], &[42]));

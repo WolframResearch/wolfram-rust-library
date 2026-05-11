@@ -3,8 +3,18 @@
 //! coverage matrix lives in `tests/derive.rs` once the deserialize side
 //! also lands.
 
-use wolfram_expr::Expr;
+use wolfram_expr::{Association, Expr};
 use wolfram_serializer::{deserialize, serialize, Format, FromWolfram, ToWolfram};
+
+/// Linear-scan helper for tests. `Association` itself exposes no lookup —
+/// tests iterate to find an entry.
+fn find<'a>(assoc: &'a Association, key: &str) -> &'a Expr {
+    &assoc
+        .iter()
+        .find(|e| e.key == Expr::from(key))
+        .unwrap_or_else(|| panic!("missing key {:?} in Association", key))
+        .value
+}
 
 #[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
 struct Frame {
@@ -61,18 +71,15 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     let assoc = expr.try_as_association().expect("Frame should be Association");
 
     // payload → ByteArray
-    let payload = &assoc
-        .get(&wolfram_expr::Expr::from("payload"))
-        .unwrap()
-        .value;
-    assert!(payload.try_as_byte_array().is_some(), "payload should be ByteArray");
+    assert!(
+        find(assoc, "payload").try_as_byte_array().is_some(),
+        "payload should be ByteArray"
+    );
 
     // samples → 1-D NumericArray<Integer32>
-    let samples = &assoc
-        .get(&wolfram_expr::Expr::from("samples"))
-        .unwrap()
-        .value;
-    let na = samples.try_as_numeric_array().expect("samples should be NumericArray");
+    let na = find(assoc, "samples")
+        .try_as_numeric_array()
+        .expect("samples should be NumericArray");
     assert_eq!(
         na.data_type(),
         wolfram_expr::NumericArrayDataType::Integer32
@@ -80,11 +87,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     assert_eq!(na.dimensions(), &[3]);
 
     // tag → Integer (since Some)
-    let tag = &assoc
-        .get(&wolfram_expr::Expr::from("tag"))
-        .unwrap()
-        .value;
-    assert_eq!(tag, &wolfram_expr::Expr::from(7i64));
+    assert_eq!(find(assoc, "tag"), &Expr::from(7i64));
 }
 
 #[test]
@@ -120,31 +123,28 @@ fn tensor_fields_become_numeric_arrays() {
     let expr: Expr = deserialize(&bytes, Format::Wxf).unwrap();
     let assoc = expr.try_as_association().unwrap();
 
-    let fixed = &assoc.get(&wolfram_expr::Expr::from("fixed")).unwrap().value;
-    let na = fixed.try_as_numeric_array().expect("fixed → NumericArray");
+    let na = find(assoc, "fixed")
+        .try_as_numeric_array()
+        .expect("fixed → NumericArray");
     assert_eq!(na.dimensions(), &[4]);
 
-    let nested = &assoc.get(&wolfram_expr::Expr::from("nested")).unwrap().value;
-    let na = nested
+    let na = find(assoc, "nested")
         .try_as_numeric_array()
         .expect("nested → 2D NumericArray");
     assert_eq!(na.dimensions(), &[2, 3]);
 
-    let tup = &assoc.get(&wolfram_expr::Expr::from("tup")).unwrap().value;
-    let na = tup.try_as_numeric_array().expect("tup → 1D NumericArray");
+    let na = find(assoc, "tup")
+        .try_as_numeric_array()
+        .expect("tup → 1D NumericArray");
     assert_eq!(na.dimensions(), &[3]);
 
-    let nested_tup = &assoc
-        .get(&wolfram_expr::Expr::from("nested_tup"))
-        .unwrap()
-        .value;
-    let na = nested_tup
+    let na = find(assoc, "nested_tup")
         .try_as_numeric_array()
         .expect("nested_tup → 2D NumericArray");
     assert_eq!(na.dimensions(), &[2, 2]);
 
     // hetero (i64, String) should NOT be a NumericArray; should be a List.
-    let hetero = &assoc.get(&wolfram_expr::Expr::from("hetero")).unwrap().value;
+    let hetero = find(assoc, "hetero");
     assert!(hetero.try_as_numeric_array().is_none());
     let n = hetero.try_as_normal().expect("hetero → Function[List, …]");
     assert_eq!(n.head().try_as_symbol().unwrap().as_str(), "System`List");
@@ -223,17 +223,18 @@ fn enum_roundtrips_all_variant_shapes() {
 
 #[test]
 fn enum_variants_emit_proper_shapes() {
-    use wolfram_expr::Expr;
-
-    // Helper: assert the parsed Expr is an Association whose first entry is
-    // `"Enum" -> variant_name_string`.
+    // Helper: assert the parsed Expr is an Association whose `"Enum"` entry
+    // equals `expected_variant`, and return the value of the `"Data"` entry
+    // (or `System\`Null` if absent).
     fn assert_enum_key(expr: &Expr, expected_variant: &str) -> Expr {
         let assoc = expr.try_as_association().expect("Association");
-        let v = &assoc.get(&Expr::from("Enum")).expect("Enum key").value;
-        let s = v.try_as_str().expect("Enum value is String").to_string();
+        let s = find(assoc, "Enum")
+            .try_as_str()
+            .expect("Enum value is String");
         assert_eq!(s, expected_variant);
-        // Return Data value if present (for caller to inspect further).
-        assoc.get(&Expr::from("Data"))
+        assoc
+            .iter()
+            .find(|e| e.key == Expr::from("Data"))
             .map(|e| e.value.clone())
             .unwrap_or_else(|| Expr::symbol(wolfram_expr::Symbol::new("System`Null")))
     }
@@ -243,8 +244,7 @@ fn enum_variants_emit_proper_shapes() {
     let s: Expr = deserialize(&bytes, Format::Wxf).unwrap();
     let assoc = s.try_as_association().expect("Association");
     assert_eq!(assoc.len(), 1);
-    let v = &assoc.get(&Expr::from("Enum")).unwrap().value;
-    assert_eq!(v.try_as_str().unwrap(), "Origin");
+    assert_eq!(find(assoc, "Enum").try_as_str().unwrap(), "Origin");
 
     // Tuple variant (1 arg): "Data" → List of args.
     let bytes = serialize(&Shape::Square(2.0), Format::Wxf).unwrap();
@@ -267,7 +267,7 @@ fn enum_variants_emit_proper_shapes() {
     let s: Expr = deserialize(&bytes, Format::Wxf).unwrap();
     let data = assert_enum_key(&s, "Circle");
     let inner = data.try_as_association().expect("Data is an Association");
-    assert!(inner.get(&Expr::from("radius")).is_some());
+    assert!(inner.iter().any(|e| e.key == Expr::from("radius")));
 }
 
 /// Hand-craft WXF bytes for `<|"a" -> 1, "b" -> 2|>` — i.e. an Association

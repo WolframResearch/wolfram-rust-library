@@ -89,16 +89,16 @@ fn function_user_context() {
 #[test]
 fn association_plain() {
     let mut a = Association::new();
-    a.insert(Expr::from("a"), RuleEntry::rule(Expr::from(1)));
-    a.insert(Expr::from("b"), RuleEntry::rule(Expr::from(2)));
+    a.push(RuleEntry::rule(Expr::from("a"), Expr::from(1)));
+    a.push(RuleEntry::rule(Expr::from("b"), Expr::from(2)));
     assert_parses_to(fix::ASSOCIATION_PLAIN, Expr::from(a));
 }
 
 #[test]
 fn association_with_delayed_rule() {
     let mut a = Association::new();
-    a.insert(Expr::from("a"), RuleEntry::rule(Expr::from(1)));
-    a.insert(Expr::from("b"), RuleEntry::rule_delayed(Expr::from(2)));
+    a.push(RuleEntry::rule(Expr::from("a"), Expr::from(1)));
+    a.push(RuleEntry::rule_delayed(Expr::from("b"), Expr::from(2)));
     assert_parses_to(fix::ASSOCIATION_DELAYED, Expr::from(a));
 }
 

@@ -296,7 +296,7 @@ impl ToWolfram for Association {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
         let entries: Vec<(&dyn ToWolfram, &dyn ToWolfram, bool)> = self
             .iter()
-            .map(|(k, e)| (k as &dyn ToWolfram, &e.value as &dyn ToWolfram, e.delayed))
+            .map(|e| (&e.key as &dyn ToWolfram, &e.value as &dyn ToWolfram, e.delayed))
             .collect();
         s.serialize_association(&entries)
     }

@@ -72,8 +72,8 @@ fn byte_array_roundtrip() {
 #[test]
 fn association_rule_and_delayed() {
     let mut a = Association::new();
-    a.insert(Expr::from("eager"), RuleEntry::rule(Expr::from(1)));
-    a.insert(Expr::from("lazy"), RuleEntry::rule_delayed(Expr::from(2)));
+    a.push(RuleEntry::rule(Expr::from("eager"), Expr::from(1)));
+    a.push(RuleEntry::rule_delayed(Expr::from("lazy"), Expr::from(2)));
     roundtrip(Expr::from(a));
 }
 

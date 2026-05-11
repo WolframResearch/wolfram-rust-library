@@ -44,9 +44,9 @@ fn list_via_normal() {
 #[test]
 fn association_arrows() {
     let mut a = Association::new();
-    a.insert(Expr::from("a"), RuleEntry::rule(Expr::from(1)));
-    a.insert(Expr::from("b"), RuleEntry::rule_delayed(Expr::from(2)));
-    // BTreeMap ordering: "a" before "b"
+    a.push(RuleEntry::rule(Expr::from("a"), Expr::from(1)));
+    a.push(RuleEntry::rule_delayed(Expr::from("b"), Expr::from(2)));
+    // Insertion order: "a" before "b"
     assert_eq!(wl(&Expr::from(a)), r#"<|"a" -> 1, "b" :> 2|>"#);
 }
 

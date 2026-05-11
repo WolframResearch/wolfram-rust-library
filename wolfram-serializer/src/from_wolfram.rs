@@ -116,9 +116,13 @@ impl FromWolfram for Expr {
                 let mut a = Association::new();
                 for _ in 0..n {
                     let delayed = c.read_rule()?;
-                    let k = Expr::from_cursor(c)?;
-                    let v = Expr::from_cursor(c)?;
-                    a.insert(k, RuleEntry { value: v, delayed });
+                    let key = Expr::from_cursor(c)?;
+                    let value = Expr::from_cursor(c)?;
+                    a.push(RuleEntry {
+                        key,
+                        value,
+                        delayed,
+                    });
                 }
                 Ok(Expr::from(a))
             }
@@ -241,9 +245,13 @@ impl FromWolfram for Association {
         let mut a = Association::new();
         for _ in 0..n {
             let delayed = c.read_rule()?;
-            let k = Expr::from_cursor(c)?;
-            let v = Expr::from_cursor(c)?;
-            a.insert(k, RuleEntry { value: v, delayed });
+            let key = Expr::from_cursor(c)?;
+            let value = Expr::from_cursor(c)?;
+            a.push(RuleEntry {
+                key,
+                value,
+                delayed,
+            });
         }
         Ok(a)
     }
