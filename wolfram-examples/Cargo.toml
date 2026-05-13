@@ -1,0 +1,9 @@
+[package]
+name = "wolfram-examples"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
+wolfram-serializer = { version = "0.1.0", path = "../wolfram-serializer" }

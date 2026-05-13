@@ -13,9 +13,18 @@ wolfram-library-link = { version = "0.2.11", path = "../wolfram-library-link", d
 wolfram-library-link-sys = { version = "0.2.10", path = "../wolfram-library-link-sys" }
 wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
 
+[dev-dependencies]
+wolfram-examples = { path = "../wolfram-examples" }
+wolfram-library-link = { version = "0.2.11", path = "../wolfram-library-link", default-features = false }
+
 [features]
 default = ["automate-function-loading-boilerplate"]
 automate-function-loading-boilerplate = [
     "wolfram-export-core/automate-function-loading-boilerplate",
     "wolfram-export-macros/automate-function-loading-boilerplate",
 ]
+
+[[example]]
+name = "points_native"
+crate-type = ["cdylib"]
+required-features = ["automate-function-loading-boilerplate"]

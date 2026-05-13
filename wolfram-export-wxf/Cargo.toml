@@ -17,6 +17,7 @@ wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
 
 [dev-dependencies]
 libloading = "0.8"
+wolfram-examples = { path = "../wolfram-examples" }
 
 [features]
 default = ["automate-function-loading-boilerplate"]
@@ -25,10 +26,7 @@ automate-function-loading-boilerplate = [
     "wolfram-export-macros/automate-function-loading-boilerplate",
 ]
 
-# WXF counterpart to wolfram-library-link/examples/docs/convert/manual_wstp.rs
-# and using_expr.rs — both create the same `Point` struct, but using typed
-# WXF transfer instead of manual WSTP marshalling.
 [[example]]
-name = "point"
+name = "points_wxf"
 crate-type = ["cdylib"]
 required-features = ["automate-function-loading-boilerplate"]
