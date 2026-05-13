@@ -865,7 +865,9 @@ impl<T> fmt::Debug for NumericArray<T> {
 // valid element types, which can't move to wolfram-expr (orphan rule).
 //==============================================================================
 
-use wolfram_expr::{NumericArray as ExprNumericArray, NumericArrayRead as ExprNumericArrayRead};
+use wolfram_expr::{
+    NumericArray as ExprNumericArray, NumericArrayRead as ExprNumericArrayRead,
+};
 
 impl<T> ExprNumericArrayRead for NumericArray<T> {
     fn data_type(&self) -> NumericArrayDataType {

@@ -34,9 +34,12 @@ fn manage_instance(action: ManagedExpressionEvent) {
     match action {
         ManagedExpressionEvent::Create(id) => {
             // Insert a new MyObject instance with some default values.
-            instances.insert(id, MyObject {
-                value: String::from("default"),
-            });
+            instances.insert(
+                id,
+                MyObject {
+                    value: String::from("default"),
+                },
+            );
         },
         ManagedExpressionEvent::Drop(id) => {
             if let Some(obj) = instances.remove(&id) {
@@ -81,10 +84,13 @@ fn get_instance_data(args: Vec<Expr>) -> Expr {
             .expect("instance does not exist")
     };
 
-    Expr::normal(Symbol::new("System`Association"), vec![Expr::normal(
-        Symbol::new("System`Rule"),
-        vec![Expr::string("Value"), Expr::string(value)],
-    )])
+    Expr::normal(
+        Symbol::new("System`Association"),
+        vec![Expr::normal(
+            Symbol::new("System`Rule"),
+            vec![Expr::string("Value"), Expr::string(value)],
+        )],
+    )
 }
 
 fn unwrap_id_arg(arg: &Expr) -> u32 {

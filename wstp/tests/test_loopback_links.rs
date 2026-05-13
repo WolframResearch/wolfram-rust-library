@@ -100,7 +100,6 @@ fn test_loopback_basic_put_and_get_list() {
     link.put_function("List", 1).unwrap();
     link.put_i64(10).unwrap();
 
-
     assert_eq!(link.raw_get_next(), Ok(sys::WSTKFUNC.into()));
     assert_eq!(link.get_arg_count(), Ok(1));
     assert_eq!(

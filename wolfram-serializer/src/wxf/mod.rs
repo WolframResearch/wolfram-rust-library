@@ -8,8 +8,8 @@ use std::io::Write;
 
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
 use wolfram_expr::{BigInteger, BigReal};
+use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
 
 use crate::serializer::{Serializer, ToWolfram};
 use crate::{CompressionLevel, Error};
@@ -36,7 +36,8 @@ where
     // Header: `8C:` — version 8, compression marker, separator.
     writer.write_all(&[WXF_VERSION, WXF_HEADER_COMPRESS, WXF_HEADER_SEPARATOR])?;
 
-    let mut encoder = ZlibEncoder::new(writer, Compression::new(u32::from(level.to_u8())));
+    let mut encoder =
+        ZlibEncoder::new(writer, Compression::new(u32::from(level.to_u8())));
     {
         // Inside the encoder, write the WXF token payload — but with NO header
         // (header was already emitted to the underlying writer above).
@@ -135,8 +136,11 @@ impl<'w, W: Write> Serializer for WxfSerializer<'w, W> {
         self.out.write_all(&[TOKEN_ASSOCIATION])?;
         write_varint(self.out, entries.len() as u64)?;
         for (k, v, delayed) in entries {
-            self.out
-                .write_all(&[if *delayed { TOKEN_RULE_DELAYED } else { TOKEN_RULE }])?;
+            self.out.write_all(&[if *delayed {
+                TOKEN_RULE_DELAYED
+            } else {
+                TOKEN_RULE
+            }])?;
             k.serialize(self)?;
             v.serialize(self)?;
         }
@@ -166,7 +170,8 @@ impl<'w, W: Write> Serializer for WxfSerializer<'w, W> {
         bytes: &[u8],
     ) -> Result<(), Error> {
         self.out.write_all(&[TOKEN_PACKED_ARRAY])?;
-        self.out.write_all(&[array_type_to_wxf(data_type.into_numeric())])?;
+        self.out
+            .write_all(&[array_type_to_wxf(data_type.into_numeric())])?;
         write_varint(self.out, dimensions.len() as u64)?;
         for d in dimensions {
             write_varint(self.out, *d as u64)?;

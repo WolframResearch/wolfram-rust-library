@@ -14,7 +14,6 @@ use static_assertions::assert_not_impl_any;
 
 use crate::{rtl, sys, DataStore};
 
-
 /// Handle to a Wolfram Language [`AsynchronousTaskObject`][ref/AsynchronousTaskObject]<sub>WL</sub>
 /// instance.
 ///
@@ -27,7 +26,6 @@ pub struct AsyncTaskObject(sys::mint);
 
 // TODO: Determine if it would be safe for this type to implement Copy/Clone.
 assert_not_impl_any!(AsyncTaskObject: Copy, Clone);
-
 
 //======================================
 // Impls

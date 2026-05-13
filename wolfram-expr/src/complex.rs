@@ -63,7 +63,10 @@ mod tests {
     fn layout_matches_c_complex_double() {
         // C `_Complex double` is two contiguous doubles, 16 bytes, aligned to f64.
         assert_eq!(std::mem::size_of::<Complex64>(), 16);
-        assert_eq!(std::mem::align_of::<Complex64>(), std::mem::align_of::<f64>());
+        assert_eq!(
+            std::mem::align_of::<Complex64>(),
+            std::mem::align_of::<f64>()
+        );
         // Field offsets: re at byte 0, im at byte 8.
         let z = Complex64::new(1.0, 2.0);
         let bytes: [u8; 16] = unsafe { std::mem::transmute(z) };
@@ -76,6 +79,9 @@ mod tests {
     #[test]
     fn layout_matches_c_complex_float() {
         assert_eq!(std::mem::size_of::<Complex32>(), 8);
-        assert_eq!(std::mem::align_of::<Complex32>(), std::mem::align_of::<f32>());
+        assert_eq!(
+            std::mem::align_of::<Complex32>(),
+            std::mem::align_of::<f32>()
+        );
     }
 }

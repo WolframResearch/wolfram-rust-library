@@ -94,7 +94,6 @@ pub(crate) fn with_raw_stdenv<T, F: FnOnce(sys::WSENV) -> T>(
     Ok(result)
 }
 
-
 /// Deinitialize the [`WSENV`] static maintained by this library.
 ///
 /// Ideally, this function would not be necessary. However, the WSTP C library internally

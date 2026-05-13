@@ -50,7 +50,9 @@ where
     F: FnOnce() -> NumericArray<u8>,
 {
     use std::panic::AssertUnwindSafe;
-    match wolfram_library_link::macro_utils::call_and_catch_as_expr(AssertUnwindSafe(func)) {
+    match wolfram_library_link::macro_utils::call_and_catch_as_expr(AssertUnwindSafe(
+        func,
+    )) {
         Ok(result) => result,
         Err(failure_expr) => encode(&failure_expr),
     }
@@ -66,8 +68,7 @@ impl<A: FromWolfram, R: ToWolfram> WxfFunction for fn(A) -> R {}
 
 /// Bridge to `wolfram_library_link::macro_utils::call_native_wolfram_library_function`
 /// — exposed under our own path so the proc-macro emits a single tidy reference.
-pub use wolfram_library_link::macro_utils::call_native_wolfram_library_function
-    as call_wxf_wolfram_library_function;
+pub use wolfram_library_link::macro_utils::call_native_wolfram_library_function as call_wxf_wolfram_library_function;
 
 /// Macro-emitted code references `crate::macro_utils::LibraryLinkFunction::Wxf`
 /// for inventory submission. Type-aliased to the shared `ExportEntry`.

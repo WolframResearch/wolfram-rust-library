@@ -86,7 +86,6 @@ fn parse_symbol_like(input: &str) -> Option<SymbolLike> {
     Some(like)
 }
 
-
 fn is_symbol_component(str: &str) -> bool {
     if str.is_empty() {
         return false;

@@ -1,6 +1,5 @@
 use wolfram_library_link::{self as wll, DataStore, NumericArray};
 
-
 #[wll::export]
 fn test_na_automatic_count(array: &NumericArray) -> i64 {
     array.share_count() as i64

@@ -784,7 +784,6 @@ unsafe impl LinkStrType for Utf32Str {
     }
 }
 
-
 /// Reference to a multidimensional rectangular array borrowed from a [`Link`].
 ///
 /// [`Array`] is returned from:

@@ -9,14 +9,14 @@ use std::{
 
 use ref_cast::RefCast;
 
+#[cfg(feature = "wstp")]
+use crate::wstp::Link;
 use crate::{
     expr::{Expr, Symbol},
     rtl,
     sys::{self, mint, mreal, MArgument},
     DataStore, Image, NumericArray,
 };
-#[cfg(feature = "wstp")]
-use crate::wstp::Link;
 
 /// Trait implemented for types that can be passed via an [`MArgument`].
 pub trait FromArg<'a> {
@@ -263,7 +263,6 @@ impl<'a> FromArg<'a> for &'a str {
 // TODO: Add FromArg for NumericArray which just clones the numeric array? Or disclaims
 //       ownership in another way?
 
-
 /// # Safety
 ///
 /// `FromArg for NumericArray<T>` MUST be constrained by `T: NumericArrayType` to prevent
@@ -300,13 +299,19 @@ impl<'a, T: crate::NumericArrayType> FromArg<'a> for &'a NumericArray<T> {
         //   won't mutate the array the Kernel passes in).
 
         // {LibraryDataType[NumericArray, "<T>"], "Constant"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`LibraryDataType"), vec![
-                Expr::from(Symbol::new("System`NumericArray")),
-                Expr::string(T::TYPE.name()),
-            ]),
-            Expr::string("Constant"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`LibraryDataType"),
+                    vec![
+                        Expr::from(Symbol::new("System`NumericArray")),
+                        Expr::string(T::TYPE.name()),
+                    ],
+                ),
+                Expr::string("Constant"),
+            ],
+        )
     }
 }
 
@@ -317,13 +322,19 @@ impl<'a, T: crate::NumericArrayType> FromArg<'a> for NumericArray<T> {
 
     fn parameter_type() -> Expr {
         // {LibraryDataType[NumericArray, "<T>"], "Shared"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`LibraryDataType"), vec![
-                Expr::from(Symbol::new("System`NumericArray")),
-                Expr::string(T::TYPE.name()),
-            ]),
-            Expr::string("Shared"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`LibraryDataType"),
+                    vec![
+                        Expr::from(Symbol::new("System`NumericArray")),
+                        Expr::string(T::TYPE.name()),
+                    ],
+                ),
+                Expr::string("Shared"),
+            ],
+        )
     }
 }
 
@@ -334,10 +345,13 @@ impl<'a> FromArg<'a> for &'a NumericArray<()> {
 
     fn parameter_type() -> Expr {
         // {NumericArray, "Constant"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::from(Symbol::new("System`NumericArray")),
-            Expr::string("Constant"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::from(Symbol::new("System`NumericArray")),
+                Expr::string("Constant"),
+            ],
+        )
     }
 }
 
@@ -348,10 +362,13 @@ impl<'a> FromArg<'a> for NumericArray<()> {
 
     fn parameter_type() -> Expr {
         // {NumericArray, "Shared"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::from(Symbol::new("System`NumericArray")),
-            Expr::string("Shared"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::from(Symbol::new("System`NumericArray")),
+                Expr::string("Shared"),
+            ],
+        )
     }
 }
 
@@ -366,16 +383,25 @@ impl<'a, T: crate::ImageData> FromArg<'a> for &'a Image<T> {
 
     fn parameter_type() -> Expr {
         // {LibraryDataType[Image | Image3D, "<T>"], "Constant"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`LibraryDataType"), vec![
-                Expr::normal(Symbol::new("System`Alternatives"), vec![
-                    Expr::from(Symbol::new("System`Image")),
-                    Expr::from(Symbol::new("System`Image3D")),
-                ]),
-                Expr::string(T::TYPE.name()),
-            ]),
-            Expr::string("Constant"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`LibraryDataType"),
+                    vec![
+                        Expr::normal(
+                            Symbol::new("System`Alternatives"),
+                            vec![
+                                Expr::from(Symbol::new("System`Image")),
+                                Expr::from(Symbol::new("System`Image3D")),
+                            ],
+                        ),
+                        Expr::string(T::TYPE.name()),
+                    ],
+                ),
+                Expr::string("Constant"),
+            ],
+        )
     }
 }
 
@@ -386,16 +412,25 @@ impl<'a, T: crate::ImageData> FromArg<'a> for Image<T> {
 
     fn parameter_type() -> Expr {
         // {LibraryDataType[Image | Image3D, "<T>"], "Shared"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`LibraryDataType"), vec![
-                Expr::normal(Symbol::new("System`Alternatives"), vec![
-                    Expr::from(Symbol::new("System`Image")),
-                    Expr::from(Symbol::new("System`Image3D")),
-                ]),
-                Expr::string(T::TYPE.name()),
-            ]),
-            Expr::string("Shared"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`LibraryDataType"),
+                    vec![
+                        Expr::normal(
+                            Symbol::new("System`Alternatives"),
+                            vec![
+                                Expr::from(Symbol::new("System`Image")),
+                                Expr::from(Symbol::new("System`Image3D")),
+                            ],
+                        ),
+                        Expr::string(T::TYPE.name()),
+                    ],
+                ),
+                Expr::string("Shared"),
+            ],
+        )
     }
 }
 
@@ -406,13 +441,19 @@ impl<'a> FromArg<'a> for &'a Image<()> {
 
     fn parameter_type() -> Expr {
         // {Image | Image3D, "Constant"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`Alternatives"), vec![
-                Expr::from(Symbol::new("System`Image")),
-                Expr::from(Symbol::new("System`Image3D")),
-            ]),
-            Expr::string("Constant"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`Alternatives"),
+                    vec![
+                        Expr::from(Symbol::new("System`Image")),
+                        Expr::from(Symbol::new("System`Image3D")),
+                    ],
+                ),
+                Expr::string("Constant"),
+            ],
+        )
     }
 }
 
@@ -423,13 +464,19 @@ impl<'a> FromArg<'a> for Image<()> {
 
     fn parameter_type() -> Expr {
         // {Image | Image3D, "Shared"}
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`Alternatives"), vec![
-                Expr::from(Symbol::new("System`Image")),
-                Expr::from(Symbol::new("System`Image3D")),
-            ]),
-            Expr::string("Shared"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`Alternatives"),
+                    vec![
+                        Expr::from(Symbol::new("System`Image")),
+                        Expr::from(Symbol::new("System`Image3D")),
+                    ],
+                ),
+                Expr::string("Shared"),
+            ],
+        )
     }
 }
 
@@ -657,10 +704,13 @@ impl<T: crate::NumericArrayType> IntoArg for NumericArray<T> {
 
     fn return_type() -> Expr {
         // LibraryDataType[NumericArray, "<T>"]
-        Expr::normal(Symbol::new("System`LibraryDataType"), vec![
-            Expr::from(Symbol::new("System`NumericArray")),
-            Expr::string(T::TYPE.name()),
-        ])
+        Expr::normal(
+            Symbol::new("System`LibraryDataType"),
+            vec![
+                Expr::from(Symbol::new("System`NumericArray")),
+                Expr::string(T::TYPE.name()),
+            ],
+        )
     }
 }
 
@@ -682,16 +732,25 @@ impl<T: crate::ImageData> IntoArg for Image<T> {
 
     fn return_type() -> Expr {
         // LibraryDataType[Image | Image3D, "<T>"]
-        Expr::normal(Symbol::new("System`List"), vec![
-            Expr::normal(Symbol::new("System`LibraryDataType"), vec![
-                Expr::normal(Symbol::new("System`Alternatives"), vec![
-                    Expr::from(Symbol::new("System`Image")),
-                    Expr::from(Symbol::new("System`Image3D")),
-                ]),
-                Expr::string(T::TYPE.name()),
-            ]),
-            Expr::string("Shared"),
-        ])
+        Expr::normal(
+            Symbol::new("System`List"),
+            vec![
+                Expr::normal(
+                    Symbol::new("System`LibraryDataType"),
+                    vec![
+                        Expr::normal(
+                            Symbol::new("System`Alternatives"),
+                            vec![
+                                Expr::from(Symbol::new("System`Image")),
+                                Expr::from(Symbol::new("System`Image3D")),
+                            ],
+                        ),
+                        Expr::string(T::TYPE.name()),
+                    ],
+                ),
+                Expr::string("Shared"),
+            ],
+        )
     }
 }
 
@@ -842,138 +901,137 @@ impl_NativeFunction!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12);
 mod wstp_impls {
     use super::*;
 
-/// Implement [`WstpFunction`] for functions that use a [`Link`] for their arguments and
-/// return value.
-///
-/// # Example
-///
-/// ```
-/// # mod scope {
-/// use wolfram_library_link::{self as wll, wstp::Link};
-///
-/// #[wll::export(wstp)]
-/// fn add2_link(link: &mut Link) {
-///     let argc: usize = link.test_head("List").unwrap();
-///
-///     if argc != 2 {
-///         panic!("expected 2 arguments, got {}", argc);
-///     }
-///
-///     let x = link.get_i64().unwrap();
-///     let y = link.get_i64().unwrap();
-///
-///     link.put_i64(x + y).unwrap();
-/// }
-/// # }
-/// ```
-///
-/// ```wolfram
-/// LibraryFunctionLoad["...", "add2_link", LinkObject, LinkObject]
-/// ```
-impl WstpFunction for fn(&mut Link) {
-    unsafe fn call(&self, link: &mut Link) {
-        self(link)
-    }
-}
-
-/// Implement [`WstpFunction`] for functions that use [`Expr`] for their arguments and
-/// return value.
-///
-/// # Example
-///
-/// ```
-/// # mod scope {
-/// use wolfram_library_link::{self as wll, wstp::Link, expr::{Expr, ExprKind}};
-///
-/// #[wll::export(wstp)]
-/// fn add2(args: Vec<Expr>) -> Expr {
-///     if args.len() != 2 {
-///         panic!("expected 2 arguments, got {}", args.len());
-///     }
-///
-///     let x: i64 = match *args[0].kind() {
-///         ExprKind::Integer(value) => value,
-///         _ => panic!("expected 1st argument to be Integer, got: {}", args[0])
-///     };
-///     let y: i64 = match *args[1].kind() {
-///         ExprKind::Integer(value) => value,
-///         _ => panic!("expected 2nd argument to be Integer, got: {}", args[1])
-///     };
-///
-///     Expr::from(x + y)
-/// }
-/// # }
-/// ```
-///
-/// ```wolfram
-/// LibraryFunctionLoad["...", "add2", LinkObject, LinkObject]
-/// ```
-impl WstpFunction for fn(Vec<Expr>) -> Expr {
-    unsafe fn call(&self, link: &mut Link) {
-        let args: Vec<Expr> = match get_args_list(link) {
-            Ok(args) => args,
-            Err(message) => panic!("WstpFunction: {}", message),
-        };
-
-        let result: Expr = self(args);
-
-        match link.put_expr(&result) {
-            Ok(()) => (),
-            Err(err) => panic!(
-                "WstpFunction: WSTP error writing return expression to link: {}",
-                err
-            ),
+    /// Implement [`WstpFunction`] for functions that use a [`Link`] for their arguments and
+    /// return value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # mod scope {
+    /// use wolfram_library_link::{self as wll, wstp::Link};
+    ///
+    /// #[wll::export(wstp)]
+    /// fn add2_link(link: &mut Link) {
+    ///     let argc: usize = link.test_head("List").unwrap();
+    ///
+    ///     if argc != 2 {
+    ///         panic!("expected 2 arguments, got {}", argc);
+    ///     }
+    ///
+    ///     let x = link.get_i64().unwrap();
+    ///     let y = link.get_i64().unwrap();
+    ///
+    ///     link.put_i64(x + y).unwrap();
+    /// }
+    /// # }
+    /// ```
+    ///
+    /// ```wolfram
+    /// LibraryFunctionLoad["...", "add2_link", LinkObject, LinkObject]
+    /// ```
+    impl WstpFunction for fn(&mut Link) {
+        unsafe fn call(&self, link: &mut Link) {
+            self(link)
         }
     }
-}
 
-impl WstpFunction for fn(Vec<Expr>) {
-    unsafe fn call(&self, link: &mut Link) {
-        let args: Vec<Expr> = match get_args_list(link) {
-            Ok(args) => args,
-            Err(message) => panic!("WstpFunction: {}", message),
-        };
+    /// Implement [`WstpFunction`] for functions that use [`Expr`] for their arguments and
+    /// return value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # mod scope {
+    /// use wolfram_library_link::{self as wll, wstp::Link, expr::{Expr, ExprKind}};
+    ///
+    /// #[wll::export(wstp)]
+    /// fn add2(args: Vec<Expr>) -> Expr {
+    ///     if args.len() != 2 {
+    ///         panic!("expected 2 arguments, got {}", args.len());
+    ///     }
+    ///
+    ///     let x: i64 = match *args[0].kind() {
+    ///         ExprKind::Integer(value) => value,
+    ///         _ => panic!("expected 1st argument to be Integer, got: {}", args[0])
+    ///     };
+    ///     let y: i64 = match *args[1].kind() {
+    ///         ExprKind::Integer(value) => value,
+    ///         _ => panic!("expected 2nd argument to be Integer, got: {}", args[1])
+    ///     };
+    ///
+    ///     Expr::from(x + y)
+    /// }
+    /// # }
+    /// ```
+    ///
+    /// ```wolfram
+    /// LibraryFunctionLoad["...", "add2", LinkObject, LinkObject]
+    /// ```
+    impl WstpFunction for fn(Vec<Expr>) -> Expr {
+        unsafe fn call(&self, link: &mut Link) {
+            let args: Vec<Expr> = match get_args_list(link) {
+                Ok(args) => args,
+                Err(message) => panic!("WstpFunction: {}", message),
+            };
 
-        let _null: () = self(args);
+            let result: Expr = self(args);
 
-        match link.put_symbol("System`Null") {
-            Ok(()) => (),
-            Err(err) => panic!(
-                "WstpFunction: WSTP error writing return Null expression to link: {}",
-                err
-            ),
+            match link.put_expr(&result) {
+                Ok(()) => (),
+                Err(err) => panic!(
+                    "WstpFunction: WSTP error writing return expression to link: {}",
+                    err
+                ),
+            }
         }
     }
-}
 
-//----------------------------
-// Utilities
-//----------------------------
+    impl WstpFunction for fn(Vec<Expr>) {
+        unsafe fn call(&self, link: &mut Link) {
+            let args: Vec<Expr> = match get_args_list(link) {
+                Ok(args) => args,
+                Err(message) => panic!("WstpFunction: {}", message),
+            };
 
-fn get_args_list(link: &mut Link) -> Result<Vec<Expr>, String> {
-    get_args_list_impl(link).map_err(|err: wstp::Error| {
-        format!("WSTP error reading argument List expression: {}", err)
-    })
-}
+            let _null: () = self(args);
 
-fn get_args_list_impl(link: &mut Link) -> Result<Vec<Expr>, wstp::Error> {
-    let arg_count: usize = match link.test_head("List") {
-        Ok(count) => Ok(count),
-        Err(err) if err.code() == Some(wstp::sys::WSEGSEQ) => {
-            link.clear_error();
-            link.test_head("System`List")
-        },
-        Err(err) => Err(err),
-    }?;
-
-    let mut elements: Vec<Expr> = Vec::new();
-
-    for _ in 0..arg_count {
-        let elem = link.get_expr()?;
-        elements.push(elem);
+            match link.put_symbol("System`Null") {
+                Ok(()) => (),
+                Err(err) => panic!(
+                    "WstpFunction: WSTP error writing return Null expression to link: {}",
+                    err
+                ),
+            }
+        }
     }
 
-    Ok(elements)
-}
+    //----------------------------
+    // Utilities
+    //----------------------------
 
+    fn get_args_list(link: &mut Link) -> Result<Vec<Expr>, String> {
+        get_args_list_impl(link).map_err(|err: wstp::Error| {
+            format!("WSTP error reading argument List expression: {}", err)
+        })
+    }
+
+    fn get_args_list_impl(link: &mut Link) -> Result<Vec<Expr>, wstp::Error> {
+        let arg_count: usize = match link.test_head("List") {
+            Ok(count) => Ok(count),
+            Err(err) if err.code() == Some(wstp::sys::WSEGSEQ) => {
+                link.clear_error();
+                link.test_head("System`List")
+            },
+            Err(err) => Err(err),
+        }?;
+
+        let mut elements: Vec<Expr> = Vec::new();
+
+        for _ in 0..arg_count {
+            let elem = link.get_expr()?;
+            elements.push(elem);
+        }
+
+        Ok(elements)
+    }
 } // end of #[cfg(feature = "wstp")] mod wstp_impls

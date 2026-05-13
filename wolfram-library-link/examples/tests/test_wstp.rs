@@ -43,7 +43,6 @@ fn test_wstp_fn_panic_partial_result(link: &mut Link) {
     assert!(!link.is_ready());
     assert!(link.error().is_none());
 
-
     // Indicate that we will be writing a 3 element list, but only write one
     // of the elements.
     link.put_function("System`List", 3).unwrap();

@@ -5,7 +5,6 @@ use wolfram_library_link::{
     DataStore, NumericArray,
 };
 
-
 #[no_mangle]
 pub unsafe extern "C" fn WolframLibrary_initialize(lib: WolframLibraryData) -> c_int {
     match wll::initialize(lib) {

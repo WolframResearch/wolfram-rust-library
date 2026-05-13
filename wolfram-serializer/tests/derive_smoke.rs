@@ -68,7 +68,9 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     };
     let bytes = serialize(&f, Format::Wxf).unwrap();
     let expr: Expr = deserialize(&bytes, Format::Wxf).unwrap();
-    let assoc = expr.try_as_association().expect("Frame should be Association");
+    let assoc = expr
+        .try_as_association()
+        .expect("Frame should be Association");
 
     // payload → ByteArray
     assert!(
@@ -297,7 +299,8 @@ fn optional_field_missing_key_yields_none() {
         // No `c` entry — that key is absent on the wire.
     ];
 
-    let parsed: TwoOrThree = deserialize(bytes, Format::Wxf).expect("deserialize should succeed");
+    let parsed: TwoOrThree =
+        deserialize(bytes, Format::Wxf).expect("deserialize should succeed");
     assert_eq!(
         parsed,
         TwoOrThree {
@@ -321,5 +324,9 @@ fn optional_field_missing_key_yields_none() {
     let err = deserialize::<TwoOrThree>(missing_required, Format::Wxf)
         .expect_err("missing `b` should error");
     let msg = format!("{}", err);
-    assert!(msg.contains("\"b\""), "error should mention the missing key: {}", msg);
+    assert!(
+        msg.contains("\"b\""),
+        "error should mention the missing key: {}",
+        msg
+    );
 }

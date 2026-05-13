@@ -100,11 +100,13 @@ pub extern "C" fn demo_wstp_function_callback(
 
         safe_callback_link
             // EvaluatePacket[Print["Hello, World! --- WSTP"]]
-            .put_expr(&Expr::normal(Symbol::new("System`EvaluatePacket"), vec![
-                Expr::normal(Symbol::new("System`Print"), vec![Expr::string(
-                    "Hello, World! --- WSTP",
-                )]),
-            ]))
+            .put_expr(&Expr::normal(
+                Symbol::new("System`EvaluatePacket"),
+                vec![Expr::normal(
+                    Symbol::new("System`Print"),
+                    vec![Expr::string("Hello, World! --- WSTP")],
+                )],
+            ))
             .unwrap();
 
         unsafe {
@@ -157,13 +159,19 @@ pub extern "C" fn wstp_expr_function(
             }
 
             let err = Expr::string(err.to_string());
-            let err = Expr::normal(Symbol::new("System`Failure"), vec![
-                Expr::string("WSTP Error"),
-                Expr::normal(Symbol::new("System`Association"), vec![Expr::normal(
-                    Symbol::new("System`Rule"),
-                    vec![Expr::string("Message"), err],
-                )]),
-            ]);
+            let err = Expr::normal(
+                Symbol::new("System`Failure"),
+                vec![
+                    Expr::string("WSTP Error"),
+                    Expr::normal(
+                        Symbol::new("System`Association"),
+                        vec![Expr::normal(
+                            Symbol::new("System`Rule"),
+                            vec![Expr::string("Message"), err],
+                        )],
+                    ),
+                ],
+            );
             match link.put_expr(&err) {
                 Ok(()) => return LIBRARY_NO_ERROR,
                 Err(_) => return LIBRARY_FUNCTION_ERROR,

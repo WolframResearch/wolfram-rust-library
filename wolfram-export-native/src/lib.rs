@@ -19,9 +19,9 @@
 pub use wolfram_export_macros::{export_native as export, init};
 
 // Shared inventory + manifest plumbing.
-pub use wolfram_export_core::{inventory, ExportEntry};
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use wolfram_export_core::exported_library_functions_association;
+pub use wolfram_export_core::{inventory, ExportEntry};
 
 // `sys` module — the proc-macro emits `::wolfram_export_native::sys::*` paths.
 pub mod sys {
@@ -33,7 +33,6 @@ pub use wolfram_library_link::{FromArg, IntoArg, NativeFunction};
 
 pub mod macro_utils {
     pub use wolfram_library_link::macro_utils::{
-        call_native_wolfram_library_function,
-        init_with_user_function,
+        call_native_wolfram_library_function, init_with_user_function,
     };
 }

@@ -479,6 +479,5 @@ rtl_func![
     ]
 ];
 
-
 // pub compileLibraryFunctions: *mut st_WolframCompileLibrary_Functions,
 // pub rawarrayLibraryFunctions: *mut st_WolframRawArrayLibrary_Functions,

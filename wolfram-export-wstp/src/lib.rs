@@ -10,9 +10,9 @@
 
 pub use wolfram_export_macros::{export_wstp as export, init};
 
-pub use wolfram_export_core::{inventory, ExportEntry};
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use wolfram_export_core::exported_library_functions_association;
+pub use wolfram_export_core::{inventory, ExportEntry};
 
 // `sys` and `wstp` modules — paths the proc-macro emits.
 pub mod sys {

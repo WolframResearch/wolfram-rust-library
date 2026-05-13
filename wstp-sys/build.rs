@@ -4,7 +4,6 @@
 //! `wolframscript` to evaluate `$InstallationDirectory`. This script will fail if
 //! `wolframscript` is not on `$PATH`.
 
-
 use std::path::PathBuf;
 use std::process;
 

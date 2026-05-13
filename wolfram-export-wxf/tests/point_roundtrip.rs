@@ -123,7 +123,8 @@ fn create_point_wxf_roundtrip_via_user_fn() {
 
 #[test]
 fn scale_point_wxf_roundtrip_via_user_fn() {
-    let arg: Point = deserialize(KERNEL_POINT_1_2, Format::Wxf).expect("decode Point 1,2");
+    let arg: Point =
+        deserialize(KERNEL_POINT_1_2, Format::Wxf).expect("decode Point 1,2");
     let result: Point = scale_point(arg, 2.0);
     let out_bytes = serialize(&result, Format::Wxf).expect("encode Point 2,4");
     assert_eq!(out_bytes.as_slice(), KERNEL_POINT_2_4);
@@ -147,7 +148,9 @@ fn bad_input_yields_failure_expr() {
     let failure_expr = result.expect_err("expected a caught panic");
 
     // The result must be Failure["RustPanic", ...].
-    let n = failure_expr.try_as_normal().expect("Failure should be a Normal expr");
+    let n = failure_expr
+        .try_as_normal()
+        .expect("Failure should be a Normal expr");
     assert_eq!(
         n.head().try_as_symbol().unwrap().as_str(),
         "System`Failure",
@@ -160,7 +163,13 @@ fn bad_input_yields_failure_expr() {
     let bytes = serialize(&failure_expr, Format::Wxf).expect("serialize Failure");
     let decoded: Expr = deserialize(&bytes, Format::Wxf).expect("deserialize Failure");
     assert_eq!(
-        decoded.try_as_normal().unwrap().head().try_as_symbol().unwrap().as_str(),
+        decoded
+            .try_as_normal()
+            .unwrap()
+            .head()
+            .try_as_symbol()
+            .unwrap()
+            .as_str(),
         "System`Failure"
     );
 }

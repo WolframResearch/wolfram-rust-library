@@ -112,14 +112,30 @@ pub trait PackedArrayElement: ArrayElement<PackedArrayDataType> {
 }
 impl<T: ArrayElement<PackedArrayDataType>> PackedArrayElement for T {}
 
-impl ArrayElement<PackedArrayDataType> for i8 { const TAG: PackedArrayDataType = PackedArrayDataType::Integer8; }
-impl ArrayElement<PackedArrayDataType> for i16 { const TAG: PackedArrayDataType = PackedArrayDataType::Integer16; }
-impl ArrayElement<PackedArrayDataType> for i32 { const TAG: PackedArrayDataType = PackedArrayDataType::Integer32; }
-impl ArrayElement<PackedArrayDataType> for i64 { const TAG: PackedArrayDataType = PackedArrayDataType::Integer64; }
-impl ArrayElement<PackedArrayDataType> for f32 { const TAG: PackedArrayDataType = PackedArrayDataType::Real32; }
-impl ArrayElement<PackedArrayDataType> for f64 { const TAG: PackedArrayDataType = PackedArrayDataType::Real64; }
-impl ArrayElement<PackedArrayDataType> for crate::complex::Complex32 { const TAG: PackedArrayDataType = PackedArrayDataType::ComplexReal32; }
-impl ArrayElement<PackedArrayDataType> for crate::complex::Complex64 { const TAG: PackedArrayDataType = PackedArrayDataType::ComplexReal64; }
+impl ArrayElement<PackedArrayDataType> for i8 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::Integer8;
+}
+impl ArrayElement<PackedArrayDataType> for i16 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::Integer16;
+}
+impl ArrayElement<PackedArrayDataType> for i32 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::Integer32;
+}
+impl ArrayElement<PackedArrayDataType> for i64 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::Integer64;
+}
+impl ArrayElement<PackedArrayDataType> for f32 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::Real32;
+}
+impl ArrayElement<PackedArrayDataType> for f64 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::Real64;
+}
+impl ArrayElement<PackedArrayDataType> for crate::complex::Complex32 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::ComplexReal32;
+}
+impl ArrayElement<PackedArrayDataType> for crate::complex::Complex64 {
+    const TAG: PackedArrayDataType = PackedArrayDataType::ComplexReal64;
+}
 
 impl ArrayTag for PackedArrayDataType {
     fn to_numeric_array_data_type(self) -> NumericArrayDataType {
@@ -156,7 +172,10 @@ mod tests {
         assert_eq!(arr.data_type(), PackedArrayDataType::Real64);
         assert_eq!(arr.dimensions(), &[2, 2]);
         assert_eq!(arr.element_count(), 4);
-        assert_eq!(arr.try_as_slice::<f64>(), Some([1.0, 2.0, 3.0, 4.0].as_slice()));
+        assert_eq!(
+            arr.try_as_slice::<f64>(),
+            Some([1.0, 2.0, 3.0, 4.0].as_slice())
+        );
         assert_eq!(arr.try_as_slice::<i32>(), None);
     }
 

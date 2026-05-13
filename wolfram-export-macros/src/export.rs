@@ -88,7 +88,7 @@ pub(crate) fn export(
                 proc_macro2::Span::call_site(),
                 "this attribute can only be applied to `fn(..) {..}` items",
             ));
-        }
+        },
     };
 
     if let Some(async_) = func.sig.asyncness {
@@ -111,7 +111,7 @@ pub(crate) fn export(
     let wrapper = match mode {
         Mode::Native => {
             export_native_function(&name, &exported_name, params.len(), hidden, prefix)
-        }
+        },
         Mode::Wstp => export_wstp_function(&name, &exported_name, params, hidden, prefix),
         Mode::Wxf => export_wxf_function(&name, &exported_name, params, hidden, prefix),
     };
@@ -239,9 +239,7 @@ fn export_wxf_function(
     let input_idents: Vec<_> = (0..n)
         .map(|i| quote::format_ident!("__input{}", i))
         .collect();
-    let arg_idents: Vec<_> = (0..n)
-        .map(|i| quote::format_ident!("__arg{}", i))
-        .collect();
+    let arg_idents: Vec<_> = (0..n).map(|i| quote::format_ident!("__arg{}", i)).collect();
 
     // Bridge params: `__input0: &NumericArray<u8>, __input1: &NumericArray<u8>, ...`
     let bridge_params: Vec<_> = input_idents
@@ -338,13 +336,13 @@ fn parse_export_attribute_args(attrs: syn::AttributeArgs) -> Result<ExportArgs, 
                         ));
                     }
                     hidden = true;
-                }
+                },
                 Meta::List(_) | Meta::Path(_) => {
                     return Err(Error::new(
                         attr.span(),
                         "unrecognized export attribute argument",
                     ));
-                }
+                },
                 Meta::NameValue(syn::MetaNameValue { path, lit, .. }) => {
                     if path.is_ident("name") {
                         if exported_name.is_some() {
@@ -360,7 +358,7 @@ fn parse_export_attribute_args(attrs: syn::AttributeArgs) -> Result<ExportArgs, 
                                     lit.span(),
                                     "expected `name = \"...\"`",
                                 ))
-                            }
+                            },
                         };
                         exported_name = Some(
                             lit_str
@@ -373,14 +371,14 @@ fn parse_export_attribute_args(attrs: syn::AttributeArgs) -> Result<ExportArgs, 
                             "unrecognized export attribute named argument",
                         ));
                     }
-                }
+                },
             },
             NestedMeta::Lit(_) => {
                 return Err(Error::new(
                     attr.span(),
                     "unrecognized export attribute literal argument",
                 ));
-            }
+            },
         }
     }
 

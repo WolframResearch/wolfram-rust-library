@@ -96,7 +96,8 @@ fn wolfram_manifest_symbol_returns_valid_wxf() {
     );
 
     // Deserialize the WXF payload back into an Association Expr.
-    let assoc_expr: Expr = deserialize(bytes, Format::Wxf).expect("deserialize manifest WXF");
+    let assoc_expr: Expr =
+        deserialize(bytes, Format::Wxf).expect("deserialize manifest WXF");
     let assoc = assoc_expr
         .try_as_normal()
         .expect("manifest should be Association[...]");
@@ -141,11 +142,7 @@ fn wolfram_manifest_symbol_returns_valid_wxf() {
     let create_rule = entries
         .iter()
         .find(|r| {
-            r.try_as_normal()
-                .unwrap()
-                .elements()[0]
-                .try_as_str()
-                == Some("create_point")
+            r.try_as_normal().unwrap().elements()[0].try_as_str() == Some("create_point")
         })
         .expect("create_point entry");
     let create_lf = create_rule.try_as_normal().unwrap().elements()[1]
@@ -163,7 +160,10 @@ fn wolfram_manifest_symbol_returns_valid_wxf() {
     let arg_tys = lf_args[2]
         .try_as_normal()
         .expect("arg-types slot should be a List");
-    assert_eq!(arg_tys.head().try_as_symbol().unwrap().as_str(), "System`List");
+    assert_eq!(
+        arg_tys.head().try_as_symbol().unwrap().as_str(),
+        "System`List"
+    );
     assert_eq!(
         arg_tys.elements()[0].try_as_symbol().unwrap().as_str(),
         "System`ByteArray"

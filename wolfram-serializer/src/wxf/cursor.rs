@@ -40,7 +40,9 @@ impl<'a> WxfCursor<'a> {
     /// For compressed payloads, decompresses once upfront.
     pub fn new(input: &'a [u8]) -> Result<Self, Error> {
         if input.len() < 2 {
-            return Err(Error::InvalidWxf("byte stream too short for WXF header".into()));
+            return Err(Error::InvalidWxf(
+                "byte stream too short for WXF header".into(),
+            ));
         }
         if input[0] != WXF_VERSION {
             return Err(Error::InvalidWxf(format!(
@@ -62,7 +64,9 @@ impl<'a> WxfCursor<'a> {
             let mut decoded = Vec::new();
             ZlibDecoder::new(&input[3..])
                 .read_to_end(&mut decoded)
-                .map_err(|e| Error::InvalidWxf(format!("zlib decompress failed: {}", e)))?;
+                .map_err(|e| {
+                    Error::InvalidWxf(format!("zlib decompress failed: {}", e))
+                })?;
             return Ok(Self {
                 bytes: Cow::Owned(decoded),
                 pos: 0,
@@ -217,8 +221,9 @@ impl<'a> WxfCursor<'a> {
         self.expect_token(TOKEN_BIG_INTEGER, "read_big_integer")?;
         let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
-        let s = String::from_utf8(bytes)
-            .map_err(|_| Error::InvalidWxf("BigInteger payload not valid UTF-8".into()))?;
+        let s = String::from_utf8(bytes).map_err(|_| {
+            Error::InvalidWxf("BigInteger payload not valid UTF-8".into())
+        })?;
         Ok(BigInteger::new(s))
     }
 
@@ -319,38 +324,38 @@ impl<'a> WxfCursor<'a> {
         match tag {
             TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
                 let _ = self.read_integer()?;
-            }
+            },
             TOKEN_REAL64 => {
                 let _ = self.read_real()?;
-            }
+            },
             TOKEN_STRING => {
                 let _ = self.read_string()?;
-            }
+            },
             TOKEN_SYMBOL => {
                 let _ = self.read_symbol()?;
-            }
+            },
             TOKEN_BINARY_STRING => {
                 let _ = self.read_byte_array()?;
-            }
+            },
             TOKEN_BIG_INTEGER => {
                 let _ = self.read_big_integer()?;
-            }
+            },
             TOKEN_BIG_REAL => {
                 let _ = self.read_big_real()?;
-            }
+            },
             TOKEN_NUMERIC_ARRAY => {
                 let _ = self.read_numeric_array()?;
-            }
+            },
             TOKEN_PACKED_ARRAY => {
                 let _ = self.read_packed_array()?;
-            }
+            },
             TOKEN_FUNCTION => {
                 let n = self.read_function_header()?;
                 self.skip()?; // head
                 for _ in 0..n {
                     self.skip()?;
                 }
-            }
+            },
             TOKEN_ASSOCIATION => {
                 let n = self.read_association_header()?;
                 for _ in 0..n {
@@ -358,13 +363,13 @@ impl<'a> WxfCursor<'a> {
                     self.skip()?; // key
                     self.skip()?; // value
                 }
-            }
+            },
             other => {
                 return Err(Error::InvalidWxf(format!(
                     "skip(): unknown WXF token: 0x{:02X}",
                     other
                 )));
-            }
+            },
         }
         Ok(())
     }

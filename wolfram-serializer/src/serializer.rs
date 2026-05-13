@@ -3,8 +3,8 @@
 
 use crate::Error;
 use wolfram_expr::{
-    ArrayBuf, Association, Expr, ExprKind, NumericArray, NumericArrayDataType, PackedArray,
-    PackedArrayDataType, Symbol,
+    ArrayBuf, Association, Expr, ExprKind, NumericArray, NumericArrayDataType,
+    PackedArray, PackedArrayDataType, Symbol,
 };
 use wolfram_expr::{BigInteger, BigReal};
 
@@ -296,7 +296,13 @@ impl ToWolfram for Association {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
         let entries: Vec<(&dyn ToWolfram, &dyn ToWolfram, bool)> = self
             .iter()
-            .map(|e| (&e.key as &dyn ToWolfram, &e.value as &dyn ToWolfram, e.delayed))
+            .map(|e| {
+                (
+                    &e.key as &dyn ToWolfram,
+                    &e.value as &dyn ToWolfram,
+                    e.delayed,
+                )
+            })
             .collect();
         s.serialize_association(&entries)
     }
@@ -324,10 +330,13 @@ impl ToWolfram for Expr {
             ExprKind::String(t) => s.serialize_string(t.as_str()),
             ExprKind::Symbol(sym) => s.serialize_symbol(sym.as_str()),
             ExprKind::Normal(normal) => {
-                let args: Vec<&dyn ToWolfram> =
-                    normal.elements().iter().map(|e| e as &dyn ToWolfram).collect();
+                let args: Vec<&dyn ToWolfram> = normal
+                    .elements()
+                    .iter()
+                    .map(|e| e as &dyn ToWolfram)
+                    .collect();
                 s.serialize_function(normal.head(), &args)
-            }
+            },
             ExprKind::ByteArray(b) => s.serialize_byte_array(b.as_slice()),
             ExprKind::Association(a) => a.serialize(s),
             ExprKind::NumericArray(arr) => s.serialize_numeric_array(

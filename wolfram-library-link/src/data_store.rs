@@ -5,7 +5,6 @@ use std::{
     os::raw::c_char,
 };
 
-
 use once_cell::sync::OnceCell;
 use static_assertions::assert_not_impl_any;
 
@@ -14,7 +13,6 @@ use crate::{
     sys::{self, mcomplex, mint, mreal},
     FromArg, Image, NumericArray,
 };
-
 
 /// Storage for heterogenous expression-like data.
 ///

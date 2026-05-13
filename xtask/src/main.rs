@@ -57,9 +57,9 @@ fn main() {
             target,
             wolfram_version,
         } => {
-            let [major, minor, patch]: [u32; 3] = wolfram_version
-                .try_into()
-                .expect("--wolfram-version requires 3 components, e.g. --wolfram-version=13.0.1");
+            let [major, minor, patch]: [u32; 3] = wolfram_version.try_into().expect(
+                "--wolfram-version requires 3 components, e.g. --wolfram-version=13.0.1",
+            );
             let wolfram_version = WolframVersion::new(major, minor, patch);
             let sdk = WstpSdk::try_from_directory(sdk_path.clone())
                 .map_err(|err| {
@@ -257,7 +257,9 @@ fn determine_targets() -> &'static [&'static str] {
     } else if cfg!(target_os = "linux") {
         &["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
     } else {
-        panic!("unsupported operating system for determining bindings target architecture")
+        panic!(
+            "unsupported operating system for determining bindings target architecture"
+        )
     }
 }
 

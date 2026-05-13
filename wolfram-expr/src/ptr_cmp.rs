@@ -5,7 +5,6 @@ use std::{
 
 use crate::{Expr, ExprKind};
 
-
 /// [`Expr`] wrapper that compares by reference instead of by value.
 ///
 /// The standard [`Expr`] type uses *value* semantics for comparision: two [`Expr`]

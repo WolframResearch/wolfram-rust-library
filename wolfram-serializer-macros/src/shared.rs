@@ -39,13 +39,13 @@ pub(crate) fn parse_container_attrs(attrs: &[Attribute]) -> Result<ContainerAttr
             match nested {
                 NestedMeta::Meta(Meta::NameValue(nv)) if nv.path.is_ident("symbol") => {
                     out.symbol = Some(string_lit(&nv.lit)?);
-                }
+                },
                 other => {
                     return Err(Error::new_spanned(
                         other,
                         "unknown `#[wolfram(...)]` option here; expected `symbol = \"...\"`",
                     ));
-                }
+                },
             }
         }
     }
@@ -67,13 +67,13 @@ pub(crate) fn parse_field_attrs(attrs: &[Attribute]) -> Result<FieldAttrs> {
             match nested {
                 NestedMeta::Meta(Meta::NameValue(nv)) if nv.path.is_ident("rename") => {
                     out.rename = Some(string_lit(&nv.lit)?);
-                }
+                },
                 other => {
                     return Err(Error::new_spanned(
                         other,
                         "unknown `#[wolfram(...)]` option here; expected `rename = \"...\"`",
                     ));
-                }
+                },
             }
         }
     }
@@ -96,4 +96,3 @@ pub(crate) fn qualify_symbol(ident_str: &str, container: &ContainerAttrs) -> Str
         .clone()
         .unwrap_or_else(|| format!("Global`{}", ident_str))
 }
-

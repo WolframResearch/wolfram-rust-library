@@ -72,7 +72,9 @@ impl NumericArrayDataType {
     pub fn size_in_bytes(&self) -> usize {
         match *self {
             NumericArrayDataType::Integer8 | NumericArrayDataType::UnsignedInteger8 => 1,
-            NumericArrayDataType::Integer16 | NumericArrayDataType::UnsignedInteger16 => 2,
+            NumericArrayDataType::Integer16 | NumericArrayDataType::UnsignedInteger16 => {
+                2
+            },
             NumericArrayDataType::Integer32
             | NumericArrayDataType::UnsignedInteger32
             | NumericArrayDataType::Real32 => 4,
@@ -162,18 +164,42 @@ pub trait NumericArrayElement: ArrayElement<NumericArrayDataType> {
 }
 impl<T: ArrayElement<NumericArrayDataType>> NumericArrayElement for T {}
 
-impl ArrayElement<NumericArrayDataType> for i8 { const TAG: NumericArrayDataType = NumericArrayDataType::Integer8; }
-impl ArrayElement<NumericArrayDataType> for i16 { const TAG: NumericArrayDataType = NumericArrayDataType::Integer16; }
-impl ArrayElement<NumericArrayDataType> for i32 { const TAG: NumericArrayDataType = NumericArrayDataType::Integer32; }
-impl ArrayElement<NumericArrayDataType> for i64 { const TAG: NumericArrayDataType = NumericArrayDataType::Integer64; }
-impl ArrayElement<NumericArrayDataType> for u8 { const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger8; }
-impl ArrayElement<NumericArrayDataType> for u16 { const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger16; }
-impl ArrayElement<NumericArrayDataType> for u32 { const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger32; }
-impl ArrayElement<NumericArrayDataType> for u64 { const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger64; }
-impl ArrayElement<NumericArrayDataType> for f32 { const TAG: NumericArrayDataType = NumericArrayDataType::Real32; }
-impl ArrayElement<NumericArrayDataType> for f64 { const TAG: NumericArrayDataType = NumericArrayDataType::Real64; }
-impl ArrayElement<NumericArrayDataType> for crate::complex::Complex32 { const TAG: NumericArrayDataType = NumericArrayDataType::ComplexReal32; }
-impl ArrayElement<NumericArrayDataType> for crate::complex::Complex64 { const TAG: NumericArrayDataType = NumericArrayDataType::ComplexReal64; }
+impl ArrayElement<NumericArrayDataType> for i8 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::Integer8;
+}
+impl ArrayElement<NumericArrayDataType> for i16 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::Integer16;
+}
+impl ArrayElement<NumericArrayDataType> for i32 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::Integer32;
+}
+impl ArrayElement<NumericArrayDataType> for i64 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::Integer64;
+}
+impl ArrayElement<NumericArrayDataType> for u8 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger8;
+}
+impl ArrayElement<NumericArrayDataType> for u16 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger16;
+}
+impl ArrayElement<NumericArrayDataType> for u32 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger32;
+}
+impl ArrayElement<NumericArrayDataType> for u64 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::UnsignedInteger64;
+}
+impl ArrayElement<NumericArrayDataType> for f32 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::Real32;
+}
+impl ArrayElement<NumericArrayDataType> for f64 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::Real64;
+}
+impl ArrayElement<NumericArrayDataType> for crate::complex::Complex32 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::ComplexReal32;
+}
+impl ArrayElement<NumericArrayDataType> for crate::complex::Complex64 {
+    const TAG: NumericArrayDataType = NumericArrayDataType::ComplexReal64;
+}
 
 //======================================
 // NumericArrayRead (shared read API)
@@ -225,7 +251,10 @@ pub trait NumericArrayRead {
         // guaranteed by the buffer's allocation: NumericArray buffers are aligned to at
         // least the largest element size when constructed from a typed source).
         Some(unsafe {
-            std::slice::from_raw_parts(bytes.as_ptr() as *const T, bytes.len() / elem_size)
+            std::slice::from_raw_parts(
+                bytes.as_ptr() as *const T,
+                bytes.len() / elem_size,
+            )
         })
     }
 }
@@ -312,7 +341,10 @@ mod tests {
         assert_eq!(arr.dimensions(), &[2, 3]);
         assert_eq!(arr.element_count(), 6);
         assert_eq!(arr.byte_count(), 24);
-        assert_eq!(arr.try_as_slice::<i32>(), Some([1, 2, 3, 4, 5, 6].as_slice()));
+        assert_eq!(
+            arr.try_as_slice::<i32>(),
+            Some([1, 2, 3, 4, 5, 6].as_slice())
+        );
         assert_eq!(arr.try_as_slice::<i64>(), None); // wrong type tag
     }
 }

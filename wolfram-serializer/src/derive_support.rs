@@ -120,4 +120,9 @@ pub fn warn_if_numeric_in_list<T: 'static + ?Sized>(file: &str, line: u32, field
 /// Release-build no-op (matches the debug signature so generated code can call
 /// it unconditionally without a `cfg!`).
 #[cfg(not(debug_assertions))]
-pub fn warn_if_numeric_in_list<T: 'static + ?Sized>(_file: &str, _line: u32, _field: &str) {}
+pub fn warn_if_numeric_in_list<T: 'static + ?Sized>(
+    _file: &str,
+    _line: u32,
+    _field: &str,
+) {
+}

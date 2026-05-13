@@ -33,7 +33,6 @@ use std::{
     sync::Arc,
 };
 
-
 /* Notes
 
 Operations on Symbols
@@ -162,7 +161,9 @@ impl Symbol {
     /// `String::from_utf8`, and then become the `Arc<String>` inside `Symbol`
     /// without an intermediate copy.
     pub fn try_from_wxf_name_owned(input: String) -> Result<Self, String> {
-        if SymbolRef::try_new(&input).is_some() || SymbolNameRef::try_new(&input).is_some() {
+        if SymbolRef::try_new(&input).is_some()
+            || SymbolNameRef::try_new(&input).is_some()
+        {
             // SAFETY: validated above by SymbolRef or SymbolNameRef parsing.
             return Ok(unsafe { Symbol::unchecked_new(input) });
         }

@@ -170,14 +170,14 @@ pub fn serialize<T: ToWolfram + ?Sized>(
         Format::Wl => {
             let mut s = wl::WlSerializer::new(&mut out);
             value.serialize(&mut s)?;
-        }
+        },
         Format::Wxf => {
             let mut s = wxf::WxfSerializer::new(&mut out)?;
             value.serialize(&mut s)?;
-        }
+        },
         Format::WxfCompressed(level) => {
             wxf::serialize_compressed(value, &mut out, level)?;
-        }
+        },
     }
     Ok(out)
 }
@@ -205,6 +205,6 @@ pub fn deserialize<T: FromWolfram>(
         Format::Wxf | Format::WxfCompressed(_) => {
             let mut cursor = WxfCursor::new(bytes)?;
             T::from_cursor(&mut cursor)
-        }
+        },
     }
 }

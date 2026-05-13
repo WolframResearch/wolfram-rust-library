@@ -74,7 +74,6 @@ impl Utf8Str {
         const _: () = assert!(mem::size_of::<&Utf8Str>() == mem::size_of::<&[u8]>());
         const _: () = assert!(mem::align_of::<&Utf8Str>() == mem::align_of::<&[u8]>());
 
-
         // SAFETY: Relies on representation of references to unsized data being the same
         //         between types.
         std::mem::transmute::<&[u8], &Utf8Str>(utf8)
@@ -196,7 +195,6 @@ fn test_utf8_str_display() {
         String::from("hello 👋")
     );
 }
-
 
 #[test]
 fn test_utf16_str_display() {

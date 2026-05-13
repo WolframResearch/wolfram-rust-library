@@ -5,13 +5,13 @@
 
 mod array_buf;
 mod association;
+mod bignum;
 mod byte_array;
 mod complex;
 mod conversion;
 mod numeric_array;
 mod packed_array;
 mod ptr_cmp;
-mod bignum;
 
 pub mod symbol;
 
@@ -24,24 +24,22 @@ mod test_readme {
     #![doc = include_str ! ("../README.md")]
 }
 
-
 use std::fmt;
 use std::mem;
 use std::sync::Arc;
-
 
 #[doc(inline)]
 pub use self::symbol::Symbol;
 
 pub use self::array_buf::{ArrayBuf, ArrayElement, ArrayTag};
 pub use self::association::{Association, RuleEntry};
+pub use self::bignum::{BigInteger, BigReal};
 pub use self::byte_array::ByteArray;
 pub use self::complex::{Complex32, Complex64};
 pub use self::numeric_array::{
     NumericArray, NumericArrayDataType, NumericArrayElement, NumericArrayRead,
 };
 pub use self::packed_array::{PackedArray, PackedArrayDataType, PackedArrayElement};
-pub use self::bignum::{BigInteger, BigReal};
 
 #[cfg(feature = "unstable_parse")]
 pub use self::ptr_cmp::ExprRefCmp;

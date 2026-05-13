@@ -1,10 +1,10 @@
 //! WXF self-roundtrip tests: serialize → deserialize → equal.
 
 use wolfram_expr::{
-    Association, ByteArray, Complex32, Complex64, Expr, NumericArray, NumericArrayDataType,
-    PackedArray, PackedArrayDataType, RuleEntry, Symbol,
+    Association, ByteArray, Complex32, Complex64, Expr, NumericArray,
+    NumericArrayDataType, PackedArray, PackedArrayDataType, RuleEntry, Symbol,
 };
-use wolfram_serializer::{serialize, deserialize, CompressionLevel, Format};
+use wolfram_serializer::{deserialize, serialize, CompressionLevel, Format};
 
 fn roundtrip(expr: Expr) {
     let bytes = serialize(&expr, Format::Wxf).expect("serialize Wxf");
@@ -46,7 +46,10 @@ fn symbol_roundtrip() {
 #[test]
 fn function_nested() {
     // Plus[1, Times[2, 3], "x"]
-    let times = Expr::normal(Symbol::new("System`Times"), vec![Expr::from(2), Expr::from(3)]);
+    let times = Expr::normal(
+        Symbol::new("System`Times"),
+        vec![Expr::from(2), Expr::from(3)],
+    );
     let plus = Expr::normal(
         Symbol::new("System`Plus"),
         vec![Expr::from(1), times, Expr::from("x")],
@@ -57,7 +60,10 @@ fn function_nested() {
 #[test]
 fn function_curried_head() {
     // f[1, 2][3, 4] — head is itself a Normal
-    let inner = Expr::normal(Expr::symbol(Symbol::new("Global`f")), vec![Expr::from(1), Expr::from(2)]);
+    let inner = Expr::normal(
+        Expr::symbol(Symbol::new("Global`f")),
+        vec![Expr::from(1), Expr::from(2)],
+    );
     let outer = Expr::normal(inner, vec![Expr::from(3), Expr::from(4)]);
     roundtrip(outer);
 }
@@ -129,19 +135,35 @@ fn empty_function() {
 
 #[test]
 fn vec_u8_serializes_as_byte_array() {
-    let bytes = wolfram_serializer::serialize(&vec![1u8, 2, 3, 0xff], wolfram_serializer::Format::Wxf)
-        .unwrap();
-    let parsed: Expr = wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
-    assert!(matches!(parsed.kind(), wolfram_expr::ExprKind::ByteArray(_)));
-    assert_eq!(parsed.try_as_byte_array().unwrap().as_slice(), &[1u8, 2, 3, 0xff]);
+    let bytes = wolfram_serializer::serialize(
+        &vec![1u8, 2, 3, 0xff],
+        wolfram_serializer::Format::Wxf,
+    )
+    .unwrap();
+    let parsed: Expr =
+        wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
+    assert!(matches!(
+        parsed.kind(),
+        wolfram_expr::ExprKind::ByteArray(_)
+    ));
+    assert_eq!(
+        parsed.try_as_byte_array().unwrap().as_slice(),
+        &[1u8, 2, 3, 0xff]
+    );
 }
 
 #[test]
 fn vec_i32_serializes_as_numeric_array() {
-    let bytes = wolfram_serializer::serialize(&vec![10i32, 20, 30, 40], wolfram_serializer::Format::Wxf)
-        .unwrap();
-    let parsed: Expr = wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
-    let arr = parsed.try_as_numeric_array().expect("expected NumericArray");
+    let bytes = wolfram_serializer::serialize(
+        &vec![10i32, 20, 30, 40],
+        wolfram_serializer::Format::Wxf,
+    )
+    .unwrap();
+    let parsed: Expr =
+        wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
+    let arr = parsed
+        .try_as_numeric_array()
+        .expect("expected NumericArray");
     assert_eq!(arr.data_type(), NumericArrayDataType::Integer32);
     assert_eq!(arr.dimensions(), &[4]);
     assert_eq!(arr.try_as_slice::<i32>(), Some([10, 20, 30, 40].as_slice()));
@@ -149,10 +171,16 @@ fn vec_i32_serializes_as_numeric_array() {
 
 #[test]
 fn vec_f64_serializes_as_numeric_array() {
-    let bytes = wolfram_serializer::serialize(&vec![1.5f64, 2.5, 3.5], wolfram_serializer::Format::Wxf)
-        .unwrap();
-    let parsed: Expr = wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
-    let arr = parsed.try_as_numeric_array().expect("expected NumericArray");
+    let bytes = wolfram_serializer::serialize(
+        &vec![1.5f64, 2.5, 3.5],
+        wolfram_serializer::Format::Wxf,
+    )
+    .unwrap();
+    let parsed: Expr =
+        wolfram_serializer::deserialize(&bytes, wolfram_serializer::Format::Wxf).unwrap();
+    let arr = parsed
+        .try_as_numeric_array()
+        .expect("expected NumericArray");
     assert_eq!(arr.data_type(), NumericArrayDataType::Real64);
     assert_eq!(arr.try_as_slice::<f64>(), Some([1.5, 2.5, 3.5].as_slice()));
 }
@@ -232,8 +260,13 @@ fn compressible_expr() -> Expr {
 #[test]
 fn compressed_header_is_8c_colon() {
     let expr = compressible_expr();
-    let bytes = serialize(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
-    assert_eq!(&bytes[..3], b"8C:", "compressed header should start with 8C:");
+    let bytes =
+        serialize(&expr, Format::WxfCompressed(CompressionLevel::Default)).unwrap();
+    assert_eq!(
+        &bytes[..3],
+        b"8C:",
+        "compressed header should start with 8C:"
+    );
 }
 
 #[test]

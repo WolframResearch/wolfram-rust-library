@@ -135,7 +135,7 @@ fn peel_array_nest(ty: &Type) -> Option<(&Type, Vec<usize>)> {
             let mut dims = vec![n];
             dims.append(&mut inner_dims);
             Some((leaf, dims))
-        }
+        },
         // Leaf — must not be a Tuple (mixed nests are rejected for v1).
         Type::Tuple(_) => None,
         _ => Some((ty, Vec::new())),
@@ -163,7 +163,7 @@ fn peel_tuple_nest(ty: &Type) -> Option<(&Type, Vec<usize>)> {
             let mut dims = vec![n];
             dims.extend(first_inner_dims);
             Some((leaf, dims))
-        }
+        },
         // Leaf — must not be an Array (mixed nests are rejected for v1).
         Type::Array(_) => None,
         _ => Some((ty, Vec::new())),
@@ -185,14 +185,14 @@ fn generate_tuple_paths(ty: &Type) -> Vec<String> {
                     };
                     walk(elem, &next, out);
                 }
-            }
+            },
             _ => {
                 // Leaf reached — record the accumulated path. (For pure-tuple
                 // nests the leaf is always a primitive type.)
                 if !prefix.is_empty() {
                     out.push(prefix.to_string());
                 }
-            }
+            },
         }
     }
     let mut out = Vec::new();

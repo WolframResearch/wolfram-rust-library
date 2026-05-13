@@ -237,7 +237,6 @@ pub mod rtl;
 
 pub mod docs;
 
-
 // Note: This is exported as doc(inline) so that it shows up in the 'Modules' section of
 //       the crate docs instead of in the 'Re-exports' section. This is to make way for
 //       the chance that in the future, wolfram-library-link will have it's own expression
@@ -250,7 +249,6 @@ pub use wolfram_library_link_sys as sys;
 #[cfg(feature = "wstp")]
 pub use wstp;
 
-
 // Used by the #[export]/#[export(wstp)] macro implementations.
 #[cfg(feature = "automate-function-loading-boilerplate")]
 #[doc(hidden)]
@@ -258,7 +256,6 @@ pub use inventory;
 
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use self::macro_utils::exported_library_functions_association;
-
 
 pub use self::{
     args::{FromArg, IntoArg, NativeFunction},
@@ -278,23 +275,17 @@ pub use self::args::WstpFunction;
 // Re-export the new `wolfram-expr` portable value types under aliases that don't
 // shadow the existing wll types. Users wanting the WXF-portable forms can reach
 // them from this crate's namespace without an extra `use wolfram_expr` line.
+pub use wolfram_expr::NumericArray as OwnedNumericArray;
 pub use wolfram_expr::{
     Association, ByteArray, NumericArrayDataType as ExprNumericArrayDataType,
     NumericArrayElement, NumericArrayRead, PackedArray, PackedArrayDataType,
     PackedArrayElement,
 };
-pub use wolfram_expr::NumericArray as OwnedNumericArray;
 pub use wolfram_expr::{BigInteger, BigReal};
-
-
 
 use wolfram_library_link_sys::mint;
 #[cfg(feature = "wstp")]
-use {
-    std::sync::Mutex,
-    once_cell::sync::Lazy,
-    wstp::Link,
-};
+use {once_cell::sync::Lazy, std::sync::Mutex, wstp::Link};
 
 #[cfg(feature = "wstp")]
 pub(crate) use self::library_data::assert_main_thread;
@@ -351,7 +342,6 @@ use crate::expr::{Expr, ExprKind, Symbol};
 // version in `wolfram-export-macros` (the new home for all #[export*]-related
 // proc-macros). Same call-site syntax as before.
 pub use wolfram_export_macros::init;
-
 
 /// Export the specified functions as native *LibraryLink* functions.
 ///
@@ -687,7 +677,6 @@ pub use wolfram_export_macros::init;
 // syntax as today.
 pub use wolfram_export_macros::export;
 
-
 //======================================
 // Callbacks to the Wolfram Kernel
 //======================================
@@ -715,9 +704,10 @@ pub fn try_evaluate(expr: &Expr) -> Result<Expr, String> {
         // Send an EvaluatePacket['expr].
         let _: () = link
             // .put_expr(&Expr! { EvaluatePacket['expr] })
-            .put_expr(&Expr::normal(Symbol::new("System`EvaluatePacket"), vec![
-                expr.clone(),
-            ]))
+            .put_expr(&Expr::normal(
+                Symbol::new("System`EvaluatePacket"),
+                vec![expr.clone()],
+            ))
             .map_err(|e| e.to_string())?;
 
         let _: () = process_wstp_link(link)?;
@@ -814,7 +804,6 @@ fn with_link<F: FnOnce(&mut Link) -> R, R>(f: F) -> R {
 fn bool_from_mbool(boole: sys::mbool) -> bool {
     boole != 0
 }
-
 
 // TODO: Allow any type which implements FromExpr in wrapper parameter lists?
 

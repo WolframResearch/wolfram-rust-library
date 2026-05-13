@@ -5,8 +5,8 @@ use std::io::Write;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
 use wolfram_expr::{BigInteger, BigReal};
+use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
 
 use crate::serializer::{Serializer, ToWolfram};
 use crate::Error;

@@ -144,7 +144,10 @@ impl<Tag: ArrayTag> ArrayBuf<Tag> {
             "ArrayBuf::from_slice: dims product must equal slice length"
         );
         let bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(slice.as_ptr() as *const u8, std::mem::size_of_val(slice))
+            std::slice::from_raw_parts(
+                slice.as_ptr() as *const u8,
+                std::mem::size_of_val(slice),
+            )
         };
         ArrayBuf::new(T::TAG, dimensions, ByteArray::from(bytes))
     }
@@ -167,7 +170,10 @@ impl<Tag: ArrayTag> ArrayBuf<Tag> {
         }
         // SAFETY: tag matches T, so the bytes were produced from a `[T]`.
         Some(unsafe {
-            std::slice::from_raw_parts(bytes.as_ptr() as *const T, bytes.len() / elem_size)
+            std::slice::from_raw_parts(
+                bytes.as_ptr() as *const T,
+                bytes.len() / elem_size,
+            )
         })
     }
 }

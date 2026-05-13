@@ -24,10 +24,7 @@ fn strings_with_escapes() {
 
 #[test]
 fn symbol_and_function() {
-    assert_eq!(
-        wl(&Expr::symbol(Symbol::new("System`Plus"))),
-        "System`Plus"
-    );
+    assert_eq!(wl(&Expr::symbol(Symbol::new("System`Plus"))), "System`Plus");
     let plus = Expr::normal(
         Symbol::new("System`Plus"),
         vec![Expr::from(1), Expr::from(2), Expr::from(3)],
@@ -60,5 +57,8 @@ fn byte_array_base64() {
 #[test]
 fn numeric_array_inputform() {
     let arr = NumericArray::from_slice::<i32>(vec![3], &[10, 20, 30]);
-    assert_eq!(wl(&Expr::from(arr)), r#"NumericArray[{10, 20, 30}, "Integer32"]"#);
+    assert_eq!(
+        wl(&Expr::from(arr)),
+        r#"NumericArray[{10, 20, 30}, "Integer32"]"#
+    );
 }

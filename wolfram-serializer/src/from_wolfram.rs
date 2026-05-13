@@ -19,12 +19,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use wolfram_expr::{
-    Association, BigInteger, BigReal, ByteArray, Expr, NumericArray, PackedArray, RuleEntry,
-    Symbol,
+    Association, BigInteger, BigReal, ByteArray, Expr, NumericArray, PackedArray,
+    RuleEntry, Symbol,
 };
 
-use crate::wxf::cursor::WxfCursor;
 use crate::wxf::constants::*;
+use crate::wxf::cursor::WxfCursor;
 use crate::Error;
 
 /// Deserialize a typed value by reading directly from a [`WxfCursor`].
@@ -83,19 +83,19 @@ impl FromWolfram for Expr {
         match tag {
             TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
                 Ok(Expr::from(c.read_integer()?))
-            }
+            },
             TOKEN_REAL64 => {
                 let f = c.read_real()?;
                 if f.is_nan() {
                     return Err(Error::InvalidWxf("Real64 token contained NaN".into()));
                 }
                 Ok(Expr::real(f))
-            }
+            },
             TOKEN_STRING => {
                 // Expr::string<S: Into<String>> moves the owned String into
                 // ExprKind::String without an intermediate copy.
                 Ok(Expr::string(c.read_string()?))
-            }
+            },
             TOKEN_SYMBOL => Ok(Expr::symbol(c.read_symbol()?)),
             TOKEN_BINARY_STRING => Ok(Expr::from(c.read_byte_array()?)),
             TOKEN_BIG_INTEGER => Ok(Expr::from(c.read_big_integer()?)),
@@ -110,7 +110,7 @@ impl FromWolfram for Expr {
                     args.push(Expr::from_cursor(c)?);
                 }
                 Ok(Expr::normal(head, args))
-            }
+            },
             TOKEN_ASSOCIATION => {
                 let n = c.read_association_header()?;
                 let mut a = Association::new();
@@ -125,7 +125,7 @@ impl FromWolfram for Expr {
                     });
                 }
                 Ok(Expr::from(a))
-            }
+            },
             TOKEN_RULE | TOKEN_RULE_DELAYED => Err(Error::InvalidWxf(format!(
                 "unexpected Rule/RuleDelayed token outside Association: 0x{:02X}",
                 tag
@@ -167,7 +167,7 @@ impl FromWolfram for f32 {
             TOKEN_REAL64 => Ok(c.read_real()? as f32),
             TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
                 Ok(c.read_integer()? as f32)
-            }
+            },
             other => Err(Error::Deserialize {
                 path: String::new(),
                 expected: "f32",
@@ -184,7 +184,7 @@ impl FromWolfram for f64 {
             TOKEN_REAL64 => c.read_real(),
             TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
                 Ok(c.read_integer()? as f64)
-            }
+            },
             other => Err(Error::Deserialize {
                 path: String::new(),
                 expected: "f64",

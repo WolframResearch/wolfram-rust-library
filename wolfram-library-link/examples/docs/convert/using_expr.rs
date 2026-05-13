@@ -21,9 +21,9 @@ impl Point {
     fn to_expr(&self) -> Expr {
         let Point { x, y } = *self;
 
-        Expr::normal(Symbol::new("System`Point"), vec![Expr::list(vec![
-            Expr::real(x),
-            Expr::real(y),
-        ])])
+        Expr::normal(
+            Symbol::new("System`Point"),
+            vec![Expr::list(vec![Expr::real(x), Expr::real(y)])],
+        )
     }
 }

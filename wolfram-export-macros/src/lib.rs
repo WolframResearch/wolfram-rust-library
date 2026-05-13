@@ -46,7 +46,7 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
                 attr.span(),
                 "this attribute can only be applied to `fn(..) {..}` items",
             ))
-        }
+        },
     };
 
     if let Some(async_) = func.sig.asyncness {

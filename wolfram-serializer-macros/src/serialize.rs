@@ -13,7 +13,9 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::shared::{parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs};
+use crate::shared::{
+    parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs,
+};
 use crate::ty_classify::{classify, FieldKind};
 
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
@@ -29,7 +31,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                 input,
                 "#[derive(ToWolfram)] does not support unions",
             ))
-        }
+        },
     };
 
     Ok(quote! {
@@ -66,7 +68,7 @@ fn expand_struct(
                 #entries
                 __s.serialize_association(__entries)?;
             })
-        }
+        },
         Fields::Unnamed(unnamed) => {
             // Tuple struct → emit Function[Symbol("System`List"), arg0, arg1, …].
             // The head is fixed; tuple structs identify themselves by the
@@ -81,14 +83,14 @@ fn expand_struct(
                 let __head = ::wolfram_serializer::__derive_support::HeadSymbol("System`List");
                 __s.serialize_function(&__head as &dyn ::wolfram_serializer::ToWolfram, __args)?;
             })
-        }
+        },
         Fields::Unit => {
             // Unit struct → emit Symbol("Global`Name").
             let symbol = qualify_symbol(&name.to_string(), attrs);
             Ok(quote! {
                 __s.serialize_symbol(#symbol)?;
             })
-        }
+        },
     }
 }
 
@@ -194,7 +196,7 @@ fn expand_field_value(
                 preamble,
                 quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
         FieldKind::VecOfNumeric { elem_ty, dt } => {
             let preamble = quote_spanned! { span =>
                 let #bytes_var: &[u8] = unsafe {
@@ -214,7 +216,7 @@ fn expand_field_value(
                 preamble,
                 quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
         FieldKind::VecOfOther { elem_ty } => {
             // List path: build a Vec<&dyn ToWolfram> and wrap in ListThunk.
             // Also emit the debug-only generic-Vec warning helper — only
@@ -235,7 +237,7 @@ fn expand_field_value(
                 preamble,
                 quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
         FieldKind::NumericTensor {
             elem_ty,
             dt,
@@ -243,7 +245,8 @@ fn expand_field_value(
             tuple_paths,
             original_ty,
         } => {
-            let dims_lits: Vec<TokenStream> = dims.iter().map(|d| quote! { #d }).collect();
+            let dims_lits: Vec<TokenStream> =
+                dims.iter().map(|d| quote! { #d }).collect();
             let total_leaves: usize = dims.iter().product();
             let rank = dims.len();
             let preamble = if let Some(paths) = tuple_paths {
@@ -289,7 +292,7 @@ fn expand_field_value(
                 preamble_full,
                 quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
         FieldKind::TupleHetero { tup } => {
             let elem_refs = tup.elems.iter().enumerate().map(|(i, _ty)| {
                 let idx = syn::Index::from(i);
@@ -306,7 +309,7 @@ fn expand_field_value(
                 preamble,
                 quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
         FieldKind::ArrayHetero { len, .. } => {
             let elems_var = format_ident!("__{}_elems", field_ident);
             let idx_iter = (0..len).map(|i| {
@@ -323,7 +326,7 @@ fn expand_field_value(
                 preamble,
                 quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
         FieldKind::Other => {
             // Delegate to <FieldTy as ToWolfram>::serialize via the existing
             // blanket / hand-written impls. No preamble needed — we just
@@ -332,7 +335,7 @@ fn expand_field_value(
                 TokenStream::new(),
                 quote_spanned! { span => &(#accessor) as &dyn ::wolfram_serializer::ToWolfram },
             ))
-        }
+        },
     }
 }
 
@@ -384,7 +387,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                         __s.serialize_association(__entries)?;
                     }
                 });
-            }
+            },
             Fields::Unnamed(unnamed) => {
                 // Bind each tuple element to a synthetic ident `__bind_0`, …
                 let bindings: Vec<syn::Ident> = (0..unnamed.unnamed.len())
@@ -422,7 +425,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                         __s.serialize_association(__entries)?;
                     }
                 });
-            }
+            },
             Fields::Named(named) => {
                 let bindings: Vec<&syn::Ident> = named
                     .named
@@ -473,7 +476,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                         __s.serialize_association(__entries)?;
                     }
                 });
-            }
+            },
         }
     }
 

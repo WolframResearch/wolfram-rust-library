@@ -1,7 +1,7 @@
 use crate::symbol::{ContextRef, RelativeContext, SymbolNameRef, SymbolRef};
 use crate::{
-    Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayDataType, PackedArray,
-    PackedArrayDataType, Symbol,
+    Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayDataType,
+    PackedArray, PackedArrayDataType, Symbol,
 };
 
 /// `(input, is Symbol, is SymbolName, is Context, is RelativeContext)`
@@ -152,7 +152,9 @@ fn display_of_new_variants_is_non_empty() {
     let na = Expr::from(NumericArray::from_slice::<u8>(vec![1], &[42]));
     let pa = Expr::from(PackedArray::from_slice::<i32>(vec![1], &[42]));
     assert!(format!("{}", ba).contains("ByteArray"));
-    assert!(format!("{}", assoc).starts_with("<|") && format!("{}", assoc).ends_with("|>"));
+    assert!(
+        format!("{}", assoc).starts_with("<|") && format!("{}", assoc).ends_with("|>")
+    );
     assert!(format!("{}", na).contains("NumericArray"));
     assert!(format!("{}", pa).contains("PackedArray"));
 }

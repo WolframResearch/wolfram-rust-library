@@ -139,7 +139,6 @@
 
 #![warn(missing_docs)]
 
-
 mod env;
 mod error;
 mod link_server;
@@ -158,7 +157,6 @@ pub mod kernel;
 mod test_readme {
     #![doc = include_str!("../README.md")]
 }
-
 
 use std::convert::TryFrom;
 use std::ffi::{c_char, CStr, CString};
@@ -188,7 +186,6 @@ pub use crate::{
 
 // TODO: Make this function public from `wstp`?
 pub(crate) use env::with_raw_stdenv;
-
 
 //======================================
 // Source

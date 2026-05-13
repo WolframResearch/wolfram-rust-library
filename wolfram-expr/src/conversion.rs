@@ -1,6 +1,5 @@
 use super::*;
 
-
 impl Expr {
     /// If this is a [`Normal`] expression, return that. Otherwise return None.
     pub fn try_as_normal(&self) -> Option<&Normal> {

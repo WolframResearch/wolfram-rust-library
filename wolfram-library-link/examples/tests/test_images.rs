@@ -2,7 +2,6 @@ use wolfram_library_link::{
     self as wll, ColorSpace, Image, NumericArray, Pixel, UninitImage, UninitNumericArray,
 };
 
-
 #[wll::export]
 fn test_image_arg(image: &Image<bool>) -> NumericArray<i8> {
     let mut array = UninitNumericArray::from_dimensions(&[image.flattened_length()]);

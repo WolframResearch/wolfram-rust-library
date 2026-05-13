@@ -15,7 +15,9 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::shared::{parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs};
+use crate::shared::{
+    parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs,
+};
 use crate::ty_classify::{classify, is_option_type, FieldKind};
 
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
@@ -32,7 +34,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                 input,
                 "#[derive(FromWolfram)] does not support unions",
             ))
-        }
+        },
     };
 
     Ok(quote! {
@@ -81,17 +83,22 @@ fn expand_struct(
                 }
             });
             // Match arms: known key → fill slot.
-            let key_arms = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
-                let slot = format_ident!("__slot_{}", id);
-                let path = format!("{}.{}", name_str, id);
-                let span = f.ty.span();
-                let extract = expand_field_extract(&f.ty, &path, span);
-                quote_spanned! { span =>
-                    #k => {
-                        #slot = ::core::option::Option::Some(#extract);
-                    }
-                }
-            });
+            let key_arms =
+                fields
+                    .iter()
+                    .zip(&field_idents)
+                    .zip(&field_keys)
+                    .map(|((f, id), k)| {
+                        let slot = format_ident!("__slot_{}", id);
+                        let path = format!("{}.{}", name_str, id);
+                        let span = f.ty.span();
+                        let extract = expand_field_extract(&f.ty, &path, span);
+                        quote_spanned! { span =>
+                            #k => {
+                                #slot = ::core::option::Option::Some(#extract);
+                            }
+                        }
+                    });
             // Unwrap each slot at the end.  `Option<T>` fields default to
             // `None` when the key is absent — `slot` for those is
             // `Option<Option<T>>`, and `slot.flatten()` collapses the
@@ -126,7 +133,7 @@ fn expand_struct(
                 #(#unwraps)*
                 ::core::result::Result::Ok(#name { #(#field_idents),* })
             })
-        }
+        },
         Fields::Unnamed(unnamed) => {
             // Tuple struct: expect Function[<head>, arg0, arg1, ...].
             // The head is not validated — tuple structs identify themselves
@@ -158,7 +165,7 @@ fn expand_struct(
                 #(#extracts)*
                 ::core::result::Result::Ok(#name(#(#bindings),*))
             })
-        }
+        },
         Fields::Unit => {
             let symbol = qualify_symbol(name_str, attrs);
             Ok(quote! {
@@ -174,7 +181,7 @@ fn expand_struct(
                 }
                 ::core::result::Result::Ok(#name)
             })
-        }
+        },
     }
 }
 
@@ -347,7 +354,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                     __out
                 }}
             }
-        }
+        },
         FieldKind::TupleHetero { tup } => {
             // Heterogeneous tuple — expect Function[List, …] with arity = tup.elems.len().
             let arity = tup.elems.len();
@@ -379,7 +386,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                 }
                 ( #(#elem_extracts),* )
             }}
-        }
+        },
         FieldKind::ArrayHetero { arr, len } => {
             // Heterogeneous fixed-size array — expect Function[List, …]
             // with `len` elements.
@@ -417,7 +424,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                     )
                 })?
             }}
-        }
+        },
         FieldKind::Other => quote_spanned! { span => {
             <#ty as ::wolfram_serializer::FromWolfram>::from_cursor(__c)?
         }},
@@ -435,12 +442,12 @@ fn build_tuple_ctor_from_slice(ty: &syn::Type, idx: &mut usize) -> TokenStream {
                 .map(|inner| build_tuple_ctor_from_slice(inner, idx))
                 .collect::<Vec<_>>();
             quote! { ( #(#parts),* ) }
-        }
+        },
         _ => {
             let i = *idx;
             *idx += 1;
             quote! { __slice[#i] }
-        }
+        },
     }
 }
 
@@ -458,7 +465,11 @@ fn build_tuple_ctor_from_slice(ty: &syn::Type, idx: &mut usize) -> TokenStream {
 // order). This sidesteps the need to buffer the `"Data"` payload before
 // knowing the variant — we read the variant name first, then dispatch the
 // per-variant reader to consume the rest of the entries.
-fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<TokenStream> {
+fn expand_enum(
+    name: &syn::Ident,
+    name_str: &str,
+    data: &DataEnum,
+) -> Result<TokenStream> {
     let mut variant_arms = Vec::with_capacity(data.variants.len());
 
     for v in &data.variants {
@@ -483,7 +494,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                         return ::core::result::Result::Ok(#name :: #v_name);
                     }
                 });
-            }
+            },
             Fields::Unnamed(unnamed) => {
                 // Tuple variant: 2-entry Association; "Data" is a List of args.
                 let fields: Vec<&syn::Field> = unnamed.unnamed.iter().collect();
@@ -546,7 +557,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                         return ::core::result::Result::Ok(#name :: #v_name ( #(#bindings),* ));
                     }
                 });
-            }
+            },
             Fields::Named(named) => {
                 // Struct variant: 2-entry Association; "Data" is itself an
                 // Association of the variant's fields.
@@ -626,7 +637,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                         return ::core::result::Result::Ok(#name :: #v_name { #(#field_idents),* });
                     }
                 });
-            }
+            },
         }
     }
 

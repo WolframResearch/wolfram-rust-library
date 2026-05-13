@@ -161,53 +161,79 @@ impl ExportEntry {
             ExportEntry::Native { name, signature } => {
                 let (args, ret) = signature()?;
 
-                Expr::normal(&lib_func_load, vec![
-                    library.clone(),
-                    Expr::string(*name),
-                    Expr::normal(sys("List"), args),
-                    ret,
-                ])
-            }
+                Expr::normal(
+                    &lib_func_load,
+                    vec![
+                        library.clone(),
+                        Expr::string(*name),
+                        Expr::normal(sys("List"), args),
+                        ret,
+                    ],
+                )
+            },
             // WSTP-mode loading code, preserved verbatim from the legacy
             // LibraryLinkFunction::Wstp arm — wraps LibraryFunctionLoad in
             // a Function[Block[...]] that resets $Context for predictable
             // symbol context across the link.
             ExportEntry::Wstp { name } => {
-                let load_call = Expr::normal(&lib_func_load, vec![
-                    library.clone(),
-                    Expr::string(*name),
-                    link_object.clone(),
-                    link_object,
-                ]);
+                let load_call = Expr::normal(
+                    &lib_func_load,
+                    vec![
+                        library.clone(),
+                        Expr::string(*name),
+                        link_object.clone(),
+                        link_object,
+                    ],
+                );
 
                 let var = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
 
-                Expr::normal(sys("With"), vec![
-                    Expr::normal(sys("List"), vec![Expr::normal(sys("Set"), vec![
-                        var.clone(),
-                        load_call,
-                    ])]),
-                    Expr::normal(sys("Function"), vec![Expr::normal(
-                        sys("Block"),
-                        vec![
-                            Expr::normal(sys("List"), vec![
-                                Expr::normal(sys("Set"), vec![
-                                    Expr::from(sys("$Context")),
-                                    Expr::string("RustLinkWSTPPrivateContext`"),
-                                ]),
-                                Expr::normal(sys("Set"), vec![
-                                    Expr::from(sys("$ContextPath")),
-                                    Expr::normal(sys("List"), vec![]),
-                                ]),
-                            ]),
-                            Expr::normal(var, vec![Expr::normal(
-                                sys("SlotSequence"),
-                                vec![Expr::from(1)],
-                            )]),
-                        ],
-                    )]),
-                ])
-            }
+                Expr::normal(
+                    sys("With"),
+                    vec![
+                        Expr::normal(
+                            sys("List"),
+                            vec![Expr::normal(sys("Set"), vec![var.clone(), load_call])],
+                        ),
+                        Expr::normal(
+                            sys("Function"),
+                            vec![Expr::normal(
+                                sys("Block"),
+                                vec![
+                                    Expr::normal(
+                                        sys("List"),
+                                        vec![
+                                            Expr::normal(
+                                                sys("Set"),
+                                                vec![
+                                                    Expr::from(sys("$Context")),
+                                                    Expr::string(
+                                                        "RustLinkWSTPPrivateContext`",
+                                                    ),
+                                                ],
+                                            ),
+                                            Expr::normal(
+                                                sys("Set"),
+                                                vec![
+                                                    Expr::from(sys("$ContextPath")),
+                                                    Expr::normal(sys("List"), vec![]),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                    Expr::normal(
+                                        var,
+                                        vec![Expr::normal(
+                                            sys("SlotSequence"),
+                                            vec![Expr::from(1)],
+                                        )],
+                                    ),
+                                ],
+                            )],
+                        ),
+                    ],
+                )
+            },
             // Wxf-mode: the wire shape at the LibraryLink C ABI level is
             // always `{ByteArray} -> ByteArray`. The typed argument/return
             // types from `signature()` are intentionally NOT embedded in the
@@ -215,12 +241,15 @@ impl ExportEntry {
             // for display/documentation only. Callers are expected to wrap
             // calls with BinarySerialize/BinaryDeserialize (or use a helper
             // generated alongside the manifest).
-            ExportEntry::Wxf { name, .. } => Expr::normal(&lib_func_load, vec![
-                library.clone(),
-                Expr::string(*name),
-                Expr::normal(sys("List"), vec![byte_array.clone()]),
-                byte_array,
-            ]),
+            ExportEntry::Wxf { name, .. } => Expr::normal(
+                &lib_func_load,
+                vec![
+                    library.clone(),
+                    Expr::string(*name),
+                    Expr::normal(sys("List"), vec![byte_array.clone()]),
+                    byte_array,
+                ],
+            ),
         };
 
         Ok(code)

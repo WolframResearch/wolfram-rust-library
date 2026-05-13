@@ -10,11 +10,7 @@ use crate::{
     NativeFunction,
 };
 #[cfg(feature = "wstp")]
-use crate::{
-    catch_panic::CaughtPanic,
-    sys::LIBRARY_NO_ERROR,
-    WstpFunction,
-};
+use crate::{catch_panic::CaughtPanic, sys::LIBRARY_NO_ERROR, WstpFunction};
 
 /// Error codes returned by macro-generated wrapper code.
 ///
