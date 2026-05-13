@@ -243,10 +243,16 @@ fn export_wxf_function(
         mod #name {
             use super::*;
 
+            // The bridge takes input by reference (`&NumericArray<u8>`)
+            // because WL's `ByteArray` argument is passed in `Constant`
+            // memory mode — the kernel retains ownership of the buffer and
+            // the wrapper must not increment the share count. Using an
+            // owned `NumericArray<u8>` would map to `Shared` mode and
+            // mismatch the LibraryFunctionLoad signature.
             fn __wxf_bridge(
-                __input: #p::NumericArray<u8>,
+                __input: &#p::NumericArray<u8>,
             ) -> #p::NumericArray<u8> {
-                let __arg = #p::macro_utils::decode(&__input);
+                let __arg = #p::macro_utils::decode(__input);
                 let __result = super::#name(__arg);
                 #p::macro_utils::encode(&__result)
             }
@@ -258,15 +264,17 @@ fn export_wxf_function(
                 args: *mut #p::sys::MArgument,
                 res: #p::sys::MArgument,
             ) -> std::os::raw::c_int {
-                let func: fn(
-                    #p::NumericArray<u8>,
-                ) -> #p::NumericArray<u8> = __wxf_bridge;
+                // Match the lifetime-elision pattern the existing native
+                // macro uses (`let func: fn(_) -> _ = super::name;`).
+                // Rust resolves NativeFunction<'a> from `FromArg<'a>` via
+                // fn-item coercion at the call site.
+                let func: fn(_) -> _ = __wxf_bridge;
                 #p::macro_utils::call_wxf_wolfram_library_function(
                     lib,
                     args,
                     argc,
                     res,
-                    func
+                    func,
                 )
             }
         }

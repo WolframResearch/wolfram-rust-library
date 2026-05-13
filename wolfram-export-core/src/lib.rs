@@ -16,12 +16,6 @@
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use inventory;
 
-pub mod catch_panic;
-
-/// Env var to opt in to backtrace-resolution in panic Failure objects. Set
-/// to anything non-empty to enable.
-pub const BACKTRACE_ENV_VAR: &str = "LIBRARY_LINK_RUST_BACKTRACE";
-
 use wolfram_expr::{Expr, Symbol};
 
 /// Inventory entry for one `#[export]`-marked function.

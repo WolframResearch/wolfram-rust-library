@@ -276,12 +276,15 @@ impl FromWolfram for BigReal {
 impl FromWolfram for () {
     fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
         let sym = c.read_symbol()?;
-        if sym.as_str() == "System`Null" {
+        // The kernel's BinarySerialize strips the System` context, so the
+        // bare "Null" is the canonical wire form. Accept either to be
+        // resilient to context-preserving callers.
+        if sym.as_str() == "Null" || sym.as_str() == "System`Null" {
             Ok(())
         } else {
             Err(Error::Deserialize {
                 path: String::new(),
-                expected: "() (System`Null symbol)",
+                expected: "() (Null symbol)",
                 got: format!("Symbol({:?})", sym.as_str()),
             })
         }

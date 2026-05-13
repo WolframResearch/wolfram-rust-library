@@ -17,7 +17,6 @@
 pub use wolfram_export_macros::{export_wxf as export, init};
 
 pub use wolfram_export_core::{inventory, ExportEntry};
-pub use wolfram_export_core::catch_panic;
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use wolfram_export_core::exported_library_functions_association;
 
