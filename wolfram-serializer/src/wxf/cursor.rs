@@ -159,8 +159,10 @@ impl<'a> WxfCursor<'a> {
         let got = self.read_byte()?;
         if got != expected {
             return Err(Error::InvalidWxf(format!(
-                "{}: expected token byte 0x{:02X}, got 0x{:02X}",
-                ctx, expected, got
+                "{}: expected {}, got {}",
+                ctx,
+                token_kind_name(expected),
+                token_kind_name(got)
             )));
         }
         Ok(())
@@ -177,8 +179,8 @@ impl<'a> WxfCursor<'a> {
             TOKEN_INTEGER32 => Ok(i64::from(i32::from_le_bytes(self.read_array::<4>()?))),
             TOKEN_INTEGER64 => Ok(i64::from_le_bytes(self.read_array::<8>()?)),
             other => Err(Error::InvalidWxf(format!(
-                "expected an Integer token, got 0x{:02X}",
-                other
+                "expected Integer, got {}",
+                token_kind_name(other)
             ))),
         }
     }
@@ -311,8 +313,8 @@ impl<'a> WxfCursor<'a> {
             TOKEN_RULE => Ok(false),
             TOKEN_RULE_DELAYED => Ok(true),
             other => Err(Error::InvalidWxf(format!(
-                "expected Rule or RuleDelayed token, got 0x{:02X}",
-                other
+                "expected Rule or RuleDelayed, got {}",
+                token_kind_name(other)
             ))),
         }
     }
@@ -366,8 +368,8 @@ impl<'a> WxfCursor<'a> {
             },
             other => {
                 return Err(Error::InvalidWxf(format!(
-                    "skip(): unknown WXF token: 0x{:02X}",
-                    other
+                    "skip(): unknown: {}",
+                    token_kind_name(other)
                 )));
             },
         }

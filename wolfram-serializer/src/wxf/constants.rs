@@ -68,6 +68,31 @@ pub fn array_type_to_wxf(dt: NumericArrayDataType) -> u8 {
     }
 }
 
+/// Map a token byte to its human-readable WXF token name (`"NumericArray"`,
+/// `"Function"`, …) — used by every layer that wants a readable error
+/// message instead of a raw `0x..` byte. Unknown tokens return `"<unknown>"`.
+pub(crate) fn token_kind_name(tag: u8) -> &'static str {
+    match tag {
+        TOKEN_INTEGER8 => "Integer8",
+        TOKEN_INTEGER16 => "Integer16",
+        TOKEN_INTEGER32 => "Integer32",
+        TOKEN_INTEGER64 => "Integer64",
+        TOKEN_REAL64 => "Real64",
+        TOKEN_STRING => "String",
+        TOKEN_SYMBOL => "Symbol",
+        TOKEN_BINARY_STRING => "ByteArray",
+        TOKEN_BIG_INTEGER => "BigInteger",
+        TOKEN_BIG_REAL => "BigReal",
+        TOKEN_FUNCTION => "Function",
+        TOKEN_ASSOCIATION => "Association",
+        TOKEN_NUMERIC_ARRAY => "NumericArray",
+        TOKEN_PACKED_ARRAY => "PackedArray",
+        TOKEN_RULE => "Rule",
+        TOKEN_RULE_DELAYED => "RuleDelayed",
+        _ => "<unknown>",
+    }
+}
+
 /// Inverse of [`array_type_to_wxf`].
 pub fn array_type_from_wxf(byte: u8) -> Option<NumericArrayDataType> {
     Some(match byte {

@@ -13,7 +13,7 @@
 use wolfram_expr::NumericArrayDataType as DT;
 
 use crate::wxf::constants::{
-    TOKEN_BINARY_STRING, TOKEN_NUMERIC_ARRAY, TOKEN_PACKED_ARRAY,
+    token_kind_name, TOKEN_BINARY_STRING, TOKEN_NUMERIC_ARRAY, TOKEN_PACKED_ARRAY,
 };
 use crate::wxf::cursor::WxfCursor;
 use crate::Error;
@@ -98,7 +98,7 @@ fn read_numeric_payload(
         other => Err(err(
             path,
             "NumericArray, PackedArray, or ByteArray",
-            format!("token 0x{:02X}", other),
+            token_kind_name(other).to_string(),
         )),
     }
 }

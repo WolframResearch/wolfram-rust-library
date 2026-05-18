@@ -49,29 +49,7 @@ pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> E
     }
 }
 
-/// Tag-byte → human-readable kind name. Used in error messages when an
-/// impl rejects the next token.
-pub(crate) fn token_kind_name(tag: u8) -> &'static str {
-    match tag {
-        TOKEN_INTEGER8 => "Integer8",
-        TOKEN_INTEGER16 => "Integer16",
-        TOKEN_INTEGER32 => "Integer32",
-        TOKEN_INTEGER64 => "Integer64",
-        TOKEN_REAL64 => "Real64",
-        TOKEN_STRING => "String",
-        TOKEN_SYMBOL => "Symbol",
-        TOKEN_BINARY_STRING => "ByteArray",
-        TOKEN_BIG_INTEGER => "BigInteger",
-        TOKEN_BIG_REAL => "BigReal",
-        TOKEN_FUNCTION => "Function",
-        TOKEN_ASSOCIATION => "Association",
-        TOKEN_NUMERIC_ARRAY => "NumericArray",
-        TOKEN_PACKED_ARRAY => "PackedArray",
-        TOKEN_RULE => "Rule",
-        TOKEN_RULE_DELAYED => "RuleDelayed",
-        _ => "<unknown>",
-    }
-}
+pub(crate) use crate::wxf::constants::token_kind_name;
 
 //==============================================================================
 // Expr — replaces the old ExprConsumer's tree-building behavior.
@@ -127,12 +105,12 @@ impl FromWolfram for Expr {
                 Ok(Expr::from(a))
             },
             TOKEN_RULE | TOKEN_RULE_DELAYED => Err(Error::InvalidWxf(format!(
-                "unexpected Rule/RuleDelayed token outside Association: 0x{:02X}",
-                tag
+                "unexpected {} outside Association",
+                token_kind_name(tag)
             ))),
             other => Err(Error::InvalidWxf(format!(
-                "unknown WXF token: 0x{:02X}",
-                other
+                "unknown: {}",
+                token_kind_name(other)
             ))),
         }
     }
