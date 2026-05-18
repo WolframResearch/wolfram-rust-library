@@ -3,12 +3,12 @@ libNative = exDir["libtypes_native.dylib"];
 libWstp = exDir["libtypes_wstp.dylib"];
 libWxf  = exDir["libtypes_wxf.dylib"];
 
-fromWxfResult[na_] := BinaryDeserialize[ByteArray @ na];
+fromWxfResult[ba_] := BinaryDeserialize[ba];
 wxfLoad[lib_, fn_, nArgs_] := Module[{raw},
   raw = LibraryFunctionLoad[lib, fn,
-    {{LibraryDataType[NumericArray, "UnsignedInteger8"], "Constant"}},
-    {LibraryDataType[NumericArray, "UnsignedInteger8"], Automatic}];
-  Function[args, fromWxfResult[raw[NumericArray @ BinarySerialize[List @@ args]]]]];
+    {{ByteArray, "Constant"}},
+    {ByteArray, Automatic}];
+  Function[args, fromWxfResult[raw[BinarySerialize[List @@ args]]]]];
 
 nativeAdd   = LibraryFunctionLoad[libNative, "add", {Real, Real}, Real];
 nativeDot   = LibraryFunctionLoad[libNative, "dot",

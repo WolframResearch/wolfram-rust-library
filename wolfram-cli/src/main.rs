@@ -224,12 +224,12 @@ fn render_wl(dylib_name: &str, entries: &[FunctionEntry]) -> String {
                 // calls BinarySerialize once.
                 let load = format!(
                     "LibraryFunctionLoad[$lib, \"{}\", \
-                     {{{{LibraryDataType[NumericArray, \"UnsignedInteger8\"], \"Constant\"}}}}, \
-                     {{LibraryDataType[NumericArray, \"UnsignedInteger8\"], Automatic}}]",
+                     {{{{ByteArray, \"Constant\"}}}}, \
+                     {{ByteArray, Automatic}}]",
                     e.name
                 );
                 out.push_str(&format!(
-                    "    \"{}\" -> Composition[BinaryDeserialize, ByteArray, \
+                    "    \"{}\" -> Composition[BinaryDeserialize, \
                      {}, BinarySerialize, List]{}\n",
                     e.name, load, sep
                 ));
