@@ -166,7 +166,7 @@ fn generate_loader(dylib: &Path, out_dir: Option<&Path>, cleanup: bool) -> Resul
     std::fs::write(&manifest_path, &wl)
         .with_context(|| format!("failed to write {}", manifest_path.display()))?;
 
-    eprintln!("cargo wolfram: generated {}", folder.display());
+    eprintln!("cargo wolfram: generated {}", manifest_path.display());
     Ok(())
 }
 
