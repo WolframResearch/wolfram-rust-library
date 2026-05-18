@@ -115,52 +115,35 @@ fn err(path: &str, expected: &'static str, got: String) -> Error {
 // Per-target widening tables
 //==============================================================================
 
+/// Little-endian element reader. Yields one `$t` per `$n`-byte chunk.
+macro_rules! make_reader {
+    ($name:ident, $t:ty, $n:expr) => {
+        #[inline]
+        fn $name(b: &[u8]) -> impl Iterator<Item = $t> + '_ {
+            b.chunks_exact($n).map(|c| {
+                let arr: [u8; $n] = c.try_into().unwrap();
+                <$t>::from_le_bytes(arr)
+            })
+        }
+    };
+}
+
 #[inline]
 fn read_i8(b: &[u8]) -> impl Iterator<Item = i8> + '_ {
     b.iter().map(|&x| x as i8)
 }
 #[inline]
-fn read_i16(b: &[u8]) -> impl Iterator<Item = i16> + '_ {
-    b.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]))
-}
-#[inline]
-fn read_i32(b: &[u8]) -> impl Iterator<Item = i32> + '_ {
-    b.chunks_exact(4)
-        .map(|c| i32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-}
-#[inline]
-fn read_i64(b: &[u8]) -> impl Iterator<Item = i64> + '_ {
-    b.chunks_exact(8)
-        .map(|c| i64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
-}
-#[inline]
 fn read_u8(b: &[u8]) -> impl Iterator<Item = u8> + '_ {
     b.iter().copied()
 }
-#[inline]
-fn read_u16(b: &[u8]) -> impl Iterator<Item = u16> + '_ {
-    b.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]]))
-}
-#[inline]
-fn read_u32(b: &[u8]) -> impl Iterator<Item = u32> + '_ {
-    b.chunks_exact(4)
-        .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-}
-#[inline]
-fn read_u64(b: &[u8]) -> impl Iterator<Item = u64> + '_ {
-    b.chunks_exact(8)
-        .map(|c| u64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
-}
-#[inline]
-fn read_f32(b: &[u8]) -> impl Iterator<Item = f32> + '_ {
-    b.chunks_exact(4)
-        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-}
-#[inline]
-fn read_f64(b: &[u8]) -> impl Iterator<Item = f64> + '_ {
-    b.chunks_exact(8)
-        .map(|c| f64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
-}
+make_reader!(read_i16, i16, 2);
+make_reader!(read_i32, i32, 4);
+make_reader!(read_i64, i64, 8);
+make_reader!(read_u16, u16, 2);
+make_reader!(read_u32, u32, 4);
+make_reader!(read_u64, u64, 8);
+make_reader!(read_f32, f32, 4);
+make_reader!(read_f64, f64, 8);
 
 fn reject(src: DT, target: DT) -> String {
     format!(

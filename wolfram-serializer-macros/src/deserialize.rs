@@ -50,6 +50,92 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 }
 
 //==============================================================================
+// Shared: Association-keyed read of named fields
+//==============================================================================
+
+/// Per-field code fragments that drive the "Association keyed by string"
+/// deserialization path. Both `expand_struct(Fields::Named)` and the
+/// `expand_enum(Fields::Named)` variant arm consume the same shape — only
+/// the surrounding scaffolding (header check, final constructor) differs.
+struct NamedFieldsAssoc<'a> {
+    /// `let mut __slot_x: Option<X> = None;` per field.
+    slot_decls: Vec<TokenStream>,
+    /// `"x" => { __slot_x = Some(<read>); }` per field.
+    key_arms: Vec<TokenStream>,
+    /// `let x = __slot_x.ok_or_else(...)?;` (or `.flatten()` for `Option<T>`).
+    unwraps: Vec<TokenStream>,
+    /// Field identifiers in declaration order — used to spell the struct
+    /// constructor at the call site.
+    field_idents: Vec<&'a syn::Ident>,
+}
+
+fn build_named_assoc<'a>(
+    fields: &'a [&'a syn::Field],
+    err_path_prefix: &str,
+) -> Result<NamedFieldsAssoc<'a>> {
+    let mut field_keys: Vec<String> = Vec::with_capacity(fields.len());
+    let mut field_idents: Vec<&syn::Ident> = Vec::with_capacity(fields.len());
+    for f in fields {
+        let attrs = parse_field_attrs(&f.attrs)?;
+        let id = f.ident.as_ref().expect("named field");
+        field_keys.push(attrs.rename.unwrap_or_else(|| id.to_string()));
+        field_idents.push(id);
+    }
+    let slot_decls = fields
+        .iter()
+        .zip(&field_idents)
+        .map(|(f, id)| {
+            let ty = &f.ty;
+            let slot = format_ident!("__slot_{}", id);
+            quote_spanned! { f.ty.span() =>
+                let mut #slot: ::core::option::Option<#ty> = ::core::option::Option::None;
+            }
+        })
+        .collect();
+    let key_arms = fields
+        .iter()
+        .zip(&field_idents)
+        .zip(&field_keys)
+        .map(|((f, id), k)| {
+            let slot = format_ident!("__slot_{}", id);
+            let path = format!("{}.{}", err_path_prefix, id);
+            let span = f.ty.span();
+            let extract = expand_field_extract(&f.ty, &path, span);
+            quote_spanned! { span =>
+                #k => { #slot = ::core::option::Option::Some(#extract); }
+            }
+        })
+        .collect();
+    let unwraps = fields
+        .iter()
+        .zip(&field_idents)
+        .zip(&field_keys)
+        .map(|((f, id), k)| {
+            let slot = format_ident!("__slot_{}", id);
+            let span = f.ty.span();
+            if is_option_type(&f.ty) {
+                quote_spanned! { span => let #id = #slot.flatten(); }
+            } else {
+                let path = format!("{}.{}", err_path_prefix, id);
+                quote_spanned! { span =>
+                    let #id = #slot.ok_or_else(|| ::wolfram_serializer::from_wolfram::err_at(
+                        #path,
+                        "Association entry",
+                        format!("missing key {:?}", #k),
+                    ))?;
+                }
+            }
+        })
+        .collect();
+    Ok(NamedFieldsAssoc {
+        slot_decls,
+        key_arms,
+        unwraps,
+        field_idents,
+    })
+}
+
+//==============================================================================
 // Structs
 //==============================================================================
 
@@ -63,55 +149,12 @@ fn expand_struct(
         Fields::Named(named) => {
             let fields: Vec<&syn::Field> = named.named.iter().collect();
             let arity = fields.len();
-            let mut field_keys: Vec<String> = Vec::with_capacity(fields.len());
-            let mut field_idents: Vec<&syn::Ident> = Vec::with_capacity(fields.len());
-            for f in &fields {
-                let attrs = parse_field_attrs(&f.attrs)?;
-                let id = f.ident.as_ref().expect("named field");
-                field_keys.push(attrs.rename.unwrap_or_else(|| id.to_string()));
-                field_idents.push(id);
-            }
-
-            // Association branch: key-driven, order-independent.
-            let slot_decls = fields.iter().zip(&field_idents).map(|(f, id)| {
-                let ty = &f.ty;
-                let slot = format_ident!("__slot_{}", id);
-                quote_spanned! { f.ty.span() =>
-                    let mut #slot: ::core::option::Option<#ty> = ::core::option::Option::None;
-                }
-            });
-            let key_arms =
-                fields
-                    .iter()
-                    .zip(&field_idents)
-                    .zip(&field_keys)
-                    .map(|((f, id), k)| {
-                        let slot = format_ident!("__slot_{}", id);
-                        let path = format!("{}.{}", name_str, id);
-                        let span = f.ty.span();
-                        let extract = expand_field_extract(&f.ty, &path, span);
-                        quote_spanned! { span =>
-                            #k => {
-                                #slot = ::core::option::Option::Some(#extract);
-                            }
-                        }
-                    });
-            let unwraps = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
-                let slot = format_ident!("__slot_{}", id);
-                let span = f.ty.span();
-                if is_option_type(&f.ty) {
-                    quote_spanned! { span => let #id = #slot.flatten(); }
-                } else {
-                    let path = format!("{}.{}", name_str, id);
-                    quote_spanned! { span =>
-                        let #id = #slot.ok_or_else(|| ::wolfram_serializer::from_wolfram::err_at(
-                            #path,
-                            "Association entry",
-                            format!("missing key {:?}", #k),
-                        ))?;
-                    }
-                }
-            });
+            let NamedFieldsAssoc {
+                slot_decls,
+                key_arms,
+                unwraps,
+                field_idents,
+            } = build_named_assoc(&fields, name_str)?;
 
             // Positional branch: Function[<any head>, field0, field1, ...].
             // Head is discarded; fields are read in declaration order.
@@ -487,44 +530,12 @@ fn expand_enum(
                 // Struct variant: 2-entry Association; "Data" is itself an
                 // Association of the variant's fields.
                 let fields: Vec<&syn::Field> = named.named.iter().collect();
-                let mut field_keys: Vec<String> = Vec::with_capacity(fields.len());
-                let mut field_idents: Vec<&syn::Ident> = Vec::with_capacity(fields.len());
-                for f in &fields {
-                    let attrs = parse_field_attrs(&f.attrs)?;
-                    let id = f.ident.as_ref().expect("named field");
-                    field_keys.push(attrs.rename.unwrap_or_else(|| id.to_string()));
-                    field_idents.push(id);
-                }
-                let slot_decls = fields.iter().zip(&field_idents).map(|(f, id)| {
-                    let ty = &f.ty;
-                    let slot = format_ident!("__slot_{}", id);
-                    quote_spanned! { f.ty.span() =>
-                        let mut #slot: ::core::option::Option<#ty> = ::core::option::Option::None;
-                    }
-                });
-                let key_arms = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
-                    let slot = format_ident!("__slot_{}", id);
-                    let path = format!("{}.{}", v_path, id);
-                    let span = f.ty.span();
-                    let extract = expand_field_extract(&f.ty, &path, span);
-                    quote_spanned! { span => #k => { #slot = ::core::option::Option::Some(#extract); } }
-                });
-                let unwraps = fields.iter().zip(&field_idents).zip(&field_keys).map(|((f, id), k)| {
-                    let slot = format_ident!("__slot_{}", id);
-                    let span = f.ty.span();
-                    if is_option_type(&f.ty) {
-                        quote_spanned! { span => let #id = #slot.flatten(); }
-                    } else {
-                        let path = format!("{}.{}", v_path, id);
-                        quote_spanned! { span =>
-                            let #id = #slot.ok_or_else(|| ::wolfram_serializer::from_wolfram::err_at(
-                                #path,
-                                "Association entry",
-                                format!("missing key {:?}", #k),
-                            ))?;
-                        }
-                    }
-                });
+                let NamedFieldsAssoc {
+                    slot_decls,
+                    key_arms,
+                    unwraps,
+                    field_idents,
+                } = build_named_assoc(&fields, &v_path)?;
                 variant_arms.push(quote! {
                     #v_str => {
                         if __n != 2 {
