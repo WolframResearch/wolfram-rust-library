@@ -1,6 +1,6 @@
 [package]
 name = "wstp"
-version = "0.2.9"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.70" # Update to 1.70 for OnceLock
 license = "MIT OR Apache-2.0"
@@ -14,12 +14,12 @@ categories = ["external-ffi-bindings", "development-tools::ffi", "encoding"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wstp-sys = { version = "0.2.8", path = "../wstp-sys" }
+wstp-sys = { version = "0.5.0", path = "../wstp-sys" }
 
-wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
+wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
 
 ref-cast = "1.0.13"
 
 [dev-dependencies]
 rand = "0.8.3"
-wolfram-app-discovery = { version = "0.4.1", path = "../wolfram-app-discovery" }
+wolfram-app-discovery = { version = "0.5.0", path = "../wolfram-app-discovery" }

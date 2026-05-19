@@ -1,18 +1,18 @@
 [package]
 name = "wolfram-export-wstp"
-version = "0.1.0"
+version = "0.5.0"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
 description = "Runtime support for #[export]-marked Wolfram LibraryLink WSTP (Link-based) functions"
 
 [dependencies]
-wolfram-export-macros = { version = "0.1.0", path = "../wolfram-export-macros" }
-wolfram-export-core = { version = "0.1.0", path = "../wolfram-export-core" }
-wolfram-library-link = { version = "0.2.11", path = "../wolfram-library-link", default-features = false, features = ["automate-function-loading-boilerplate", "wstp"] }
-wolfram-library-link-sys = { version = "0.2.10", path = "../wolfram-library-link-sys" }
-wstp = { version = "0.2.8", path = "../wstp" }
-wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
+wolfram-export-macros = { version = "0.5.0", path = "../wolfram-export-macros" }
+wolfram-export-core = { version = "0.5.0", path = "../wolfram-export-core" }
+wolfram-library-link = { version = "0.5.0", path = "../wolfram-library-link", default-features = false, features = ["automate-function-loading-boilerplate", "wstp"] }
+wolfram-library-link-sys = { version = "0.5.0", path = "../wolfram-library-link-sys" }
+wstp = { version = "0.5.0", path = "../wstp" }
+wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
 
 [dev-dependencies]
 wolfram-examples = { path = "../wolfram-examples" }

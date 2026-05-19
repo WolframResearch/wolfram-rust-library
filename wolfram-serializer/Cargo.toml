@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-serializer"
-version = "0.1.0"
+version = "0.5.0"
 authors = ["Wolfram Research"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,8 +10,8 @@ keywords = ["wolfram", "wxf", "wolfram-language", "serialization", "mathematica"
 categories = ["encoding"]
 
 [dependencies]
-wolfram-expr = { version = "0.2", path = "../wolfram-expr" }
-wolfram-serializer-macros = { version = "0.1.0", path = "../wolfram-serializer-macros" }
+wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
+wolfram-serializer-macros = { version = "0.5.0", path = "../wolfram-serializer-macros" }
 # zlib for the optional WXF compressed payload (`8C:` header). Pure-Rust backend
 # so we don't pull a C zlib build into the dep graph.
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
