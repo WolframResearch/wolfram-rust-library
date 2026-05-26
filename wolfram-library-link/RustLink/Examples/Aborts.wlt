@@ -16,4 +16,6 @@ Test[
     ]
     ,
     $Aborted
+    ,
+    TestID -> "RustLink-Aborts"
 ]
