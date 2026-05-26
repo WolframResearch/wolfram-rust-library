@@ -1,10 +1,13 @@
 Function @ Module[{passed = 0, failed = 0},
   $LibraryPath = Join[#LibPaths, $LibraryPath];
-  TestReport[
-    If[Length[#Files] === 0,
-      FileNames["*.wl" | "*.wlt", #Cwd, Infinity],
+  Module[{files = If[Length[#Files] === 0,
+      FileNames["*.wlt", #Cwd, Infinity],
       FileNames[#Files, #Cwd]
-    ],
+    ]},
+  Print["running from: ", #Cwd];
+  Print["files: ", files];
+  TestReport[
+    files,
     HandlerFunctions -> <|
     "FileStarted" -> Function[{ev},
       Print["testing ", FileNameTake[ev["TestFileName"]]]
@@ -28,4 +31,4 @@ Function @ Module[{passed = 0, failed = 0},
     "test result: ", If[failed == 0, "ok", "FAILED"], ". ",
     ToString[passed], " passed; ", ToString[failed], " failed"
   ]
-]
+]]
