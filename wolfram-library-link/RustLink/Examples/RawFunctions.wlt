@@ -15,6 +15,9 @@ Test[
 	func[2, 2]
 	,
 	4
+
+    ,
+    TestID -> "RustLink-RawFunctions-1"
 ]
 
 Test[
@@ -28,6 +31,9 @@ Test[
 	func[]
 	,
 	"returned normally"
+
+    ,
+    TestID -> "RustLink-RawFunctions-2"
 ]
 
 Test[
@@ -44,4 +50,7 @@ Test[
 	Failure["WSTP Error", <|
 		"Message" -> "WSTP error: symbol name 'List' has no context"
 	|>]
+
+    ,
+    TestID -> "RustLink-RawFunctions-3"
 ]

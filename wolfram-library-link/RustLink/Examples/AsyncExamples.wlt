@@ -37,6 +37,8 @@ Test[
     $changes
     ,
     {expectedModifiedTime}
+    ,
+    TestID -> "RustLink-AsyncExamples-1"
 ]
 
 (* Test the async_file_watcher.rs example. This is identical to the above test, except the
@@ -77,4 +79,6 @@ Test[
     $changes2
     ,
     {expectedModifiedTime}
+    ,
+    TestID -> "RustLink-AsyncExamples-2"
 ]

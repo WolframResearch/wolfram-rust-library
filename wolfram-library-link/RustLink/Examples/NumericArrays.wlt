@@ -17,6 +17,9 @@ Test[
 		55,
 		32640
 	}
+
+    ,
+    TestID -> "RustLink-NumericArrays-1"
 ]
 
 Test[
@@ -36,4 +39,7 @@ Test[
 		4015.0,
 		4015.0
 	}
+
+    ,
+    TestID -> "RustLink-NumericArrays-2"
 ]

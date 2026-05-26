@@ -20,4 +20,6 @@ TestMatch[
 		"SourceLocation" -> s_?StringQ /; StringStartsQ[s, "wolfram-library-link/src/lib.rs:"],
 		"Backtrace" -> Missing["NotEnabled"]
 	|>]
+	,
+	TestID -> "RustLink-Expressions"
 ]

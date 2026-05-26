@@ -14,40 +14,61 @@ TestMatch[
         "get_instance_data" -> Function[___],
         "set_instance_value" -> Function[___]
     |>
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-1"
 ]
 
 Test[
     $obj = CreateManagedLibraryExpression["my_object", MyObject];
 
     MatchQ[$obj, MyObject[1]]
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-2"
 ]
 
 Test[
     ManagedLibraryExpressionQ[$obj]
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-3"
 ]
 
 Test[
     $objID = ManagedLibraryExpressionID[$obj];
 
     MatchQ[$objID, 1]
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-4"
 ]
 
 Test[
     $functions["get_instance_data"][$objID]
     ,
     <| "Value" -> "default" |>
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-5"
 ]
 
 Test[
     $functions["set_instance_value"][$objID, "new value"]
     ,
     Null
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-6"
 ]
 
 Test[
     $functions["get_instance_data"][$objID]
     ,
     <| "Value" -> "new value" |>
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-7"
 ]
 
 TestMatch[
@@ -69,4 +90,7 @@ TestMatch[
         "SourceLocation" -> s_?StringQ /; StringStartsQ[s, "wolfram-library-link/examples/exprs/managed.rs:"],
         "Backtrace" -> Missing["NotEnabled"]
     |>]
+
+    ,
+    TestID -> "RustLink-ManagedExpressions-8"
 ]

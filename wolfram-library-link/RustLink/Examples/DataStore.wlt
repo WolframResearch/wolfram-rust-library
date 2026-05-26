@@ -11,4 +11,6 @@ Test[
     ]
     ,
     "hello world"
+    ,
+    TestID -> "RustLink-DataStore"
 ]

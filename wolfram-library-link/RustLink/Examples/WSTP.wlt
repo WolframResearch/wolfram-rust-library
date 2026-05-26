@@ -38,12 +38,18 @@ TestMatch[
 		"total" -> Function[__],
 		"total_args_i64" -> Function[__]
 	|>
+
+    ,
+    TestID -> "RustLink-WSTP-1"
 ]
 
 Test[
 	$functions["square_wstp"][4]
 	,
 	16
+
+    ,
+    TestID -> "RustLink-WSTP-2"
 ]
 
 (* Test that passing more than one argument to square_wstp() results in a Failure. *)
@@ -56,12 +62,18 @@ TestMatch[
 		"SourceLocation" -> s_?StringQ /; StringStartsQ[s, "wolfram-library-link/examples/wstp.rs:"],
 		"Backtrace" -> Missing["NotEnabled"]
 	|>]
+
+    ,
+    TestID -> "RustLink-WSTP-3"
 ]
 
 Test[
 	$functions["count_args"][a, b, c]
 	,
 	3
+
+    ,
+    TestID -> "RustLink-WSTP-4"
 ]
 
 Test[
@@ -76,6 +88,9 @@ Test[
 		4,
 		6
 	}
+
+    ,
+    TestID -> "RustLink-WSTP-5"
 ]
 
 Test[
@@ -91,6 +106,9 @@ Test[
 		"ABCDEFG",
 		""
 	}
+
+    ,
+    TestID -> "RustLink-WSTP-6"
 ]
 
 TestMatch[
@@ -99,6 +117,9 @@ TestMatch[
 	linkExprIdentity[foo[], bar[baz]]
 	,
 	{foo[], bar[baz]}
+
+    ,
+    TestID -> "RustLink-WSTP-7"
 ]
 
 TestMatch[
@@ -125,6 +146,9 @@ TestMatch[
 			"Backtrace" -> Missing["NotEnabled"]
 		|>]
 	}
+
+    ,
+    TestID -> "RustLink-WSTP-8"
 ]
 
 TestMatch[
@@ -158,4 +182,7 @@ TestMatch[
 			"Backtrace" -> Missing["NotEnabled"]
 		|>]
 	}
+
+    ,
+    TestID -> "RustLink-WSTP-9"
 ]
