@@ -1,5 +1,5 @@
 [package]
-name = "wolfram-cli"
+name = "cargo-wl"
 version = "0.5.0"
 edition = "2021"
 description = "Cargo subcommand for building and packaging Wolfram LibraryLink crates"
@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
 
 [[bin]]
-name = "cargo-wolfram"
+name = "cargo-wl"
 path = "src/main.rs"
 
 [dependencies]

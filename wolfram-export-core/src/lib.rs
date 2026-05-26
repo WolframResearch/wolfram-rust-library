@@ -16,7 +16,7 @@
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use inventory;
 
-use wolfram_expr::{Expr, Symbol};
+use wolfram_expr::{Association, Expr, ExprKind, RuleEntry, Symbol};
 
 /// Inventory entry for one `#[export]`-marked function.
 ///
@@ -168,8 +168,7 @@ pub fn exported_library_functions_association(
             .expect("unable to automatically determine Rust LibraryLink dynamic library file path. Suggestion: pass the library name or path to exported_library_functions_association(..)")
     });
 
-    let mut fields = Vec::new();
-    let rule = Symbol::new("System`Rule");
+    let mut assoc: Association = Vec::new();
 
     for entry in inventory::iter::<ExportEntry> {
         let code = match entry.loading_code(&library) {
@@ -180,10 +179,10 @@ pub fn exported_library_functions_association(
             Err(_) => continue,
         };
 
-        fields.push(Expr::normal(&rule, vec![Expr::string(entry.name()), code]));
+        assoc.push(RuleEntry::rule(Expr::string(entry.name()), code));
     }
 
-    Expr::normal(Symbol::new("System`Association"), fields)
+    Expr::new(ExprKind::Association(assoc))
 }
 
 #[cfg_attr(

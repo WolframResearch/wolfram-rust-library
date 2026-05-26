@@ -8,7 +8,6 @@ use std::ffi::CStr;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::str::FromStr;
 use wolfram_app_discovery::SystemID;
 
 // ── CLI structure ────────────────────────────────────────────────────────────
@@ -17,21 +16,21 @@ use wolfram_app_discovery::SystemID;
 #[command(name = "cargo")]
 #[command(bin_name = "cargo")]
 enum Cargo {
-    Wolfram(WolframArgs),
+    Wl(WlArgs),
 }
 
 #[derive(Parser)]
 #[command(
-    name = "wolfram",
+    name = "wl",
     about = "Build and package Wolfram LibraryLink crates"
 )]
-struct WolframArgs {
+struct WlArgs {
     #[command(subcommand)]
-    cmd: WolframCmd,
+    cmd: WlCmd,
 }
 
 #[derive(Subcommand)]
-enum WolframCmd {
+enum WlCmd {
     /// Build the crate and generate a WL loader alongside each cdylib
     Build(BuildArgs),
 }
@@ -66,96 +65,34 @@ struct FunctionEntry {
 
 struct ParsedBuildArgs {
     cargo_args: Vec<String>,
-    system_ids: Vec<SupportedSystemId>,
+    system_ids: Vec<SystemID>,
     out: Option<PathBuf>,
     cleanup: bool,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum SupportedSystemId {
-    MacOsX86_64,
-    MacOsArm64,
-    WindowsX86_64,
-    LinuxX86_64,
-    LinuxArm64,
-    LinuxArm,
-}
-
-impl SupportedSystemId {
-    fn current() -> Result<Self> {
-        Self::try_from(SystemID::current_rust_target())
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            SupportedSystemId::MacOsX86_64 => "MacOSX-x86-64",
-            SupportedSystemId::MacOsArm64 => "MacOSX-ARM64",
-            SupportedSystemId::WindowsX86_64 => "Windows-x86-64",
-            SupportedSystemId::LinuxX86_64 => "Linux-x86-64",
-            SupportedSystemId::LinuxArm64 => "Linux-ARM64",
-            SupportedSystemId::LinuxArm => "Linux-ARM",
-        }
-    }
-
-    fn rust_target(self) -> &'static str {
-        match self {
-            SupportedSystemId::MacOsX86_64 => "x86_64-apple-darwin",
-            SupportedSystemId::MacOsArm64 => "aarch64-apple-darwin",
-            // Prefer the GNU Windows target for cross builds; MSVC cross-linking
-            // is host/toolchain dependent and can be added as an explicit override.
-            SupportedSystemId::WindowsX86_64 => "x86_64-pc-windows-gnu",
-            SupportedSystemId::LinuxX86_64 => "x86_64-unknown-linux-gnu",
-            SupportedSystemId::LinuxArm64 => "aarch64-unknown-linux-gnu",
-            SupportedSystemId::LinuxArm => "armv7-unknown-linux-gnueabihf",
-        }
-    }
-}
-
-impl FromStr for SupportedSystemId {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self> {
-        match value {
-            "MacOSX-x86-64" => Ok(SupportedSystemId::MacOsX86_64),
-            "MacOSX-ARM64" => Ok(SupportedSystemId::MacOsArm64),
-            "Windows-x86-64" => Ok(SupportedSystemId::WindowsX86_64),
-            "Linux-x86-64" => Ok(SupportedSystemId::LinuxX86_64),
-            "Linux-ARM64" => Ok(SupportedSystemId::LinuxArm64),
-            "Linux-ARM" => Ok(SupportedSystemId::LinuxArm),
-            other => anyhow::bail!(
-                "unsupported Wolfram SystemID {other:?}; supported values are: \
-                 MacOSX-x86-64, MacOSX-ARM64, Windows-x86-64, \
-                 Linux-x86-64, Linux-ARM64, Linux-ARM"
-            ),
-        }
-    }
-}
-
-impl TryFrom<SystemID> for SupportedSystemId {
-    type Error = anyhow::Error;
-
-    fn try_from(system_id: SystemID) -> Result<Self> {
-        match system_id {
-            SystemID::MacOSX_x86_64 => Ok(SupportedSystemId::MacOsX86_64),
-            SystemID::MacOSX_ARM64 => Ok(SupportedSystemId::MacOsArm64),
-            SystemID::Windows_x86_64 => Ok(SupportedSystemId::WindowsX86_64),
-            SystemID::Linux_x86_64 => Ok(SupportedSystemId::LinuxX86_64),
-            SystemID::Linux_ARM64 => Ok(SupportedSystemId::LinuxArm64),
-            SystemID::Linux_ARM => Ok(SupportedSystemId::LinuxArm),
-            other => anyhow::bail!(
-                "current Wolfram SystemID {} is not supported by cargo wolfram build",
-                other.as_str()
-            ),
-        }
+fn rust_target(id: SystemID) -> Result<&'static str> {
+    match id {
+        SystemID::MacOSX_x86_64 => Ok("x86_64-apple-darwin"),
+        SystemID::MacOSX_ARM64 => Ok("aarch64-apple-darwin"),
+        // Prefer the GNU Windows target for cross builds; MSVC cross-linking
+        // is host/toolchain dependent and can be added as an explicit override.
+        SystemID::Windows_x86_64 => Ok("x86_64-pc-windows-gnu"),
+        SystemID::Linux_x86_64 => Ok("x86_64-unknown-linux-gnu"),
+        SystemID::Linux_ARM64 => Ok("aarch64-unknown-linux-gnu"),
+        SystemID::Linux_ARM => Ok("armv7-unknown-linux-gnueabihf"),
+        other => anyhow::bail!(
+            "SystemID {} is not supported by cargo wl build",
+            other.as_str()
+        ),
     }
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
-    let Cargo::Wolfram(args) = Cargo::parse();
+    let Cargo::Wl(args) = Cargo::parse();
     match args.cmd {
-        WolframCmd::Build(args) => cmd_build(args),
+        WlCmd::Build(args) => cmd_build(args),
     }
 }
 
@@ -165,13 +102,16 @@ fn cmd_build(args: BuildArgs) -> Result<()> {
     let parsed = parse_forwarded_args(args.cargo_args)?;
     let out_dir = parsed.out.as_deref().or(args.out.as_deref());
     let cleanup = args.cleanup || parsed.cleanup;
-    let host_system_id = SupportedSystemId::current()?;
+    let host_system_id = SystemID::try_current_rust_target()
+        .map_err(|e| anyhow::anyhow!("unsupported host platform: {e}"))?;
+    // Eagerly validate that the host has a known cross-compile target.
+    rust_target(host_system_id)?;
     let system_ids = target_system_ids(host_system_id, parsed.system_ids);
 
     let host_dylibs = run_cargo_build(&parsed.cargo_args, None)?;
 
     if host_dylibs.is_empty() {
-        eprintln!("cargo wolfram: no cdylib artifacts found — nothing to generate");
+        eprintln!("cargo wl: no cdylib artifacts found — nothing to generate");
         return Ok(());
     }
 
@@ -183,7 +123,7 @@ fn cmd_build(args: BuildArgs) -> Result<()> {
             continue;
         }
 
-        let dylibs = run_cargo_build(&parsed.cargo_args, Some(system_id.rust_target()))?;
+        let dylibs = run_cargo_build(&parsed.cargo_args, Some(rust_target(system_id)?))?;
         artifacts_by_system_id.push((system_id, dylibs));
     }
 
@@ -293,9 +233,15 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
             let value = iter
                 .next()
                 .context("--system-id requires a Wolfram SystemID value")?;
-            system_ids.push(value.parse()?);
+            system_ids.push(
+                value.parse::<SystemID>()
+                    .map_err(|()| anyhow::anyhow!("unrecognized Wolfram SystemID: {value:?}"))?,
+            );
         } else if let Some(value) = arg.strip_prefix("--system-id=") {
-            system_ids.push(value.parse()?);
+            system_ids.push(
+                value.parse::<SystemID>()
+                    .map_err(|()| anyhow::anyhow!("unrecognized Wolfram SystemID: {value:?}"))?,
+            );
         } else if arg == "--out" {
             let value = iter.next().context("--out requires a destination folder")?;
             out = Some(PathBuf::from(value));
@@ -321,9 +267,9 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
 }
 
 fn target_system_ids(
-    host_system_id: SupportedSystemId,
-    requested: Vec<SupportedSystemId>,
-) -> Vec<SupportedSystemId> {
+    host_system_id: SystemID,
+    requested: Vec<SystemID>,
+) -> Vec<SystemID> {
     let mut system_ids = vec![host_system_id];
     for system_id in requested {
         if !system_ids.contains(&system_id) {
@@ -414,7 +360,7 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
 fn render_wl(dylib_name: &str, entries: &[FunctionEntry]) -> String {
     let mut out = String::new();
 
-    out.push_str("(* Auto-generated by cargo wolfram build — do not edit *)\n\n");
+    out.push_str("(* Auto-generated by cargo wl build — do not edit *)\n\n");
     out.push_str(&format!(
         "With[{{$lib = FileNameJoin[{{DirectoryName[$InputFileName], \"{}\"}}]}},\n",
         dylib_name

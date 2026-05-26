@@ -7,3 +7,24 @@ publish = false
 [dependencies]
 wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
 wolfram-serializer = { version = "0.5.0", path = "../wolfram-serializer" }
+wolfram-export = { version = "0.5.0", path = "../wolfram-export", default-features = false, features = ["automate-function-loading-boilerplate"] }
+
+[features]
+native = ["wolfram-export/native"]
+wstp   = ["wolfram-export/wstp"]
+wxf    = ["wolfram-export/wxf"]
+
+[[example]]
+name = "types_native"
+crate-type = ["cdylib"]
+required-features = ["native"]
+
+[[example]]
+name = "types_wstp"
+crate-type = ["cdylib"]
+required-features = ["wstp"]
+
+[[example]]
+name = "types_wxf"
+crate-type = ["cdylib"]
+required-features = ["wxf"]

@@ -13,6 +13,10 @@ proc-macro = true
 proc-macro2 = "1.0.36"
 syn = { version = "1.0.85", features = ["full"] }
 quote = "1.0.14"
+# At macro-expansion time, look up which crate the *user* has in their Cargo.toml
+# (`wolfram-export` vs the legacy `wolfram-library-link`) so the emitted code
+# resolves through the right host crate path.
+proc-macro-crate = "3"
 
 [features]
 default = []

@@ -1,12 +1,11 @@
-//! Procedural macros for `#[export_native]`, `#[export_wstp]`, `#[export_wxf]`,
-//! and `#[init]`. Each runtime crate (`wolfram-export-native`,
-//! `wolfram-export-wstp`, `wolfram-export-wxf`) re-exports its matching macro
-//! as `export`, so user code typically writes `#[export] fn ...`.
+//! Procedural macros for `#[export]`, `#[export_native]`, `#[export_wstp]`,
+//! `#[export_wxf]`, and `#[init]`.
 //!
-//! All three modes submit entries to the same shared inventory defined in
-//! `wolfram-export-core` (`ExportEntry`), so the `__wolfram_manifest__`
-//! C-ABI symbol — and the future `cargo wolfram-manifest` subcommand — see
-//! every export regardless of mode.
+//! Emitted paths are resolved dynamically at expansion time via
+//! `proc-macro-crate`: if the caller's `Cargo.toml` has `wolfram-export` the
+//! macro emits `::wolfram_export::*`; if it has `wolfram-library-link` (legacy)
+//! it emits `::wolfram_library_link::*`. Both crates expose the same hidden
+//! runtime surface so generated code resolves correctly in both cases.
 
 mod export;
 
@@ -69,18 +68,16 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
     }
 
     let user_init_fn_name: syn::Ident = func.sig.ident.clone();
+    let p = &self::export::Prefix::resolve().crate_path;
 
-    // Emits `::wolfram_library_link::*` paths uniformly — every export-* runtime
-    // crate transitively pulls `wolfram-library-link`, so this path always
-    // resolves.
     Ok(quote! {
         #func
 
         #[no_mangle]
         pub unsafe extern "C" fn WolframLibrary_initialize(
-            lib: ::wolfram_library_link::sys::WolframLibraryData,
+            lib: #p::sys::WolframLibraryData,
         ) -> ::std::os::raw::c_int {
-            ::wolfram_library_link::macro_utils::init_with_user_function(
+            #p::macro_utils::init_with_user_function(
                 lib,
                 #user_init_fn_name
             )
@@ -101,8 +98,7 @@ pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
     let mode = self::export::detect_mode_from_args(&attrs);
     let attrs = self::export::strip_wstp_arg(attrs);
-    let prefix = self::export::Prefix::new("::wolfram_library_link");
-    match self::export::export(mode, &prefix, attrs, item) {
+    match self::export::export(mode, attrs, item) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }
@@ -117,8 +113,7 @@ pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    let prefix = self::export::Prefix::new("::wolfram_library_link");
-    match self::export::export(self::export::Mode::Native, &prefix, attrs, item) {
+    match self::export::export(self::export::Mode::Native, attrs, item) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }
@@ -133,8 +128,7 @@ pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    let prefix = self::export::Prefix::new("::wolfram_library_link");
-    match self::export::export(self::export::Mode::Wstp, &prefix, attrs, item) {
+    match self::export::export(self::export::Mode::Wstp, attrs, item) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }
@@ -152,8 +146,7 @@ pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn export_wxf(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    let prefix = self::export::Prefix::new("::wolfram_export_wxf");
-    match self::export::export(self::export::Mode::Wxf, &prefix, attrs, item) {
+    match self::export::export(self::export::Mode::Wxf, attrs, item) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }

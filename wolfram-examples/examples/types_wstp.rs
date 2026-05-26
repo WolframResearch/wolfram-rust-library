@@ -1,14 +1,14 @@
-use wolfram_export_wstp::{export, wstp::Link};
+use wolfram_export::{export, wstp::Link};
 use wolfram_expr::{Expr, ExprKind, Symbol};
 
-#[export]
+#[export(wstp)]
 fn add(args: Vec<Expr>) -> Expr {
     let a = as_f64(&args[0]);
     let b = as_f64(&args[1]);
     Expr::real(wolfram_examples::add(a, b))
 }
 
-#[export]
+#[export(wstp)]
 fn dot(link: &mut Link) {
     let _n = link.test_head("List").unwrap();
     let a = get_f64_numeric_array(link);
@@ -16,7 +16,7 @@ fn dot(link: &mut Link) {
     link.put_f64(wolfram_examples::dot(&a, &b)).unwrap();
 }
 
-#[export]
+#[export(wstp)]
 fn scale_array(link: &mut Link) {
     let _n = link.test_head("List").unwrap();
     let arr = get_f64_numeric_array(link);
@@ -25,7 +25,7 @@ fn scale_array(link: &mut Link) {
     link.put_f64_array(&result, &[result.len()]).unwrap();
 }
 
-#[export]
+#[export(wstp)]
 fn duplicate(args: Vec<Expr>) -> Expr {
     wolfram_examples::duplicate(args.into_iter().next().unwrap())
 }
@@ -39,7 +39,7 @@ fn as_f64(e: &Expr) -> f64 {
 }
 
 // Probe: for a single NumericArray arg, consume outer head then try get_f64_array on inner List.
-#[export]
+#[export(wstp)]
 fn probe(link: &mut Link) {
     let _n = link.test_head("List").unwrap();
 

@@ -12,9 +12,7 @@ members = [
     "wolfram-library-link-sys",
     "wolfram-export-macros",
     "wolfram-export-core",
-    "wolfram-export-native",
-    "wolfram-export-wstp",
-    "wolfram-export-wxf",
+    "wolfram-export",
     "wolfram-examples",
     "wolfram-cli",
     "xtask",
@@ -32,4 +30,5 @@ default-members = [
     "wolfram-library-link",
     "wolfram-export-macros",
     "wolfram-export-core",
+    "wolfram-export",
 ]

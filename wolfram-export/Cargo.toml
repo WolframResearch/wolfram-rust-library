@@ -1,0 +1,55 @@
+[package]
+name = "wolfram-export"
+version = "0.5.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+repository = "https://github.com/WolframResearch/wolfram-rust-library"
+description = "Unified #[export] runtime for Wolfram LibraryLink: native MArgument, WSTP Link, and typed WXF ByteArray modes — pick the modes you need via feature flags."
+
+[dependencies]
+wolfram-export-macros = { version = "0.5.0", path = "../wolfram-export-macros" }
+
+# `wolfram-export-core` is a small workspace-internal crate that owns the
+# `ExportEntry` enum + `inventory::collect!` declaration. It has NO dependency
+# on `wolfram-library-link`, which is what breaks the otherwise-circular
+# dependency: `wolfram-library-link` also depends on `wolfram-export-core`
+# (for backward-compat aliases), and `wolfram-export` (this crate) depends on
+# `wolfram-library-link` for the native/wxf runtimes.
+wolfram-export-core = { version = "0.5.0", path = "../wolfram-export-core", default-features = false }
+
+# Mode-gated optional deps. See [features] below.
+wolfram-library-link      = { version = "0.5.0", path = "../wolfram-library-link", default-features = false, optional = true }
+wolfram-library-link-sys  = { version = "0.5.0", path = "../wolfram-library-link-sys", optional = true }
+wstp                      = { version = "0.5.0", path = "../wstp", optional = true }
+wolfram-serializer        = { version = "0.5.0", path = "../wolfram-serializer", optional = true }
+wolfram-expr              = { version = "0.5.0", path = "../wolfram-expr", optional = true }
+
+[features]
+default = ["native", "automate-function-loading-boilerplate"]
+
+# Each mode is its own feature; users compose them.
+native = [
+    "dep:wolfram-library-link",
+    "dep:wolfram-library-link-sys",
+]
+wstp = [
+    "native",
+    "dep:wstp",
+    "wolfram-library-link/wstp",
+]
+wxf = [
+    "dep:wolfram-serializer",
+    "dep:wolfram-expr",
+    "dep:wolfram-library-link",
+    "dep:wolfram-library-link-sys",
+    "wolfram-library-link/panic-failure-backtraces",
+]
+
+# Inventory + __wolfram_manifest__ C-ABI symbols. Forwards to wolfram-export-core
+# and (if wolfram-library-link is already activated) to that crate too, so that
+# load_library_functions_impl is available when both wstp and this feature are on.
+automate-function-loading-boilerplate = [
+    "wolfram-export-core/automate-function-loading-boilerplate",
+    "wolfram-export-macros/automate-function-loading-boilerplate",
+    "wolfram-library-link?/automate-function-loading-boilerplate",
+]

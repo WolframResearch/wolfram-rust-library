@@ -677,6 +677,32 @@ pub use wolfram_export_macros::init;
 // syntax as today.
 pub use wolfram_export_macros::export;
 
+// Const-eval feature guards emitted by the #[export] proc-macro.
+// Evaluated in a const context; panic bodies become compile-time errors with
+// actionable messages when the wrong mode is requested for this crate.
+#[doc(hidden)]
+pub const fn __assert_native_enabled() {}
+
+#[cfg(feature = "wstp")]
+#[doc(hidden)]
+pub const fn __assert_wstp_enabled() {}
+#[cfg(not(feature = "wstp"))]
+#[doc(hidden)]
+pub const fn __assert_wstp_enabled() {
+    panic!(
+        "`#[export(wstp)]` requires enabling the `wstp` feature of `wolfram-library-link`"
+    );
+}
+
+// WXF mode is only available via `wolfram-export` with `features = ["wxf"]`.
+#[doc(hidden)]
+pub const fn __assert_wxf_enabled() {
+    panic!(
+        "`#[export(wxf)]` is not available from `wolfram-library-link`; \
+         use `wolfram-export` with `features = [\"wxf\"]` instead"
+    );
+}
+
 //======================================
 // Callbacks to the Wolfram Kernel
 //======================================

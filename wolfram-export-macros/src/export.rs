@@ -1,13 +1,19 @@
 //! Codegen for `#[export_native]` / `#[export_wstp]` / `#[export_wxf]`.
 //!
-//! Adapted verbatim from the legacy `wolfram-library-link-macros::export.rs`,
-//! with path-rewrites so the emitted code references the new runtime crates
-//! (`wolfram-export-{native,wstp,wxf,core}`) instead of `wolfram-library-link`.
+//! The emitted code names items under one of two host crates:
+//! - `::wolfram_export::*`    — preferred (new canonical home, with feature flags)
+//! - `::wolfram_library_link::*` — back-compat for older user crates
+//!
+//! [`resolve_host_crate`] inspects the *user's* `Cargo.toml` at expansion time
+//! (via [`proc_macro_crate`]) and picks whichever crate they actually depend
+//! on. This is how a single proc-macro crate can serve both the new and legacy
+//! call sites without forcing users to choose at macro-name level.
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 
-use quote::quote;
+use proc_macro_crate::{crate_name, FoundCrate};
+use quote::{format_ident, quote};
 use syn::{spanned::Spanned, Error, Ident, Item, Meta, NestedMeta};
 
 /// Which export shape (native MArgument / WSTP Link / typed WXF) the macro
@@ -19,51 +25,83 @@ pub(crate) enum Mode {
     Wxf,
 }
 
-/// Path prefix the macro emits in its expansion — picks which crate's
-/// re-exports the generated code resolves through. Each `#[proc_macro_attribute]`
-/// entry point in `lib.rs` passes the prefix matching its calling crate:
-///
-/// - `#[wolfram_library_link::export]`  → `::wolfram_library_link`
-/// - `#[wolfram_export_native::export]` → `::wolfram_export_native`
-/// - `#[wolfram_export_wstp::export]`   → `::wolfram_export_wstp`
-/// - `#[wolfram_export_wxf::export]`    → `::wolfram_export_wxf`
-///
-/// The codegen body is the same for all of them; only the prefix differs.
-/// All paths must resolve to the same items (`call_native_wolfram_library_function`,
-/// `LibraryLinkFunction` / `ExportEntry`, `inventory`, …) — re-exports inside
-/// the four runtime crates make this true.
+/// Path prefix the macro emits — points at the host crate that re-exports
+/// the runtime helpers (`call_native_wolfram_library_function`, `ExportEntry`,
+/// `inventory`, …). Determined dynamically at expansion time by inspecting
+/// the user's `Cargo.toml` so both new users (on `wolfram-export`) and legacy
+/// users (on `wolfram-library-link`) see correctly-resolving paths.
 pub(crate) struct Prefix {
     pub crate_path: proc_macro2::TokenStream,
 }
 
 impl Prefix {
-    pub fn new(crate_path: &str) -> Self {
+    /// Dynamic host-crate resolution. Prefers `wolfram-export` (the new
+    /// canonical crate) and falls back to `wolfram-library-link` for back-
+    /// compat. Returns a token stream usable as an absolute path prefix
+    /// (`::wolfram_export`, `::wolfram_library_link`, or `crate` if the
+    /// macro is called from inside one of those crates itself).
+    pub fn resolve() -> Self {
+        if let Some(tokens) = found_as("wolfram-export") {
+            return Self { crate_path: tokens };
+        }
+        if let Some(tokens) = found_as("wolfram-library-link") {
+            return Self { crate_path: tokens };
+        }
+        // Neither in the user's deps. Emit a path that will produce a clear
+        // unresolved-import compile error at the use-site.
         Self {
-            crate_path: crate_path.parse().expect("valid crate path tokens"),
+            crate_path: quote! { ::__wolfram_export_or_wolfram_library_link_must_be_a_dependency },
         }
     }
 }
 
-/// For the back-compat `#[wolfram_library_link::export]` shim that accepts
-/// either no args (native) or a `wstp` keyword (WSTP mode).
+/// Look up one crate name in the caller's `Cargo.toml`. Returns the path-prefix
+/// token stream (`::<rename>` or `crate`) if found, `None` otherwise.
+fn found_as(name: &str) -> Option<TokenStream2> {
+    match crate_name(name).ok()? {
+        FoundCrate::Itself => Some(quote! { crate }),
+        FoundCrate::Name(renamed) => {
+            let ident = format_ident!("{}", renamed);
+            Some(quote! { ::#ident })
+        },
+    }
+}
+
+/// Identifier of the const-assert function the macro emits to surface a clear
+/// compile error when the user picked the wrong feature on their host crate.
+/// E.g. `Mode::Wxf` → `__assert_wxf_enabled`.
+fn assert_fn_ident(mode: Mode) -> Ident {
+    match mode {
+        Mode::Native => format_ident!("__assert_native_enabled"),
+        Mode::Wstp => format_ident!("__assert_wstp_enabled"),
+        Mode::Wxf => format_ident!("__assert_wxf_enabled"),
+    }
+}
+
+/// Detect the export mode from the keyword args: `wstp`, `wxf`, or native (default).
 pub(crate) fn detect_mode_from_args(attrs: &syn::AttributeArgs) -> Mode {
     for attr in attrs {
         if let NestedMeta::Meta(Meta::Path(path)) = attr {
             if path.is_ident("wstp") {
                 return Mode::Wstp;
             }
+            if path.is_ident("wxf") {
+                return Mode::Wxf;
+            }
         }
     }
     Mode::Native
 }
 
-/// Drop the `wstp` keyword from the arg list — only meaningful to the
-/// back-compat shim, the regular parser would reject it.
+/// Drop the mode keyword (`wstp`, `wxf`) from the arg list — only meaningful
+/// to the dispatch shim; the regular arg parser would reject them.
 pub(crate) fn strip_wstp_arg(attrs: syn::AttributeArgs) -> syn::AttributeArgs {
     attrs
         .into_iter()
         .filter(|attr| match attr {
-            NestedMeta::Meta(Meta::Path(path)) => !path.is_ident("wstp"),
+            NestedMeta::Meta(Meta::Path(path)) => {
+                !path.is_ident("wstp") && !path.is_ident("wxf")
+            },
             _ => true,
         })
         .collect()
@@ -71,10 +109,10 @@ pub(crate) fn strip_wstp_arg(attrs: syn::AttributeArgs) -> syn::AttributeArgs {
 
 pub(crate) fn export(
     mode: Mode,
-    prefix: &Prefix,
     attrs: syn::AttributeArgs,
     item: TokenStream,
 ) -> Result<TokenStream2, Error> {
+    let prefix = &Prefix::resolve();
     let ExportArgs {
         exported_name,
         hidden,
@@ -138,7 +176,10 @@ fn export_native_function(
     let params = vec![quote! { _ }; parameter_count];
     let p = &prefix.crate_path;
 
+    let assert_fn = assert_fn_ident(Mode::Native);
     let mut tokens = quote! {
+        const _: () = #p::#assert_fn();
+
         mod #name {
             #[no_mangle]
             pub unsafe extern "C" fn #exported_name(
@@ -189,7 +230,10 @@ fn export_wstp_function(
     prefix: &Prefix,
 ) -> TokenStream2 {
     let p = &prefix.crate_path;
+    let assert_fn = assert_fn_ident(Mode::Wstp);
     let mut tokens = quote! {
+        const _: () = #p::#assert_fn();
+
         mod #name {
             use super::*;
 
@@ -273,7 +317,10 @@ fn export_wxf_function(
         _ => quote! { (#(#from_cursor_calls),*) },
     };
 
+    let assert_fn = assert_fn_ident(Mode::Wxf);
     let mut tokens = quote! {
+        const _: () = #p::#assert_fn();
+
         mod #name {
             use super::*;
 
