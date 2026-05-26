@@ -27,10 +27,9 @@ Function @ Module[{passed = 0, failed = 0},
         ]
       ]
     ],
-    "ReportCompleted" -> Function[{ev}, Null]
-  |>];
-  StringJoin[
-    "test result: ", If[failed == 0, "ok", "FAILED"], ". ",
-    ToString[passed], " passed; ", ToString[failed], " failed"
-  ]
+    "ReportCompleted" -> Function[{ev},
+      Print["test result: ", If[failed == 0, "ok", "FAILED"], ". ",
+        passed, " passed; ", failed, " failed"]
+    ]
+  |>]
 ]]
