@@ -47,8 +47,7 @@ pub fn cmd_build(args: BuildArgs) -> Result<()> {
 
     let host_dylibs = run_cargo_build(&parsed.cargo_args, None)?;
     if host_dylibs.is_empty() {
-        eprintln!("cargo wl: no cdylib artifacts found — nothing to generate");
-        return Ok(());
+        eprintln!("cargo wl: warning: no cdylib artifacts found — generating empty package");
     }
 
     let out_dir = parsed.out.as_deref().or(args.out.as_deref())
@@ -70,7 +69,9 @@ pub fn cmd_build(args: BuildArgs) -> Result<()> {
         .collect::<Result<_>>()?;
 
     let lib_dir = generate_package(&host_infos, host_system_id, &out_dir, named_exports, namespace_exports)?;
-    println!("{}", lib_dir.join("Functions.wl").display());
+    let functions_wl = std::fs::canonicalize(lib_dir.join("Functions.wl"))
+        .unwrap_or_else(|_| lib_dir.join("Functions.wl"));
+    println!("{}", functions_wl.display());
 
     for system_id in system_ids.iter().copied() {
         if system_id == host_system_id { continue; }
