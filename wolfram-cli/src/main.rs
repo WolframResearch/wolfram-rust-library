@@ -3,7 +3,6 @@ use cargo_metadata::Message;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 use std::ffi::CStr;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -67,6 +66,10 @@ struct BuildArgs {
     /// Copy the dylib using its original name instead of a content hash
     #[arg(long)]
     named_exports: bool,
+
+    /// Prefix every function key with the library name: "libname:fnname"
+    #[arg(long)]
+    namespace_exports: bool,
 
     /// Extra arguments forwarded verbatim to `cargo build`
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -143,6 +146,7 @@ fn main() -> Result<()> {
 fn cmd_build(args: BuildArgs) -> Result<()> {
     let parsed = parse_forwarded_args(args.cargo_args)?;
     let named_exports = args.named_exports;
+    let namespace_exports = args.namespace_exports;
     let cleanup = args.cleanup || parsed.cleanup;
     let host_system_id = SystemID::try_current_rust_target()
         .map_err(|e| anyhow::anyhow!("unsupported host platform: {e}"))?;
@@ -175,7 +179,7 @@ fn cmd_build(args: BuildArgs) -> Result<()> {
         .collect::<Result<_>>()?;
 
     // Generate the merged package for the host system.
-    let lib_dir = generate_package(&host_infos, host_system_id, &out_dir, named_exports)?;
+    let lib_dir = generate_package(&host_infos, host_system_id, &out_dir, named_exports, namespace_exports)?;
     println!("{}", lib_dir.join("Functions.wl").display());
 
     // For each additional cross-compilation target, just copy the dylibs.
@@ -269,6 +273,7 @@ fn generate_package(
     system_id: SystemID,
     out_dir: &Path,
     named_exports: bool,
+    namespace_exports: bool,
 ) -> Result<PathBuf> {
     // Everything — dylibs and WL files — goes into the SystemID subfolder.
     let lib_dir = out_dir.join(system_id.as_str());
@@ -373,7 +378,14 @@ fn generate_package(
     // All functions in one flat association, each using the appropriate caller.
     let fn_entries: Vec<String> = active.iter().enumerate().flat_map(|(i, (info, _))| {
         let lib_var = format!("lib{}", i + 1);
+        let ns = namespace_exports;
+        let info_name = info.name.clone();
         info.entries.iter().map(move |e| {
+            let key = if ns {
+                format!("{}::{}", info_name, e.name)
+            } else {
+                e.name.clone()
+            };
             match e.kind.as_str() {
                 "Native" => {
                     let params = e.params.iter()
@@ -382,17 +394,17 @@ fn generate_package(
                     let ret = e.ret.replace("System`", "");
                     format!(
                         "  \"{}\" -> NativeCaller @ LibraryFunctionLoad[{}, \"{}\", {{{}}}, {}]",
-                        e.name, lib_var, e.name, params, ret
+                        key, lib_var, e.name, params, ret
                     )
                 },
                 "Wstp" => format!(
                     "  \"{}\" -> WSTPCaller @ LibraryFunctionLoad[{}, \"{}\", LinkObject, LinkObject]",
-                    e.name, lib_var, e.name
+                    key, lib_var, e.name
                 ),
                 "Wxf" => format!(
                     "  \"{}\" -> WXFCaller @ LibraryFunctionLoad[{}, \"{}\", \
                      {{{{ByteArray, \"Constant\"}}}}, {{ByteArray, Automatic}}]",
-                    e.name, lib_var, e.name
+                    key, lib_var, e.name
                 ),
                 other => format!("  (* unknown kind {}: {} *)", other, e.name),
             }
@@ -460,14 +472,6 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
     serde_json::from_str(json).context("failed to parse manifest JSON")
 }
 
-fn artifact_key(dylib: &Path) -> String {
-    dylib
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or_default()
-        .trim_start_matches("lib")
-        .to_owned()
-}
 
 fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
     let mut cargo_args = Vec::new();
@@ -552,8 +556,8 @@ fn cmd_test(args: TestArgs) -> Result<()> {
         .map(|d| collect_dylib_info(d))
         .collect::<Result<_>>()?;
 
-    // Force named exports so LibraryFunctionLoad["libfoo", ...] resolves correctly.
-    let lib_dir = generate_package(&infos, host_system_id, &out_dir, true)?;
+    // Force named exports and namespace so LibraryFunctionLoad and test keys resolve correctly.
+    let lib_dir = generate_package(&infos, host_system_id, &out_dir, true, true)?;
 
     run_wl_script(include_str!("../commands/test.wl"), args.files, vec![lib_dir])
 }

@@ -1,5 +1,6 @@
 Function @ Module[{passed = 0, failed = 0},
   $LibraryPath = Join[#LibPaths, $LibraryPath];
+  SetDirectory[First[#LibPaths, #Cwd]];
   Module[{files = If[Length[#Files] === 0,
       FileNames["*.wlt", #Cwd, Infinity],
       FileNames[#Files, #Cwd]
