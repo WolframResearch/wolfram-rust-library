@@ -305,7 +305,7 @@ fn export_wxf_function(
     let from_cursor_calls: Vec<_> = param_types
         .iter()
         .map(|t| {
-            quote! { <#t as ::wolfram_serializer::FromWolfram>::from_cursor(__c)? }
+            quote! { <#t as #p::macro_utils::FromWolfram>::from_cursor(__c)? }
         })
         .collect();
     let tuple_read = match from_cursor_calls.len() {

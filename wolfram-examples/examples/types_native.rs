@@ -19,3 +19,8 @@ fn scale_array(arr: &NumericArray<f64>, factor: f64) -> NumericArray<f64> {
     let result = wolfram_examples::scale_array(arr.as_slice(), factor);
     NumericArray::from_slice(&result)
 }
+
+#[export]
+fn force_panic(n: f64) -> f64 {
+    wolfram_examples::force_panic(n)
+}

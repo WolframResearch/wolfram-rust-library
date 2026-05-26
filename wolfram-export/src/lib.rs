@@ -93,6 +93,9 @@ pub mod macro_utils {
     pub use crate::wstp::macro_utils::*;
 
     #[cfg(feature = "wxf")]
+    pub use ::wolfram_serializer::FromWolfram;
+
+    #[cfg(feature = "wxf")]
     pub use crate::wxf::macro_utils::*;
 
     /// `LibraryLinkFunction` is a type alias for [`ExportEntry`][crate::ExportEntry].

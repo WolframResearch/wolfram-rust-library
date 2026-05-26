@@ -168,17 +168,6 @@ fn expr_kind_tag(link: &mut Link) {
     link.put_str(tag).unwrap();
 }
 
-// ── Panic handling ────────────────────────────────────────────────────────────
-
-// Always panics with the supplied message. Used to verify that panics are
-// caught and returned as Failure["RustPanic", ...] to the WL kernel.
-#[wll::export(wstp)]
-fn force_panic(link: &mut Link) {
-    let _n = link.test_head("System`List").unwrap();
-    let msg = link.get_string_ref().expect("expected String message");
-    panic!("force_panic: {}", msg.as_str());
-}
-
 // ── String / Expr variants ────────────────────────────────────────────────────
 
 #[wll::export(wstp)]

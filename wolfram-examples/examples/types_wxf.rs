@@ -38,3 +38,8 @@ fn echo_point(p: Point) -> Point {
 fn echo_dataset(ds: Dataset) -> Dataset {
     wolfram_examples::echo_dataset(ds)
 }
+
+#[export(wxf)]
+fn force_panic(n: f64) -> f64 {
+    wolfram_examples::force_panic(n)
+}

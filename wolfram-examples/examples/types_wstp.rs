@@ -30,6 +30,12 @@ fn duplicate(args: Vec<Expr>) -> Expr {
     wolfram_examples::duplicate(args.into_iter().next().unwrap())
 }
 
+#[export(wstp)]
+fn force_panic(args: Vec<Expr>) -> Expr {
+    wolfram_examples::force_panic(as_f64(&args[0]));
+    unreachable!()
+}
+
 fn as_f64(e: &Expr) -> f64 {
     match e.kind() {
         ExprKind::Real(r) => r.into_inner(),
