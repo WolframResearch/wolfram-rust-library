@@ -22,14 +22,25 @@ pub struct FunctionEntry {
 
 pub struct DylibInfo {
     pub src: PathBuf,
-    pub filename: String,       // "libaborts"
-    pub name: String,           // "aborts"
+    pub filename: String,
+    pub name: String,
     pub hash: String,
     pub entries: Vec<FunctionEntry>,
 }
 
+pub struct PacletConfig {
+    pub name: String,
+    pub version: String,
+    pub output: Option<PathBuf>,
+    pub cleanup: bool,
+    pub named_exports: bool,
+    pub namespace_exports: bool,
+    pub system_ids: Vec<SystemID>,
+}
+
 struct ParsedBuildArgs {
     cargo_args: Vec<String>,
+    package: Option<String>,
     system_ids: Vec<SystemID>,
     out: Option<PathBuf>,
     cleanup: bool,
@@ -37,31 +48,115 @@ struct ParsedBuildArgs {
     paclet_version: Option<String>,
 }
 
+/// Resolve all paclet config from Cargo.toml `[package.metadata.wl.pacletinfo]`,
+/// with CLI values taking highest priority over Cargo.toml, which takes priority over defaults.
+///
+/// Booleans: CLI flag (true) wins; otherwise Cargo.toml value; otherwise false.
+/// Vecs:     CLI entries and Cargo.toml entries are merged.
+/// Options:  CLI value wins; otherwise Cargo.toml value; otherwise None.
+pub fn resolve_paclet_config(
+    name: Option<&str>,
+    version: Option<&str>,
+    package: Option<&str>,
+    out: Option<PathBuf>,
+    named_exports: bool,
+    namespace_exports: bool,
+    cleanup: bool,
+    system_ids: Vec<SystemID>,
+) -> PacletConfig {
+    let meta = cargo_metadata::MetadataCommand::new().exec().ok();
+    let pkg = meta.as_ref().and_then(|m| {
+        if let Some(pkg_name) = package {
+            m.workspace_packages().into_iter().find(|p| p.name.as_str() == pkg_name)
+        } else {
+            m.root_package()
+        }
+    });
+    let pi = pkg.map(|p| &p.metadata["wl"]["pacletinfo"]);
+
+    let resolved_name = name
+        .map(str::to_owned)
+        .or_else(|| pi.and_then(|p| p["name"].as_str()).map(str::to_owned))
+        .or_else(|| pkg.map(|p| p.name.to_string()))
+        .unwrap_or_else(|| "Library".to_owned());
+
+    let resolved_version = version
+        .map(str::to_owned)
+        .or_else(|| pi.and_then(|p| p["version"].as_str()).map(str::to_owned))
+        .or_else(|| pkg.map(|p| p.version.to_string()))
+        .unwrap_or_else(|| "0.1.0".to_owned());
+
+    let resolved_output = out.or_else(|| {
+        pi.and_then(|p| p["output"].as_str()).and_then(|rel| {
+            pkg?.manifest_path.parent().map(|dir| dir.join(rel).into_std_path_buf())
+        })
+    });
+
+    let resolved_named_exports = named_exports
+        || pi.and_then(|p| p["named-exports"].as_bool()).unwrap_or(false);
+
+    let resolved_namespace_exports = namespace_exports
+        || pi.and_then(|p| p["namespace-exports"].as_bool()).unwrap_or(false);
+
+    let resolved_cleanup = cleanup
+        || pi.and_then(|p| p["cleanup"].as_bool()).unwrap_or(false);
+
+    let mut resolved_system_ids = system_ids;
+    if let Some(ids) = pi.and_then(|p| p["system-ids"].as_array()) {
+        for id in ids {
+            if let Some(s) = id.as_str() {
+                if let Ok(sid) = s.parse::<SystemID>() {
+                    if !resolved_system_ids.contains(&sid) {
+                        resolved_system_ids.push(sid);
+                    }
+                }
+            }
+        }
+    }
+
+    PacletConfig {
+        name: resolved_name,
+        version: resolved_version,
+        output: resolved_output,
+        cleanup: resolved_cleanup,
+        named_exports: resolved_named_exports,
+        namespace_exports: resolved_namespace_exports,
+        system_ids: resolved_system_ids,
+    }
+}
+
 pub fn cmd_build(args: BuildArgs) -> Result<()> {
     let parsed = parse_forwarded_args(args.cargo_args)?;
-    let named_exports = args.named_exports;
-    let namespace_exports = args.namespace_exports;
-    let cleanup = args.cleanup || parsed.cleanup;
     let host_system_id = SystemID::try_current_rust_target()
         .map_err(|e| anyhow::anyhow!("unsupported host platform: {e}"))?;
     rust_target(host_system_id)?;
-    let system_ids = target_system_ids(host_system_id, parsed.system_ids);
+
+    let config = resolve_paclet_config(
+        parsed.paclet_name.as_deref(),
+        parsed.paclet_version.as_deref(),
+        parsed.package.as_deref(),
+        parsed.out.or(args.out),
+        args.named_exports,
+        args.namespace_exports,
+        args.cleanup || parsed.cleanup,
+        parsed.system_ids,
+    );
+
+    let system_ids = target_system_ids(host_system_id, config.system_ids.clone());
 
     let host_dylibs = run_cargo_build(&parsed.cargo_args, None)?;
     if host_dylibs.is_empty() {
         eprintln!("cargo wl: warning: no cdylib artifacts found — generating empty package");
     }
 
-    let out_dir = parsed.out.as_deref().or(args.out.as_deref())
-        .map(Path::to_owned)
-        .unwrap_or_else(|| {
-            host_dylibs.first()
-                .and_then(|p| p.parent())
-                .map(|p| p.join("wl-package"))
-                .unwrap_or_else(|| PathBuf::from("wl-package"))
-        });
+    let out_dir = config.output.clone().unwrap_or_else(|| {
+        host_dylibs.first()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("wl-package"))
+            .unwrap_or_else(|| PathBuf::from("wl-package"))
+    });
 
-    if cleanup && out_dir.exists() {
+    if config.cleanup && out_dir.exists() {
         std::fs::remove_dir_all(&out_dir)
             .with_context(|| format!("failed to clear {}", out_dir.display()))?;
     }
@@ -70,14 +165,14 @@ pub fn cmd_build(args: BuildArgs) -> Result<()> {
         .map(|p| collect_dylib_info(p))
         .collect::<Result<_>>()?;
 
-    let lib_dir = generate_package(&host_infos, host_system_id, &out_dir, named_exports, namespace_exports, parsed.paclet_name.as_deref(), parsed.paclet_version.as_deref())?;
+    let lib_dir = generate_package(&host_infos, host_system_id, &out_dir, &config)?;
     let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
     println!("{}", lib_dir.display());
 
     for system_id in system_ids.iter().copied() {
         if system_id == host_system_id { continue; }
         let cross_dylibs = run_cargo_build(&parsed.cargo_args, Some(rust_target(system_id)?))?;
-        copy_cross_dylibs(&host_infos, &cross_dylibs, system_id, &out_dir, named_exports)?;
+        copy_cross_dylibs(&host_infos, &cross_dylibs, system_id, &out_dir, &config)?;
     }
 
     Ok(())
@@ -136,34 +231,16 @@ pub fn collect_dylib_info(dylib: &Path) -> Result<DylibInfo> {
     Ok(DylibInfo { src: dylib.to_owned(), filename, name, hash, entries })
 }
 
-fn cargo_paclet_defaults() -> Result<(String, String)> {
-    let meta = cargo_metadata::MetadataCommand::new()
-        .exec()
-        .context("failed to read cargo metadata")?;
-    let pkg = meta.root_package().context("no root package found")?;
-    let pi = &pkg.metadata["wl"]["pacletinfo"];
-    let name = pi["name"].as_str().unwrap_or(&pkg.name).to_owned();
-    let version = pi["version"].as_str()
-        .map(str::to_owned)
-        .unwrap_or_else(|| pkg.version.to_string());
-    Ok((name, version))
-}
-
-/// Build the three WL output files and copy all dylibs into `out_dir/SystemID/`.
-/// Returns the lib dir path to add to `$LibraryPath`.
+/// Write Functions.wl, Artifacts.wl, and PacletInfo.wl into `out_dir/<name>-<SystemID>/`.
+/// Returns the output subdirectory path.
 pub fn generate_package(
     infos: &[DylibInfo],
     system_id: SystemID,
     out_dir: &Path,
-    named_exports: bool,
-    namespace_exports: bool,
-    paclet_name: Option<&str>,
-    paclet_version: Option<&str>,
+    config: &PacletConfig,
 ) -> Result<PathBuf> {
-    let lib_dir = out_dir.join(system_id.as_str());
+    let lib_dir = out_dir.join(format!("{}-{}", config.name, system_id.as_str()));
     std::fs::create_dir_all(&lib_dir)?;
-
-    let out_dir = &lib_dir;
 
     let ext = infos.first()
         .and_then(|i| i.src.extension())
@@ -171,7 +248,7 @@ pub fn generate_package(
         .unwrap_or("dylib");
 
     let placed: Vec<(&DylibInfo, String)> = infos.iter().map(|info| {
-        let dest = if named_exports {
+        let dest = if config.named_exports {
             format!("{}.{}", info.filename, ext)
         } else {
             format!("{}.{}", info.hash, ext)
@@ -180,7 +257,7 @@ pub fn generate_package(
         (info, dest)
     }).collect();
 
-    // ── Artifacts.wl  (merged artifact list + per-library signatures)
+    // ── Artifacts.wl
     let items: Vec<String> = placed.iter().map(|(info, dest)| {
         let sigs: Vec<String> = info.entries.iter().map(|e| match e.kind.as_str() {
             "Native" => {
@@ -219,20 +296,14 @@ pub fn generate_package(
         )
     }).collect();
     std::fs::write(
-        out_dir.join("Artifacts.wl"),
+        lib_dir.join("Artifacts.wl"),
         format!("(* Auto-generated by cargo wl build \u{2014} do not edit *)\n{{\n{}\n}}\n",
             items.join(",\n")),
     )?;
 
     // ── PacletInfo.wl
-    let (default_name, default_version) = cargo_paclet_defaults().unwrap_or_else(|_| {
-        let n = infos.first().map(|i| i.name.clone()).unwrap_or_else(|| "Library".to_owned());
-        (n, "0.1.0".to_owned())
-    });
-    let paclet_name = paclet_name.unwrap_or(default_name.as_str());
-    let paclet_version = paclet_version.unwrap_or(default_version.as_str());
     std::fs::write(
-        out_dir.join("PacletInfo.wl"),
+        lib_dir.join("PacletInfo.wl"),
         format!(
             "PacletObject[<|\n  \
                \"Name\" -> \"{}\",\n  \
@@ -248,9 +319,7 @@ pub fn generate_package(
                  }}\n  \
                }}\n\
              |>]\n",
-            paclet_name,
-            paclet_version,
-            system_id.as_str(),
+            config.name, config.version, system_id.as_str(),
         ),
     )?;
 
@@ -273,7 +342,7 @@ pub fn generate_package(
 
     let fn_entries: Vec<String> = active.iter().enumerate().flat_map(|(i, (info, _))| {
         let lib_var = format!("lib{}", i + 1);
-        let ns = namespace_exports;
+        let ns = config.namespace_exports;
         let info_name = info.name.clone();
         info.entries.iter().map(move |e| {
             let key = if ns { format!("{}::{}", info_name, e.name) } else { e.name.clone() };
@@ -298,7 +367,7 @@ pub fn generate_package(
     }).collect();
 
     std::fs::write(
-        out_dir.join("Functions.wl"),
+        lib_dir.join("Functions.wl"),
         format!(
             "(* Auto-generated by cargo wl build \u{2014} do not edit *)\nWith[{{\n{}\n}},\n<|\n{}\n|>]\n",
             bindings.join(",\n"), fn_entries.join(",\n")
@@ -313,9 +382,9 @@ pub fn copy_cross_dylibs(
     cross_dylibs: &[PathBuf],
     system_id: SystemID,
     out_dir: &Path,
-    named_exports: bool,
+    config: &PacletConfig,
 ) -> Result<()> {
-    let lib_dir = out_dir.join(system_id.as_str());
+    let lib_dir = out_dir.join(format!("{}-{}", config.name, system_id.as_str()));
     std::fs::create_dir_all(&lib_dir)?;
     for cross in cross_dylibs {
         let cross_name = cross.file_stem().and_then(|s| s.to_str()).unwrap_or("");
@@ -323,7 +392,7 @@ pub fn copy_cross_dylibs(
             .find(|i| i.filename == cross_name)
             .with_context(|| format!("no host match for cross dylib {cross_name}"))?;
         let ext = cross.extension().and_then(|e| e.to_str()).unwrap_or("dylib");
-        let dest = if named_exports {
+        let dest = if config.named_exports {
             format!("{}.{}", host_info.filename, ext)
         } else {
             format!("{}.{}", host_info.hash, ext)
@@ -367,6 +436,7 @@ fn rust_target(id: SystemID) -> Result<&'static str> {
 
 fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
     let mut cargo_args = Vec::new();
+    let mut package = None;
     let mut system_ids = Vec::new();
     let mut out = None;
     let mut cleanup = false;
@@ -375,7 +445,15 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
     let mut iter = args.into_iter();
 
     while let Some(arg) = iter.next() {
-        if arg == "--system-id" {
+        if arg == "-p" || arg == "--package" {
+            let value = iter.next().context("--package requires a value")?;
+            package = Some(value.clone());
+            cargo_args.push(arg);
+            cargo_args.push(value);
+        } else if let Some(value) = arg.strip_prefix("--package=") {
+            package = Some(value.to_owned());
+            cargo_args.push(arg);
+        } else if arg == "--system-id" {
             let value = iter.next().context("--system-id requires a Wolfram SystemID value")?;
             system_ids.push(value.parse::<SystemID>()
                 .map_err(|()| anyhow::anyhow!("unrecognized Wolfram SystemID: {value:?}"))?);
@@ -404,7 +482,7 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
         }
     }
 
-    Ok(ParsedBuildArgs { cargo_args, system_ids, out, cleanup, paclet_name, paclet_version })
+    Ok(ParsedBuildArgs { cargo_args, package, system_ids, out, cleanup, paclet_name, paclet_version })
 }
 
 fn target_system_ids(host_system_id: SystemID, requested: Vec<SystemID>) -> Vec<SystemID> {

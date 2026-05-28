@@ -5,7 +5,7 @@ use wolfram_app_discovery::{SystemID, WolframApp};
 use wolfram_expr::{Expr, ExprKind, RuleEntry, Symbol};
 
 use crate::{EvaluateArgs, TestArgs};
-use crate::build::{collect_dylib_info, generate_package, run_cargo_build};
+use crate::build::{collect_dylib_info, generate_package, resolve_paclet_config, run_cargo_build};
 
 pub fn cmd_test(args: TestArgs) -> Result<()> {
     let host_system_id = SystemID::try_current_rust_target()
@@ -30,7 +30,8 @@ pub fn cmd_test(args: TestArgs) -> Result<()> {
         .map(|p| collect_dylib_info(p))
         .collect::<Result<Vec<_>>>()?;
 
-    let lib_dir = generate_package(&infos, host_system_id, &out_dir, true, true, None, None)?;
+    let config = resolve_paclet_config(None, None, None, None, true, true, false, vec![]);
+    let lib_dir = generate_package(&infos, host_system_id, &out_dir, &config)?;
 
     run_wl_script(include_str!("../commands/test.wl"), args.files, vec![lib_dir], args.out)
 }

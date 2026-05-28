@@ -1,32 +1,28 @@
-exDir[f_] := FileNameJoin[{DirectoryName[$InputFileName], "..", "target", "release", "examples", f}];
-libNative = exDir["libtypes_native.dylib"];
-libWstp = exDir["libtypes_wstp.dylib"];
-libWxf  = exDir["libtypes_wxf.dylib"];
+(* ── Build ──────────────────────────────────────────────────────────────── *)
+repo  = FileNameJoin[{DirectoryName[$InputFileName], ".."}];
+cargo = FileNameJoin[{$HomeDirectory, ".cargo", "bin", "cargo"}];
 
-fromWxfResult[ba_] := BinaryDeserialize[ba];
-wxfLoad[lib_, fn_, nArgs_] := Module[{raw},
-  raw = LibraryFunctionLoad[lib, fn,
-    {{ByteArray, "Constant"}},
-    {ByteArray, Automatic}];
-  Function[args, fromWxfResult[raw[BinarySerialize[List @@ args]]]]];
+libDir = StringTrim @ First @ ExternalEvaluate[
+  {"Shell", "ProcessDirectory" -> repo, "ReturnType" -> "StandardOutput"},
+  {cargo -> {"wl", "build", "--release", "--examples", "-p", "wolfram-examples"}}
+];
 
-nativeAdd   = LibraryFunctionLoad[libNative, "add", {Real, Real}, Real];
-nativeDot   = LibraryFunctionLoad[libNative, "dot",
-                {{LibraryDataType[NumericArray,"Real64"],"Constant"},
-                 {LibraryDataType[NumericArray,"Real64"],"Constant"}}, Real];
-nativeScale = LibraryFunctionLoad[libNative, "scale_array",
-                {{LibraryDataType[NumericArray,"Real64"],"Constant"}, Real},
-                {LibraryDataType[NumericArray,"Real64"], Automatic}];
-wstpAdd   = LibraryFunctionLoad[libWstp, "add",         LinkObject, LinkObject];
-wstpDot   = LibraryFunctionLoad[libWstp, "dot",         LinkObject, LinkObject];
-wstpScale = LibraryFunctionLoad[libWstp, "scale_array", LinkObject, LinkObject];
-wstpDup   = LibraryFunctionLoad[libWstp, "duplicate",   LinkObject, LinkObject];
-wxfAdd    = wxfLoad[libWxf, "add",          2];
-wxfDot    = wxfLoad[libWxf, "dot",          2];
-wxfScale  = wxfLoad[libWxf, "scale_array",  2];
-wxfDup    = wxfLoad[libWxf, "duplicate",    1];
-wxfPoint  = wxfLoad[libWxf, "echo_point",   1];
-wxfDs     = wxfLoad[libWxf, "echo_dataset", 1];
+(* ── Load ───────────────────────────────────────────────────────────────── *)
+$fns = Get[FileNameJoin[{libDir, "Functions.wl"}]];
+
+nativeAdd   = $fns["types_native::add"];
+nativeDot   = $fns["types_native::dot"];
+nativeScale = $fns["types_native::scale_array"];
+wstpAdd     = $fns["types_wstp::add"];
+wstpDot     = $fns["types_wstp::dot"];
+wstpScale   = $fns["types_wstp::scale_array"];
+wstpDup     = $fns["types_wstp::duplicate"];
+wxfAdd      = $fns["types_wxf::add"];
+wxfDot      = $fns["types_wxf::dot"];
+wxfScale    = $fns["types_wxf::scale_array"];
+wxfDup      = $fns["types_wxf::duplicate"];
+wxfPoint    = $fns["types_wxf::echo_point"];
+wxfDs       = $fns["types_wxf::echo_dataset"];
 
 (* ── Helpers ─────────────────────────────────────────────────────────────── *)
 nC = RGBColor["#2196F3"]; wC = RGBColor["#FF5722"]; xC = RGBColor["#4CAF50"];
@@ -34,11 +30,9 @@ nC = RGBColor["#2196F3"]; wC = RGBColor["#FF5722"]; xC = RGBColor["#4CAF50"];
 rotN = 32; idx = 0; nextI[] := (idx = Mod[idx, rotN] + 1; idx);
 mkNA[n_] := Table[NumericArray[RandomReal[1, n], "Real64"], rotN];
 
-(* avg microseconds over ~1 second of repeated timing *)
 SetAttributes[avgUs, HoldFirst];
 avgUs[expr_] := RepeatedTiming[expr, 1][[1]] * 1*^6;
 
-(* avg microseconds with rotating inputs to defeat caching *)
 timeMicros[fn_, reps_] := Module[{s = 0, t},
   t = AbsoluteTiming[Do[s += fn[], reps]][[1]]; t/reps*1*^6];
 
@@ -66,31 +60,31 @@ mkLegend[labels_, colors_] := LineLegend[colors, labels,
 ns = {10, 100, 1000, 10000, 100000};
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
-(* add  — bar chart (native / wstp / wxf)                                    *)
+(* add                                                                        *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["Benchmarking add..."];
 Print @ BarChart[
-  {avgUs[nativeAdd[3., 4.]], avgUs[wstpAdd[3., 4.]], avgUs[wxfAdd[{3., 4.}]]},
+  {avgUs[nativeAdd[3., 4.]], avgUs[wstpAdd[3., 4.]], avgUs[wxfAdd[3., 4.]]},
   Sequence @@ barOpts["add(a, b)", {nC, wC, xC}, {"native", "wstp", "wxf"}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
-(* duplicate  — bar chart (wstp / wxf)                                       *)
+(* duplicate                                                                  *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["Benchmarking duplicate..."];
 Print @ BarChart[
-  {avgUs[wstpDup[42]], avgUs[wxfDup[{42}]]},
+  {avgUs[wstpDup[42]], avgUs[wxfDup[42]]},
   Sequence @@ barOpts["duplicate(x)", {wC, xC}, {"wstp", "wxf"}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
-(* echo_point  — bar chart (wxf only)                                        *)
+(* echo_point                                                                 *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["Benchmarking echo_point..."];
 Print @ BarChart[
-  {avgUs[wxfPoint[{<|"x" -> 1.5, "y" -> 2.5|>}]]},
+  {avgUs[wxfPoint[<|"x" -> 1.5, "y" -> 2.5|>]]},
   Sequence @@ barOpts["echo_point(p)", {xC}, {"wxf"}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
-(* dot  — line plot vs n (native / wstp / wxf)                               *)
+(* dot                                                                        *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["Benchmarking dot..."];
 dotRows = Table[
@@ -99,7 +93,7 @@ dotRows = Table[
     {n,
      timeMicros[Function[Module[{j=nextI[]}, nativeDot[as[[j]], bs[[j]]]]], r],
      timeMicros[Function[Module[{j=nextI[]}, wstpDot[as[[j]], bs[[j]]]]], r],
-     timeMicros[Function[Module[{j=nextI[]}, wxfDot[{as[[j]], bs[[j]]}]]], r]}],
+     timeMicros[Function[Module[{j=nextI[]}, wxfDot[as[[j]], bs[[j]]]]], r]}],
   {n, ns}];
 Print @ Legended[
   ListLinePlot[{dotRows[[All,{1,2}]], dotRows[[All,{1,3}]], dotRows[[All,{1,4}]]},
@@ -108,7 +102,7 @@ Print @ Legended[
   mkLegend[{"native","wstp","wxf"}, {nC, wC, xC}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
-(* scale_array  — line plot vs n (native / wstp / wxf)                       *)
+(* scale_array                                                                *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["Benchmarking scale_array..."];
 scRows = Table[
@@ -117,7 +111,7 @@ scRows = Table[
     {n,
      timeMicros[Function[Module[{j=nextI[]}, Total @ nativeScale[as[[j]], 2.]]], r],
      timeMicros[Function[Module[{j=nextI[]}, Total @ Normal @ wstpScale[as[[j]], 2.]]], r],
-     timeMicros[Function[Module[{j=nextI[]}, Total @ Normal @ wxfScale[{as[[j]], 2.}]]], r]}],
+     timeMicros[Function[Module[{j=nextI[]}, Total @ Normal @ wxfScale[as[[j]], 2.]]], r]}],
   {n, ns}];
 Print @ Legended[
   ListLinePlot[{scRows[[All,{1,2}]], scRows[[All,{1,3}]], scRows[[All,{1,4}]]},
@@ -126,7 +120,7 @@ Print @ Legended[
   mkLegend[{"native","wstp","wxf"}, {nC, wC, xC}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
-(* echo_dataset  — line plot vs n (wxf only)                                 *)
+(* echo_dataset                                                               *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["Benchmarking echo_dataset..."];
 dsRows = Table[
@@ -134,7 +128,7 @@ dsRows = Table[
           ds = <|"name" -> "t",
                  "values"  -> NumericArray[RandomReal[1, n], "Real64"],
                  "weights" -> NumericArray[RandomReal[1, n], "Real64"]|>},
-    {n, timeMicros[Function[wxfDs[{ds}]], r]}],
+    {n, timeMicros[Function[wxfDs[ds]], r]}],
   {n, ns}];
 Print @ Legended[
   ListLinePlot[{dsRows},

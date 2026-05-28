@@ -7,6 +7,8 @@ publish = false
 [package.metadata.wl.pacletinfo]
 name = "WolframExamples"
 version = "1.0.0"
+output = "../notebooks/"
+namespace-exports = true
 
 [dependencies]
 wolfram-library-link = { version = "0.5.0", path = "../wolfram-library-link" }
