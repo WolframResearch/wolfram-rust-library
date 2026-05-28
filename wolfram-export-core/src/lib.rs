@@ -17,6 +17,19 @@
 pub use inventory;
 
 use wolfram_expr::{Association, Expr, ExprKind, RuleEntry, Symbol};
+use wolfram_serializer::{FromWolfram, ToWolfram};
+
+/// Serializable description of one exported function, embedded in every dylib
+/// via [`__wolfram_manifest_data__`]. Defined here so the CLI can share the
+/// type and deserialize directly with [`wolfram_serializer::deserialize`].
+#[derive(ToWolfram, FromWolfram, Debug)]
+#[allow(missing_docs)]
+pub struct FunctionEntry {
+    pub name: String,
+    pub kind: String,
+    pub params: Vec<String>,
+    pub ret: String,
+}
 
 /// Inventory entry for one `#[export]`-marked function.
 ///
@@ -92,60 +105,54 @@ pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
     ptr
 }
 
-/// C-ABI symbol returning a null-terminated manifest description of every exported
-/// function. Consumed by `cargo wolfram build` via `libloading` — no WL kernel needed.
+/// C-ABI symbol returning WXF-serialized `Vec<FunctionEntry>` for every exported
+/// function. Consumed by `cargo wl build` via `libloading` — no WL kernel needed.
 ///
-/// JSON shape: `[{"name":"add","kind":"Native","params":["Real","Real"],"ret":"Real"}, ...]`
-/// where `kind` is `"Native"`, `"Wstp"`, or `"Wxf"`. Wxf entries carry only
-/// `name` + `kind` — the wire shape is always single-ByteArray-in /
-/// single-ByteArray-out regardless of the user function's arity.
-/// The returned pointer is a `'static` C string (leaked once, never freed).
+/// Returns a pointer to a leaked buffer whose first 8 bytes are the WXF payload
+/// length as a little-endian `u64`, followed immediately by the WXF bytes.
+/// Deserialize with:
+/// ```ignore
+/// let len = u64::from_le_bytes(buf[..8].try_into().unwrap()) as usize;
+/// wolfram_serializer::deserialize::<WxfList<FunctionEntry>>(&buf[8..8+len], None)
+/// ```
 #[cfg(feature = "automate-function-loading-boilerplate")]
 #[no_mangle]
-pub extern "C" fn __wolfram_manifest_data__() -> *const std::os::raw::c_char {
-    fn json_str(s: &str) -> String {
-        let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
-        format!("\"{}\"", escaped)
-    }
-
-    let mut entries = String::from("[");
-    let mut first = true;
-
-    for entry in inventory::iter::<ExportEntry> {
-        if !first {
-            entries.push(',');
-        }
-        first = false;
-
-        match entry {
+pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
+    let entries: Vec<FunctionEntry> = inventory::iter::<ExportEntry>()
+        .map(|e| match e {
             ExportEntry::Native { name, signature } => {
                 let (params, ret) =
                     signature().unwrap_or_else(|_| (vec![], Expr::string("")));
-                let params_json: Vec<String> =
-                    params.iter().map(|e| json_str(&e.to_string())).collect();
-                entries.push_str(&format!(
-                    r#"{{"name":{},"kind":"Native","params":[{}],"ret":{}}}"#,
-                    json_str(name),
-                    params_json.join(","),
-                    json_str(&ret.to_string())
-                ));
+                FunctionEntry {
+                    name: (*name).to_owned(),
+                    kind: "Native".to_owned(),
+                    params: params.iter().map(|e| e.to_string()).collect(),
+                    ret: ret.to_string(),
+                }
             },
-            ExportEntry::Wstp { name } => {
-                entries
-                    .push_str(&format!(r#"{{"name":{},"kind":"Wstp"}}"#, json_str(name)));
+            ExportEntry::Wstp { name } => FunctionEntry {
+                name: (*name).to_owned(),
+                kind: "Wstp".to_owned(),
+                params: vec![],
+                ret: String::new(),
             },
-            ExportEntry::Wxf { name, .. } => {
-                entries
-                    .push_str(&format!(r#"{{"name":{},"kind":"Wxf"}}"#, json_str(name)));
+            ExportEntry::Wxf { name, .. } => FunctionEntry {
+                name: (*name).to_owned(),
+                kind: "Wxf".to_owned(),
+                params: vec![],
+                ret: String::new(),
             },
-        }
-    }
+        })
+        .collect();
 
-    entries.push(']');
-
-    let cstring =
-        std::ffi::CString::new(entries).expect("manifest JSON contains null byte");
-    std::ffi::CString::into_raw(cstring)
+    let wxf = wolfram_serializer::serialize(&wolfram_serializer::WxfList(entries), wolfram_serializer::Format::Wxf)
+        .expect("manifest WXF serialization failed");
+    // Prepend the payload length as 8 little-endian bytes so the caller needs
+    // no out-parameter — one zero-arg call, read [0..8] for the length, [8..] for WXF.
+    let mut buf = Vec::with_capacity(8 + wxf.len());
+    buf.extend_from_slice(&(wxf.len() as u64).to_le_bytes());
+    buf.extend_from_slice(&wxf);
+    Box::leak(buf.into_boxed_slice()).as_ptr()
 }
 
 /// Returns an [`Association`][Association] containing the names and `LibraryFunctionLoad`

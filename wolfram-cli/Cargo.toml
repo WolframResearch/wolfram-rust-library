@@ -15,9 +15,9 @@ anyhow = "1"
 cargo_metadata = "0.23.1"
 clap = { version = "4", features = ["derive"] }
 libloading = "0.8"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 sha2 = "0.10"
-wolfram-app-discovery = { version = "0.5.0", path = "../wolfram-app-discovery" }
-wolfram-expr          = { version = "0.5.0", path = "../wolfram-expr" }
-wstp                  = { version = "0.5.0", path = "../wstp" }
+wolfram-app-discovery  = { version = "0.5.0", path = "../wolfram-app-discovery" }
+wolfram-export-core    = { version = "0.5.0", path = "../wolfram-export-core", default-features = false }
+wolfram-expr           = { version = "0.5.0", path = "../wolfram-expr" }
+wolfram-serializer     = { version = "0.5.0", path = "../wolfram-serializer" }
+wstp                   = { version = "0.5.0", path = "../wstp" }

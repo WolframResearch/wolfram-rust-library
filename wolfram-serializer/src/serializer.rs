@@ -225,6 +225,21 @@ impl_vec_numeric!(
     f64 => Real64,
 );
 
+/// Serializes a `Vec<T>` (or slice) as `Function[List, item1, item2, …]`.
+///
+/// The built-in `impl ToWolfram for Vec<T>` is deliberately absent for non-numeric `T`
+/// (numeric types serialize as `NumericArray`/`ByteArray` instead). Use `WxfList<T>`
+/// whenever you need to round-trip a homogeneous list of user types through WXF.
+pub struct WxfList<T>(pub Vec<T>);
+
+impl<T: ToWolfram> ToWolfram for WxfList<T> {
+    fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
+        let head = Symbol::new("System`List");
+        let args: Vec<&dyn ToWolfram> = self.0.iter().map(|e| e as &dyn ToWolfram).collect();
+        s.serialize_function(&head, &args)
+    }
+}
+
 impl ToWolfram for () {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
         s.serialize_symbol("System`Null")

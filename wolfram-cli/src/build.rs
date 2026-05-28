@@ -1,24 +1,13 @@
 use anyhow::{Context, Result};
 use cargo_metadata::Message;
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::ffi::CStr;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use wolfram_app_discovery::SystemID;
+use wolfram_export_core::FunctionEntry;
 
 use crate::BuildArgs;
-
-#[derive(Deserialize, Debug)]
-pub struct FunctionEntry {
-    pub name: String,
-    pub kind: String,
-    #[serde(default)]
-    pub params: Vec<String>,
-    #[serde(default)]
-    pub ret: String,
-}
 
 pub struct DylibInfo {
     pub src: PathBuf,
@@ -404,7 +393,7 @@ pub fn copy_cross_dylibs(
 }
 
 fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
-    type ManifestFn = unsafe extern "C" fn() -> *const std::os::raw::c_char;
+    type ManifestFn = unsafe extern "C" fn() -> *const u8;
 
     let lib = unsafe { libloading::Library::new(dylib) }
         .with_context(|| format!("failed to dlopen {}", dylib.display()))?;
@@ -416,10 +405,15 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
     let ptr = unsafe { manifest_fn() };
     anyhow::ensure!(!ptr.is_null(), "__wolfram_manifest_data__ returned null");
 
-    let json = unsafe { CStr::from_ptr(ptr) }
-        .to_str().context("manifest JSON is not valid UTF-8")?;
+    // First 8 bytes: little-endian u64 payload length; remaining bytes: WXF.
+    let len_bytes: [u8; 8] = unsafe { std::slice::from_raw_parts(ptr, 8) }
+        .try_into().unwrap();
+    let len = u64::from_le_bytes(len_bytes) as usize;
+    let wxf = unsafe { std::slice::from_raw_parts(ptr.add(8), len) };
 
-    serde_json::from_str(json).context("failed to parse manifest JSON")
+    wolfram_serializer::deserialize::<wolfram_serializer::WxfList<FunctionEntry>>(wxf, wolfram_serializer::Format::Wxf)
+        .map(|l| l.0)
+        .map_err(|e| anyhow::anyhow!("manifest WXF deserialization failed: {e}"))
 }
 
 fn rust_target(id: SystemID) -> Result<&'static str> {

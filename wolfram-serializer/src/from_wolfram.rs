@@ -356,3 +356,15 @@ macro_rules! impl_vec_numeric_from_cursor {
 }
 
 impl_vec_numeric_from_cursor!(i8, i16, i32, i64, u16, u32, u64, f32, f64);
+
+impl<T: FromWolfram> FromWolfram for crate::serializer::WxfList<T> {
+    fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
+        let n = c.read_function_header()?;
+        c.skip()?; // discard head (expected to be List but any head is accepted)
+        let mut items = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            items.push(T::from_cursor(c)?);
+        }
+        Ok(crate::serializer::WxfList(items))
+    }
+}

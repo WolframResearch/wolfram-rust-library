@@ -32,7 +32,7 @@ mod derive_support;
 pub use wolfram_expr::NumericArrayDataType;
 
 pub use crate::from_wolfram::FromWolfram;
-pub use crate::serializer::{Serializer, ToWolfram};
+pub use crate::serializer::{Serializer, ToWolfram, WxfList};
 pub use crate::wxf::cursor::WxfCursor;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
