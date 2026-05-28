@@ -113,7 +113,7 @@ pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
 /// Deserialize with:
 /// ```ignore
 /// let len = u64::from_le_bytes(buf[..8].try_into().unwrap()) as usize;
-/// wolfram_serializer::deserialize::<WxfList<FunctionEntry>>(&buf[8..8+len], None)
+/// wolfram_serializer::deserialize::<Vec<FunctionEntry>>(&buf[8..8+len], None)
 /// ```
 #[cfg(feature = "automate-function-loading-boilerplate")]
 #[no_mangle]
@@ -145,7 +145,7 @@ pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
         })
         .collect();
 
-    let wxf = wolfram_serializer::serialize(&wolfram_serializer::WxfList(entries), wolfram_serializer::Format::Wxf)
+    let wxf = wolfram_serializer::serialize(&entries, wolfram_serializer::Format::Wxf)
         .expect("manifest WXF serialization failed");
     // Prepend the payload length as 8 little-endian bytes so the caller needs
     // no out-parameter — one zero-arg call, read [0..8] for the length, [8..] for WXF.

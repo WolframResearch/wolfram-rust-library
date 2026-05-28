@@ -411,8 +411,7 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
     let len = u64::from_le_bytes(len_bytes) as usize;
     let wxf = unsafe { std::slice::from_raw_parts(ptr.add(8), len) };
 
-    wolfram_serializer::deserialize::<wolfram_serializer::WxfList<FunctionEntry>>(wxf, wolfram_serializer::Format::Wxf)
-        .map(|l| l.0)
+    wolfram_serializer::deserialize::<Vec<FunctionEntry>>(wxf, wolfram_serializer::Format::Wxf)
         .map_err(|e| anyhow::anyhow!("manifest WXF deserialization failed: {e}"))
 }
 

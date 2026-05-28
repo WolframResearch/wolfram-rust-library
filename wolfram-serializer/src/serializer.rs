@@ -225,20 +225,20 @@ impl_vec_numeric!(
     f64 => Real64,
 );
 
-/// Serializes a `Vec<T>` (or slice) as `Function[List, item1, item2, …]`.
-///
-/// The built-in `impl ToWolfram for Vec<T>` is deliberately absent for non-numeric `T`
-/// (numeric types serialize as `NumericArray`/`ByteArray` instead). Use `WxfList<T>`
-/// whenever you need to round-trip a homogeneous list of user types through WXF.
-pub struct WxfList<T>(pub Vec<T>);
+/// Marker trait automatically implemented by `#[derive(ToWolfram)]` for every
+/// user-defined struct or enum. Enables the blanket `impl<T: WolframStruct + ToWolfram>
+/// ToWolfram for Vec<T>` without conflicting with the numeric-primitive
+/// specializations (`Vec<u8>` → ByteArray, `Vec<i32>` → NumericArray, etc.).
+pub trait WolframStruct {}
 
-impl<T: ToWolfram> ToWolfram for WxfList<T> {
+impl<T: ToWolfram + WolframStruct> ToWolfram for Vec<T> {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {
         let head = Symbol::new("System`List");
-        let args: Vec<&dyn ToWolfram> = self.0.iter().map(|e| e as &dyn ToWolfram).collect();
+        let args: Vec<&dyn ToWolfram> = self.iter().map(|e| e as &dyn ToWolfram).collect();
         s.serialize_function(&head, &args)
     }
 }
+
 
 impl ToWolfram for () {
     fn serialize(&self, s: &mut dyn Serializer) -> Result<(), Error> {

@@ -45,6 +45,9 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                 ::core::result::Result::Ok(())
             }
         }
+
+        #[automatically_derived]
+        impl #impl_generics ::wolfram_serializer::WolframStruct for #name #ty_generics #where_clause {}
     })
 }
 
