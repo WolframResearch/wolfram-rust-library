@@ -281,7 +281,7 @@ impl<'a> FromArg<'a> for &'a str {
 /// ```
 ///
 /// which is not valid because `bool` is not a valid numeric array type.
-impl<'a, T: crate::NumericNumericArrayEnum> FromArg<'a> for &'a NumericArray<T> {
+impl<'a, T: crate::NumericArrayType> FromArg<'a> for &'a NumericArray<T> {
     unsafe fn from_arg(arg: &'a MArgument) -> &'a NumericArray<T> {
         NumericArray::ref_cast(&*arg.numeric)
     }
@@ -315,7 +315,7 @@ impl<'a, T: crate::NumericNumericArrayEnum> FromArg<'a> for &'a NumericArray<T> 
     }
 }
 
-impl<'a, T: crate::NumericNumericArrayEnum> FromArg<'a> for NumericArray<T> {
+impl<'a, T: crate::NumericArrayType> FromArg<'a> for NumericArray<T> {
     unsafe fn from_arg(arg: &'a MArgument) -> NumericArray<T> {
         NumericArray::from_raw(*arg.numeric)
     }
@@ -697,7 +697,7 @@ impl IntoArg for String {
 // NumericArray, Image, DataStore
 //---------------------------------------
 
-impl<T: crate::NumericNumericArrayEnum> IntoArg for NumericArray<T> {
+impl<T: crate::NumericArrayType> IntoArg for NumericArray<T> {
     unsafe fn into_arg(self, arg: MArgument) {
         *arg.numeric = self.into_raw();
     }

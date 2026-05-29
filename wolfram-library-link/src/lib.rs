@@ -264,8 +264,8 @@ pub use self::{
     image::{ColorSpace, Image, ImageData, ImageType, Pixel, UninitImage},
     library_data::{get_library_data, initialize, WolframLibraryData},
     numeric_array::{
-        NumericArray, NumericArrayConvertMethod, NumericArrayExpressionEnum, NumericArrayKind,
-        NumericNumericArrayEnum, UninitNumericArray,
+        NumericArray, NumericArrayConvertMethod, NumericArrayDataType, NumericArrayKind,
+        NumericArrayType, UninitNumericArray,
     },
 };
 

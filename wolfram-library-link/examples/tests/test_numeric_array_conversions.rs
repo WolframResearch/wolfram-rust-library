@@ -2,7 +2,7 @@ use wolfram_library_link::{
     self as wll, NumericArray, NumericArrayConvertMethod as Method,
 };
 
-fn from_slice<T: wll::NumericNumericArrayEnum>(slice: &[T]) -> NumericArray<T> {
+fn from_slice<T: wll::NumericArrayType>(slice: &[T]) -> NumericArray<T> {
     NumericArray::from_slice(slice)
 }
 
