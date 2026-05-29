@@ -18,12 +18,11 @@ use std::io::Read;
 use flate2::read::ZlibDecoder;
 
 use wolfram_expr::{
-    BigInteger, BigReal, NumericArray, PackedArray, PackedArrayDataType, Symbol,
+    BigInteger, BigReal, NumericArray, PackedArray, PackedArrayEnum, Symbol,
 };
 
 use crate::Error;
-
-use super::constants::*;
+use wolfram_expr::wxf::{NumericArrayEnum, ExpressionEnum, HeaderEnum};
 
 /// Position-indexed reader over a decoded WXF byte stream.
 pub struct WxfCursor<'a> {
@@ -44,18 +43,19 @@ impl<'a> WxfCursor<'a> {
                 "byte stream too short for WXF header".into(),
             ));
         }
-        if input[0] != WXF_VERSION {
+        if input[0] != HeaderEnum::Version as u8 {
             return Err(Error::InvalidWxf(format!(
                 "WXF header version mismatch: expected {:?}, got {:?}",
-                WXF_VERSION as char, input[0] as char
+                HeaderEnum::Version as u8 as char,
+                input[0] as char
             )));
         }
-        if input[1] == WXF_HEADER_COMPRESS {
+        if input[1] == HeaderEnum::Compress as u8 {
             // `8C:` — verify the trailing `:`, then zlib-decompress the rest.
             if input.len() < 3 {
                 return Err(Error::InvalidWxf("WXF compressed header truncated".into()));
             }
-            if input[2] != WXF_HEADER_SEPARATOR {
+            if input[2] != HeaderEnum::Separator as u8 {
                 return Err(Error::InvalidWxf(format!(
                     "WXF compressed header: expected ':' after 'C', got {:?}",
                     input[2] as char
@@ -72,7 +72,7 @@ impl<'a> WxfCursor<'a> {
                 pos: 0,
             });
         }
-        if input[1] != WXF_HEADER_SEPARATOR {
+        if input[1] != HeaderEnum::Separator as u8 {
             return Err(Error::InvalidWxf(format!(
                 "WXF header separator mismatch: expected ':' or 'C', got {:?}",
                 input[1] as char
@@ -163,14 +163,14 @@ impl<'a> WxfCursor<'a> {
     }
 
     /// Consume the next byte expecting it to equal `expected`.
-    fn expect_token(&mut self, expected: u8, ctx: &'static str) -> Result<(), Error> {
+    fn expect_token(&mut self, expected: ExpressionEnum, ctx: &'static str) -> Result<(), Error> {
         let got = self.read_byte()?;
-        if got != expected {
+        if got != expected as u8 {
             return Err(Error::InvalidWxf(format!(
                 "{}: expected {}, got {}",
                 ctx,
-                token_kind_name(expected),
-                token_kind_name(got)
+                expected.name(),
+                ExpressionEnum::try_from(got).map_or("<unknown>", |d| d.name())
             )));
         }
         Ok(())
@@ -180,28 +180,25 @@ impl<'a> WxfCursor<'a> {
 
     /// Consume an `Integer8`/`Integer16`/`Integer32`/`Integer64` token + payload.
     pub fn read_integer(&mut self) -> Result<i64, Error> {
-        let tag = self.read_byte()?;
-        match tag {
-            TOKEN_INTEGER8 => Ok(i64::from(i8::from_le_bytes(self.read_array::<1>()?))),
-            TOKEN_INTEGER16 => Ok(i64::from(i16::from_le_bytes(self.read_array::<2>()?))),
-            TOKEN_INTEGER32 => Ok(i64::from(i32::from_le_bytes(self.read_array::<4>()?))),
-            TOKEN_INTEGER64 => Ok(i64::from_le_bytes(self.read_array::<8>()?)),
-            other => Err(Error::InvalidWxf(format!(
-                "expected Integer, got {}",
-                token_kind_name(other)
-            ))),
+        match ExpressionEnum::try_from(self.read_byte()?) {
+            Ok(ExpressionEnum::Integer8)  => Ok(i64::from(i8::from_le_bytes(self.read_array::<1>()?))),
+            Ok(ExpressionEnum::Integer16) => Ok(i64::from(i16::from_le_bytes(self.read_array::<2>()?))),
+            Ok(ExpressionEnum::Integer32) => Ok(i64::from(i32::from_le_bytes(self.read_array::<4>()?))),
+            Ok(ExpressionEnum::Integer64) => Ok(i64::from_le_bytes(self.read_array::<8>()?)),
+            Ok(other) => Err(Error::InvalidWxf(format!("expected Integer, got {other}"))),
+            Err(_)    => Err(Error::InvalidWxf("expected Integer, got <unknown>".into())),
         }
     }
 
     /// Consume a `Real64` token + 8 LE bytes.
     pub fn read_real(&mut self) -> Result<f64, Error> {
-        self.expect_token(TOKEN_REAL64, "read_real")?;
+        self.expect_token(ExpressionEnum::Real64, "read_real")?;
         Ok(f64::from_le_bytes(self.read_array::<8>()?))
     }
 
     /// Consume a `String` token + varint length + UTF-8 payload.
     pub fn read_string(&mut self) -> Result<String, Error> {
-        self.expect_token(TOKEN_STRING, "read_string")?;
+        self.expect_token(ExpressionEnum::String, "read_string")?;
         let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         String::from_utf8(bytes)
@@ -210,7 +207,7 @@ impl<'a> WxfCursor<'a> {
 
     /// Consume a `Symbol` token + varint length + UTF-8 name + parse it.
     pub fn read_symbol(&mut self) -> Result<Symbol, Error> {
-        self.expect_token(TOKEN_SYMBOL, "read_symbol")?;
+        self.expect_token(ExpressionEnum::Symbol, "read_symbol")?;
         let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         let name = String::from_utf8(bytes)
@@ -221,14 +218,14 @@ impl<'a> WxfCursor<'a> {
 
     /// Consume a `BinaryString` (ByteArray) token + varint length + bytes.
     pub fn read_byte_array(&mut self) -> Result<Vec<u8>, Error> {
-        self.expect_token(TOKEN_BINARY_STRING, "read_byte_array")?;
+        self.expect_token(ExpressionEnum::ByteArray, "read_byte_array")?;
         let len = self.read_varint()? as usize;
         self.read_n(len)
     }
 
     /// Consume a `BigInteger` token + varint length + UTF-8 digit string.
     pub fn read_big_integer(&mut self) -> Result<BigInteger, Error> {
-        self.expect_token(TOKEN_BIG_INTEGER, "read_big_integer")?;
+        self.expect_token(ExpressionEnum::BigInteger, "read_big_integer")?;
         let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         let s = String::from_utf8(bytes).map_err(|_| {
@@ -239,7 +236,7 @@ impl<'a> WxfCursor<'a> {
 
     /// Consume a `BigReal` token + varint length + UTF-8 digit string.
     pub fn read_big_real(&mut self) -> Result<BigReal, Error> {
-        self.expect_token(TOKEN_BIG_REAL, "read_big_real")?;
+        self.expect_token(ExpressionEnum::BigReal, "read_big_real")?;
         let len = self.read_varint()? as usize;
         let bytes = self.read_n(len)?;
         let s = String::from_utf8(bytes)
@@ -250,9 +247,9 @@ impl<'a> WxfCursor<'a> {
     /// Consume a `NumericArray` token + element-type byte + dim count + dims +
     /// flat byte buffer.
     pub fn read_numeric_array(&mut self) -> Result<NumericArray, Error> {
-        self.expect_token(TOKEN_NUMERIC_ARRAY, "read_numeric_array")?;
+        self.expect_token(ExpressionEnum::NumericArray, "read_numeric_array")?;
         let type_byte = self.read_byte()?;
-        let dt = array_type_from_wxf(type_byte).ok_or_else(|| {
+        let dt = NumericArrayEnum::try_from(type_byte).map_err(|_| {
             Error::InvalidWxf(format!(
                 "unknown NumericArray element type: 0x{:02X}",
                 type_byte
@@ -272,20 +269,18 @@ impl<'a> WxfCursor<'a> {
     /// Consume a `PackedArray` token + element-type byte + dim count + dims +
     /// flat byte buffer.
     pub fn read_packed_array(&mut self) -> Result<PackedArray, Error> {
-        self.expect_token(TOKEN_PACKED_ARRAY, "read_packed_array")?;
+        self.expect_token(ExpressionEnum::PackedArray, "read_packed_array")?;
         let type_byte = self.read_byte()?;
-        let dt = array_type_from_wxf(type_byte).ok_or_else(|| {
+        let dt = NumericArrayEnum::try_from(type_byte).map_err(|_| {
             Error::InvalidWxf(format!(
                 "unknown PackedArray element type: 0x{:02X}",
                 type_byte
             ))
         })?;
-        let pdt = PackedArrayDataType::try_new(dt).ok_or_else(|| {
-            Error::InvalidWxf(format!(
-                "PackedArray does not support element type {:?}",
-                dt
-            ))
-        })?;
+        let pdt = PackedArrayEnum::try_from(dt)
+            .map_err(|_| Error::InvalidWxf(format!(
+                "PackedArray does not support element type {:?}", dt
+            )))?;
         let rank = self.read_varint()? as usize;
         let mut dims = Vec::with_capacity(rank);
         for _ in 0..rank {
@@ -302,71 +297,49 @@ impl<'a> WxfCursor<'a> {
     /// Consume a `Function` token + varint arity. Caller next reads the head
     /// value, then `arity` argument values.
     pub fn read_function_header(&mut self) -> Result<u64, Error> {
-        self.expect_token(TOKEN_FUNCTION, "read_function_header")?;
+        self.expect_token(ExpressionEnum::Function, "read_function_header")?;
         self.read_varint()
     }
 
     /// Consume an `Association` token + varint entry count. Caller next reads
     /// `count` (rule, key, value) triplets.
     pub fn read_association_header(&mut self) -> Result<u64, Error> {
-        self.expect_token(TOKEN_ASSOCIATION, "read_association_header")?;
+        self.expect_token(ExpressionEnum::Association, "read_association_header")?;
         self.read_varint()
     }
 
     /// Consume one `Rule` (`-`) or `RuleDelayed` (`:`) byte; returns the
     /// `delayed` flag.
     pub fn read_rule(&mut self) -> Result<bool, Error> {
-        let tag = self.read_byte()?;
-        match tag {
-            TOKEN_RULE => Ok(false),
-            TOKEN_RULE_DELAYED => Ok(true),
-            other => Err(Error::InvalidWxf(format!(
-                "expected Rule or RuleDelayed, got {}",
-                token_kind_name(other)
-            ))),
+        match ExpressionEnum::try_from(self.read_byte()?) {
+            Ok(ExpressionEnum::Rule)        => Ok(false),
+            Ok(ExpressionEnum::RuleDelayed) => Ok(true),
+            Ok(other) => Err(Error::InvalidWxf(format!("expected Rule or RuleDelayed, got {other}"))),
+            Err(_)    => Err(Error::InvalidWxf("expected Rule or RuleDelayed, got <unknown>".into())),
         }
     }
 
     /// Recursively skip one value at the cursor's current position. Used by
     /// the derive when an unknown Association key is encountered.
     pub fn skip(&mut self) -> Result<(), Error> {
-        let tag = self.peek_token()?;
-        match tag {
-            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+        match ExpressionEnum::try_from(self.peek_token()?) {
+            Ok(ExpressionEnum::Integer8 | ExpressionEnum::Integer16 | ExpressionEnum::Integer32 | ExpressionEnum::Integer64) => {
                 let _ = self.read_integer()?;
             },
-            TOKEN_REAL64 => {
-                let _ = self.read_real()?;
-            },
-            TOKEN_STRING => {
-                let _ = self.read_string()?;
-            },
-            TOKEN_SYMBOL => {
-                let _ = self.read_symbol()?;
-            },
-            TOKEN_BINARY_STRING => {
-                let _ = self.read_byte_array()?;
-            },
-            TOKEN_BIG_INTEGER => {
-                let _ = self.read_big_integer()?;
-            },
-            TOKEN_BIG_REAL => {
-                let _ = self.read_big_real()?;
-            },
-            TOKEN_NUMERIC_ARRAY => {
-                let _ = self.read_numeric_array()?;
-            },
-            TOKEN_PACKED_ARRAY => {
-                let _ = self.read_packed_array()?;
-            },
-            TOKEN_FUNCTION => {
+            Ok(ExpressionEnum::Real64)       => { let _ = self.read_real()?; },
+            Ok(ExpressionEnum::String)       => { let _ = self.read_string()?; },
+            Ok(ExpressionEnum::Symbol)       => { let _ = self.read_symbol()?; },
+            Ok(ExpressionEnum::ByteArray)    => { let _ = self.read_byte_array()?; },
+            Ok(ExpressionEnum::BigInteger)   => { let _ = self.read_big_integer()?; },
+            Ok(ExpressionEnum::BigReal)      => { let _ = self.read_big_real()?; },
+            Ok(ExpressionEnum::NumericArray) => { let _ = self.read_numeric_array()?; },
+            Ok(ExpressionEnum::PackedArray)  => { let _ = self.read_packed_array()?; },
+            Ok(ExpressionEnum::Function) => {
                 let n = self.read_function_header()?;
                 self.skip()?; // head
-                for _ in 0..n {
-                    self.skip()?;
-                }
+                for _ in 0..n { self.skip()?; }
             },
-            TOKEN_ASSOCIATION => {
+            Ok(ExpressionEnum::Association) => {
                 let n = self.read_association_header()?;
                 for _ in 0..n {
                     let _delayed = self.read_rule()?;
@@ -374,12 +347,8 @@ impl<'a> WxfCursor<'a> {
                     self.skip()?; // value
                 }
             },
-            other => {
-                return Err(Error::InvalidWxf(format!(
-                    "skip(): unknown: {}",
-                    token_kind_name(other)
-                )));
-            },
+            Ok(other) => return Err(Error::InvalidWxf(format!("skip(): unexpected token {other}"))),
+            Err(_)    => return Err(Error::InvalidWxf("skip(): unknown token byte".into())),
         }
         Ok(())
     }

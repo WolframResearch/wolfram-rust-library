@@ -1,6 +1,6 @@
 use wolfram_library_link::{
     self as wll,
-    expr::{ByteArray, Expr, ExprKind, Number, NumericArray, NumericArrayDataType, Symbol},
+    expr::{NumericArrayEnum, ByteArray, Expr, ExprKind, Number, NumericArray, Symbol},
     wstp::Link,
 };
 
@@ -208,7 +208,7 @@ fn make_numeric_array_r64(link: &mut Link) {
     let _n = link.test_head("System`List").unwrap();
     let data: Vec<f64> = vec![1.0, 2.0, 3.0];
     let bytes: Vec<u8> = data.iter().flat_map(|v| v.to_le_bytes()).collect();
-    let na = NumericArray::new(NumericArrayDataType::Real64, vec![3], bytes);
+    let na = NumericArray::new(NumericArrayEnum::Real64, vec![3], bytes);
     let expr = Expr::new(ExprKind::NumericArray(na));
     link.put_expr(&expr).unwrap();
 }
@@ -219,7 +219,7 @@ fn make_numeric_array_i32_2d(link: &mut Link) {
     let _n = link.test_head("System`List").unwrap();
     let data: Vec<i32> = vec![1, 2, 3, 4];
     let bytes: Vec<u8> = data.iter().flat_map(|v| v.to_le_bytes()).collect();
-    let na = NumericArray::new(NumericArrayDataType::Integer32, vec![2, 2], bytes);
+    let na = NumericArray::new(NumericArrayEnum::Integer32, vec![2, 2], bytes);
     let expr = Expr::new(ExprKind::NumericArray(na));
     link.put_expr(&expr).unwrap();
 }

@@ -84,7 +84,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
         .expect("samples should be NumericArray");
     assert_eq!(
         na.data_type(),
-        wolfram_expr::NumericArrayDataType::Integer32
+        wolfram_expr::NumericArrayEnum::Integer32
     );
     assert_eq!(na.dimensions(), &[3]);
 

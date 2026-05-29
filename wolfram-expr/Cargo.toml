@@ -20,3 +20,5 @@ unstable_parse = []
 
 [dependencies]
 ordered-float = "3.4.0"
+num_enum = "0.7"
+strum = { version = "0.26", features = ["derive"] }

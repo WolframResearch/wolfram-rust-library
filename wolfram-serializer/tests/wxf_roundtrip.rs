@@ -2,7 +2,7 @@
 
 use wolfram_expr::{
     Association, ByteArray, Complex32, Complex64, Expr, NumericArray,
-    NumericArrayDataType, PackedArray, PackedArrayDataType, RuleEntry, Symbol,
+    NumericArrayEnum, PackedArray, PackedArrayEnum, RuleEntry, Symbol,
 };
 use wolfram_serializer::{deserialize, serialize, CompressionLevel, Format};
 
@@ -98,7 +98,7 @@ fn numeric_array_real64() {
 #[test]
 fn numeric_array_unsigned_3d() {
     let arr = NumericArray::new(
-        NumericArrayDataType::UnsignedInteger8,
+        NumericArrayEnum::UnsignedInteger8,
         vec![2, 2, 2],
         vec![1u8, 2, 3, 4, 5, 6, 7, 8],
     );
@@ -119,7 +119,7 @@ fn packed_array_int32_2d() {
         std::slice::from_raw_parts(v.as_ptr() as *const u8, std::mem::size_of_val(&v[..]))
     }
     .to_vec();
-    let arr = PackedArray::new(PackedArrayDataType::Integer32, vec![2, 2], bytes);
+    let arr = PackedArray::new(PackedArrayEnum::Integer32, vec![2, 2], bytes);
     roundtrip(Expr::from(arr));
 }
 
@@ -164,7 +164,7 @@ fn vec_i32_serializes_as_numeric_array() {
     let arr = parsed
         .try_as_numeric_array()
         .expect("expected NumericArray");
-    assert_eq!(arr.data_type(), NumericArrayDataType::Integer32);
+    assert_eq!(arr.data_type(), NumericArrayEnum::Integer32);
     assert_eq!(arr.dimensions(), &[4]);
     assert_eq!(arr.try_as_slice::<i32>(), Some([10, 20, 30, 40].as_slice()));
 }
@@ -181,7 +181,7 @@ fn vec_f64_serializes_as_numeric_array() {
     let arr = parsed
         .try_as_numeric_array()
         .expect("expected NumericArray");
-    assert_eq!(arr.data_type(), NumericArrayDataType::Real64);
+    assert_eq!(arr.data_type(), NumericArrayEnum::Real64);
     assert_eq!(arr.try_as_slice::<f64>(), Some([1.5, 2.5, 3.5].as_slice()));
 }
 

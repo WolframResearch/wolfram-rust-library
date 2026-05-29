@@ -12,7 +12,7 @@ use std::any::TypeId;
 
 use crate::serializer::ToWolfram;
 use crate::{Error, Serializer};
-use wolfram_expr::NumericArrayDataType;
+use wolfram_expr::NumericArrayEnum;
 
 /// Wraps a borrowed byte slice as a `ToWolfram` whose serialize call emits a
 /// `ByteArray` token. Used by the derive when a struct field is `Vec<u8>` or
@@ -30,7 +30,7 @@ impl<'a> ToWolfram for ByteArrayThunk<'a> {
 /// the derive when a struct field maps to a 1-D or k-D `NumericArray`.
 pub struct NumericArrayThunk<'a> {
     /// Element-type tag (e.g. `Integer32`).
-    pub data_type: NumericArrayDataType,
+    pub data_type: NumericArrayEnum,
     /// Dimension shape (row-major).
     pub dimensions: &'a [usize],
     /// Flat row-major little-endian byte buffer.

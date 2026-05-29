@@ -7,20 +7,33 @@ use static_assertions::assert_not_impl_any;
 
 use crate::{rtl, sys};
 
-use crate::sys::MNumericArray_Convert_Method::*;
+#[rustfmt::skip]
+use crate::sys::MNumericArray_Data_Type::{
+    MNumericArray_Type_Bit8 as BIT8_TYPE,
+    MNumericArray_Type_Bit16 as BIT16_TYPE,
+    MNumericArray_Type_Bit32 as BIT32_TYPE,
+    MNumericArray_Type_Bit64 as BIT64_TYPE,
 
-// `NumericArrayDataType` (the shared element-type tag enum) lives in `wolfram-expr`.
-// Re-exported from this module so `wolfram_library_link::NumericArrayDataType` keeps
-// resolving to the same path users have been importing. The enum's variant names and
-// `#[repr(u32)]` discriminants exactly match the C ABI `MNumericArray_Type_*` values.
-pub use wolfram_expr::NumericArrayDataType;
+    MNumericArray_Type_UBit8 as UBIT8_TYPE,
+    MNumericArray_Type_UBit16 as UBIT16_TYPE,
+    MNumericArray_Type_UBit32 as UBIT32_TYPE,
+    MNumericArray_Type_UBit64 as UBIT64_TYPE,
+
+    MNumericArray_Type_Real32 as REAL32_TYPE,
+    MNumericArray_Type_Real64 as REAL64_TYPE,
+
+    MNumericArray_Type_Complex_Real32 as COMPLEX_REAL32_TYPE,
+    MNumericArray_Type_Complex_Real64 as COMPLEX_REAL64_TYPE,
+};
+
+use crate::sys::MNumericArray_Convert_Method::*;
 
 /// Native Wolfram [`NumericArray`][ref/NumericArray]<sub>WL</sub>.
 ///
 /// This type is an ABI-compatible wrapper around [`wolfram_library_link_sys::MNumericArray`].
 ///
 /// A [`NumericArray`] can contain any type `T` which satisfies the trait
-/// [`NumericArrayType`].
+/// [`NumericNumericArrayEnum`].
 ///
 /// Use [`NumericArray::kind()`] to dynamically resolve a `NumericArray` with unknown
 /// element type into a `NumericArray<T>` with explicit element type.
@@ -37,7 +50,7 @@ pub struct NumericArray<T = ()>(sys::MNumericArray, PhantomData<T>);
 ///
 /// Use [`as_slice_mut()`][`UninitNumericArray::as_slice_mut()`] to initialize the
 /// elements of this [`UninitNumericArray`].
-pub struct UninitNumericArray<T: NumericArrayType>(sys::MNumericArray, PhantomData<T>);
+pub struct UninitNumericArray<T: NumericNumericArrayEnum>(sys::MNumericArray, PhantomData<T>);
 
 // Guard against accidental `derive(Copy)` annotations.
 assert_not_impl_any!(NumericArray: Copy);
@@ -56,11 +69,11 @@ assert_not_impl_any!(UninitNumericArray<i64>: Copy);
 ///   * [`f32`], [`f64`]
 ///   * [`mcomplex`][sys::mcomplex]
 ///
-/// [`NumericArrayDataType`] is an enumeration of all the types which satisfy this trait.
-pub trait NumericArrayType: private::Sealed {
-    /// The [`NumericArrayDataType`] which dynamically represents the type which this
+/// [`NumericArrayExpressionEnum`] is an enumeration of all the types which satisfy this trait.
+pub trait NumericNumericArrayEnum: private::Sealed {
+    /// The [`NumericArrayExpressionEnum`] which dynamically represents the type which this
     /// trait is implemented for.
-    const TYPE: NumericArrayDataType;
+    const TYPE: NumericArrayExpressionEnum;
 }
 
 mod private {
@@ -85,50 +98,111 @@ mod private {
     impl Sealed for sys::mcomplex {}
 }
 
-impl NumericArrayType for i8 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::Integer8;
+impl NumericNumericArrayEnum for i8 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::Bit8;
 }
-impl NumericArrayType for i16 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::Integer16;
+impl NumericNumericArrayEnum for i16 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::Bit16;
 }
-impl NumericArrayType for i32 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::Integer32;
+impl NumericNumericArrayEnum for i32 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::Bit32;
 }
-impl NumericArrayType for i64 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::Integer64;
-}
-
-impl NumericArrayType for u8 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::UnsignedInteger8;
-}
-impl NumericArrayType for u16 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::UnsignedInteger16;
-}
-impl NumericArrayType for u32 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::UnsignedInteger32;
-}
-impl NumericArrayType for u64 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::UnsignedInteger64;
+impl NumericNumericArrayEnum for i64 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::Bit64;
 }
 
-impl NumericArrayType for f32 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::Real32;
+impl NumericNumericArrayEnum for u8 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::UBit8;
 }
-impl NumericArrayType for f64 {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::Real64;
+impl NumericNumericArrayEnum for u16 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::UBit16;
+}
+impl NumericNumericArrayEnum for u32 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::UBit32;
+}
+impl NumericNumericArrayEnum for u64 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::UBit64;
+}
+
+impl NumericNumericArrayEnum for f32 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::Real32;
+}
+impl NumericNumericArrayEnum for f64 {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::Real64;
 }
 
 // TODO: Why is there no WolframLibrary.h typedef for 32-bit complex reals?
-// impl NumericArrayType for sys::complexreal32 {
-//     const TYPE: NumericArrayDataType = NumericArrayDataType::ComplexReal32;
+// impl NumericNumericArrayEnum for sys::complexreal32 {
+//     const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::ComplexReal32;
 // }
-impl NumericArrayType for sys::mcomplex {
-    const TYPE: NumericArrayDataType = NumericArrayDataType::ComplexReal64;
+impl NumericNumericArrayEnum for sys::mcomplex {
+    const TYPE: NumericArrayExpressionEnum = NumericArrayExpressionEnum::ComplexReal64;
 }
 
 //======================================
 // Enums
 //======================================
+
+/// The type of the data being stored in a [`NumericArray`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+#[allow(missing_docs)]
+pub enum NumericArrayExpressionEnum {
+    Bit8  = BIT8_TYPE as u32,
+    Bit16 = BIT16_TYPE as u32,
+    Bit32 = BIT32_TYPE as u32,
+    Bit64 = BIT64_TYPE as u32,
+
+    UBit8  = UBIT8_TYPE as u32,
+    UBit16 = UBIT16_TYPE as u32,
+    UBit32 = UBIT32_TYPE as u32,
+    UBit64 = UBIT64_TYPE as u32,
+
+    Real32 = REAL32_TYPE as u32,
+    Real64 = REAL64_TYPE as u32,
+
+    ComplexReal32 = COMPLEX_REAL32_TYPE as u32,
+    ComplexReal64 = COMPLEX_REAL64_TYPE as u32,
+}
+
+impl std::convert::TryFrom<u32> for NumericArrayExpressionEnum {
+    type Error = ();
+    fn try_from(raw: u32) -> Result<Self, ()> {
+        Ok(match raw {
+            r if r == BIT8_TYPE as u32  => NumericArrayExpressionEnum::Bit8,
+            r if r == BIT16_TYPE as u32 => NumericArrayExpressionEnum::Bit16,
+            r if r == BIT32_TYPE as u32 => NumericArrayExpressionEnum::Bit32,
+            r if r == BIT64_TYPE as u32 => NumericArrayExpressionEnum::Bit64,
+            r if r == UBIT8_TYPE as u32  => NumericArrayExpressionEnum::UBit8,
+            r if r == UBIT16_TYPE as u32 => NumericArrayExpressionEnum::UBit16,
+            r if r == UBIT32_TYPE as u32 => NumericArrayExpressionEnum::UBit32,
+            r if r == UBIT64_TYPE as u32 => NumericArrayExpressionEnum::UBit64,
+            r if r == REAL32_TYPE as u32 => NumericArrayExpressionEnum::Real32,
+            r if r == REAL64_TYPE as u32 => NumericArrayExpressionEnum::Real64,
+            r if r == COMPLEX_REAL32_TYPE as u32 => NumericArrayExpressionEnum::ComplexReal32,
+            r if r == COMPLEX_REAL64_TYPE as u32 => NumericArrayExpressionEnum::ComplexReal64,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl NumericArrayExpressionEnum {
+    /// The raw `u32` discriminant matching the C ABI `MNumericArray_Data_Type` enum.
+    pub const fn as_raw(self) -> u32 {
+        self as u32
+    }
+
+    /// The Wolfram Language name (e.g. `"Integer32"`, `"Real64"`). Delegates to
+    /// `NumericArrayEnum` — conversion is lossless and the name is canonical there.
+    pub fn name(self) -> &'static str {
+        wolfram_expr::NumericArrayEnum::from(self).name()
+    }
+
+    /// Size of one element in bytes.
+    pub fn size_in_bytes(self) -> usize {
+        wolfram_expr::NumericArrayEnum::from(self).size_in_bytes()
+    }
+}
 
 /// Conversion method used by [`NumericArray::convert_to()`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -155,18 +229,18 @@ pub enum NumericArrayKind<'e> {
     //
     // Signed integer types
     //
-    Integer8(&'e NumericArray<i8>),
-    Integer16(&'e NumericArray<i16>),
-    Integer32(&'e NumericArray<i32>),
-    Integer64(&'e NumericArray<i64>),
+    Bit8(&'e NumericArray<i8>),
+    Bit16(&'e NumericArray<i16>),
+    Bit32(&'e NumericArray<i32>),
+    Bit64(&'e NumericArray<i64>),
 
     //
     // Unsigned integer types
     //
-    UnsignedInteger8(&'e NumericArray<u8>),
-    UnsignedInteger16(&'e NumericArray<u16>),
-    UnsignedInteger32(&'e NumericArray<u32>),
-    UnsignedInteger64(&'e NumericArray<u64>),
+    UBit8(&'e NumericArray<u8>),
+    UBit16(&'e NumericArray<u16>),
+    UBit32(&'e NumericArray<u32>),
+    UBit64(&'e NumericArray<u64>),
 
     //
     // Real types
@@ -203,14 +277,14 @@ impl NumericArray {
     ///
     /// fn sum(array: NumericArray) -> i64 {
     ///     match array.kind() {
-    ///         NumericArrayKind::Integer8(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
-    ///         NumericArrayKind::Integer16(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
-    ///         NumericArrayKind::Integer32(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
-    ///         NumericArrayKind::Integer64(na) => na.as_slice().into_iter().sum(),
-    ///         NumericArrayKind::UnsignedInteger8(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
-    ///         NumericArrayKind::UnsignedInteger16(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
-    ///         NumericArrayKind::UnsignedInteger32(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
-    ///         NumericArrayKind::UnsignedInteger64(na) => {
+    ///         NumericArrayKind::Bit8(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
+    ///         NumericArrayKind::Bit16(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
+    ///         NumericArrayKind::Bit32(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
+    ///         NumericArrayKind::Bit64(na) => na.as_slice().into_iter().sum(),
+    ///         NumericArrayKind::UBit8(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
+    ///         NumericArrayKind::UBit16(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
+    ///         NumericArrayKind::UBit32(na) => na.as_slice().into_iter().copied().map(i64::from).sum(),
+    ///         NumericArrayKind::UBit64(na) => {
     ///             match i64::try_from(na.as_slice().into_iter().sum::<u64>()) {
     ///                 Ok(sum) => sum,
     ///                 Err(_) => panic!("overflows i64"),
@@ -227,23 +301,23 @@ impl NumericArray {
         /// transmute(). `transmute()` is a *very* unsafe function, so it seems prudent to
         /// future-proof this code against accidental changes which alter the inferrence
         /// of the transmute() target type.
-        unsafe fn trans<T: NumericArrayType>(array: &NumericArray) -> &NumericArray<T> {
+        unsafe fn trans<T: NumericNumericArrayEnum>(array: &NumericArray) -> &NumericArray<T> {
             std::mem::transmute(array)
         }
 
         unsafe {
-            use NumericArrayDataType::*;
+            use NumericArrayExpressionEnum::*;
 
             match self.data_type() {
-                Integer8 => NumericArrayKind::Integer8(trans(self)),
-                Integer16 => NumericArrayKind::Integer16(trans(self)),
-                Integer32 => NumericArrayKind::Integer32(trans(self)),
-                Integer64 => NumericArrayKind::Integer64(trans(self)),
+                Bit8  => NumericArrayKind::Bit8(trans(self)),
+                Bit16 => NumericArrayKind::Bit16(trans(self)),
+                Bit32 => NumericArrayKind::Bit32(trans(self)),
+                Bit64 => NumericArrayKind::Bit64(trans(self)),
 
-                UnsignedInteger8 => NumericArrayKind::UnsignedInteger8(trans(self)),
-                UnsignedInteger16 => NumericArrayKind::UnsignedInteger16(trans(self)),
-                UnsignedInteger32 => NumericArrayKind::UnsignedInteger32(trans(self)),
-                UnsignedInteger64 => NumericArrayKind::UnsignedInteger64(trans(self)),
+                UBit8  => NumericArrayKind::UBit8(trans(self)),
+                UBit16 => NumericArrayKind::UBit16(trans(self)),
+                UBit32 => NumericArrayKind::UBit32(trans(self)),
+                UBit64 => NumericArrayKind::UBit64(trans(self)),
 
                 Real32 => NumericArrayKind::Real32(trans(self)),
                 Real64 => NumericArrayKind::Real64(trans(self)),
@@ -282,13 +356,13 @@ impl NumericArray {
     /// ```
     pub fn try_kind<T>(&self) -> Result<&NumericArray<T>, ()>
     where
-        T: NumericArrayType,
+        T: NumericNumericArrayEnum,
     {
         /// The purpose of this intermediate function is to limit the scope of the call to
         /// transmute(). `transmute()` is a *very* unsafe function, so it seems prudent to
         /// future-proof this code against accidental changes which alter the inferrence
         /// of the transmute() target type.
-        unsafe fn trans<T: NumericArrayType>(array: &NumericArray) -> &NumericArray<T> {
+        unsafe fn trans<T: NumericNumericArrayEnum>(array: &NumericArray) -> &NumericArray<T> {
             std::mem::transmute(array)
         }
 
@@ -306,13 +380,13 @@ impl NumericArray {
     /// will be returned as the error value.
     pub fn try_into_kind<T>(self) -> Result<NumericArray<T>, NumericArray>
     where
-        T: NumericArrayType,
+        T: NumericNumericArrayEnum,
     {
         /// The purpose of this intermediate function is to limit the scope of the call to
         /// transmute(). `transmute()` is a *very* unsafe function, so it seems prudent to
         /// future-proof this code against accidental changes which alter the inferrence
         /// of the transmute() target type.
-        unsafe fn trans<T: NumericArrayType>(array: NumericArray) -> NumericArray<T> {
+        unsafe fn trans<T: NumericNumericArrayEnum>(array: NumericArray) -> NumericArray<T> {
             std::mem::transmute(array)
         }
 
@@ -324,7 +398,7 @@ impl NumericArray {
     }
 }
 
-impl<T: NumericArrayType> NumericArray<T> {
+impl<T: NumericNumericArrayEnum> NumericArray<T> {
     /// Construct a new one-dimensional [`NumericArray`] from a slice.
     ///
     /// Use [`NumericArray::from_array()`] to construct multidimensional numeric arrays.
@@ -475,7 +549,7 @@ impl<T> NumericArray<T> {
     /// * `array` must be a fully initialized and valid numeric array object
     /// * `T` must either:
     ///   - be `()`, representing an array with dynamic element type, or
-    ///   - `T` must satisfy [`NumericArrayType`], and the element type of `array` must
+    ///   - `T` must satisfy [`NumericNumericArrayEnum`], and the element type of `array` must
     ///     be the same as `T`.
     // TODO: Add something about the reference count in the above list?
     pub unsafe fn from_raw(array: sys::MNumericArray) -> NumericArray<T> {
@@ -501,12 +575,12 @@ impl<T> NumericArray<T> {
     }
 
     #[allow(missing_docs)]
-    pub fn data_type(&self) -> NumericArrayDataType {
+    pub fn data_type(&self) -> NumericArrayExpressionEnum {
         let value: sys::numericarray_data_t = self.data_type_raw();
         let value: u32 = value as u32;
 
-        NumericArrayDataType::try_from(value)
-            .expect("NumericArray tensor property type is value is not a known NumericArrayDataType variant")
+        NumericArrayExpressionEnum::try_from(value)
+            .expect("NumericArray tensor property type is value is not a known NumericArrayExpressionEnum variant")
     }
 
     /// *LibraryLink C API Documentation:* [`MNumericArray_getType`](https://reference.wolfram.com/language/LibraryLink/ref/callback/MNumericArray_getType.html)
@@ -605,7 +679,7 @@ impl<T> NumericArray<T> {
     /// *LibraryLink C API Documentation:* [`MNumericArray_convertType`](https://reference.wolfram.com/language/LibraryLink/ref/callback/MNumericArray_convertType.html)
     // TODO: When can this return an error? ClipAndCheck and the tolerance is not sufficient?
     // TODO: Return a better error than `errcode_t`.
-    pub fn convert_to<T2: NumericArrayType>(
+    pub fn convert_to<T2: NumericNumericArrayEnum>(
         &self,
         method: NumericArrayConvertMethod,
         tolerance: sys::mreal,
@@ -648,7 +722,7 @@ unsafe fn flattened_length(numeric_array: sys::MNumericArray) -> usize {
 // UninitNumericArray
 //======================================
 
-impl<T: NumericArrayType> UninitNumericArray<T> {
+impl<T: NumericNumericArrayEnum> UninitNumericArray<T> {
     /// Construct a new uninitialized `NumericArray` with the specified dimensions.
     ///
     /// # Panics
@@ -679,7 +753,7 @@ impl<T: NumericArrayType> UninitNumericArray<T> {
             let mut numeric_array: sys::MNumericArray = std::ptr::null_mut();
 
             let err_code: sys::errcode_t = rtl::MNumericArray_new(
-                <T as NumericArrayType>::TYPE.as_raw() as sys::numericarray_data_t,
+                <T as NumericNumericArrayEnum>::TYPE.as_raw() as sys::numericarray_data_t,
                 i64::try_from(rank).expect("usize overflows i64"),
                 dimensions.as_ptr() as *mut sys::mint,
                 &mut numeric_array,
@@ -789,8 +863,8 @@ fn copy_from_slice_uninit<T>(src: &[T], dest: &mut [MaybeUninit<T>]) {
     }
 }
 
-// `NumericArrayDataType` inherent methods (`as_raw`, `name`, `from_name`,
-// `TryFrom<u32>`) are provided by `wolfram_expr::NumericArrayDataType` itself —
+// `NumericArrayExpressionEnum` inherent methods (`as_raw`, `name`, `from_name`,
+// `TryFrom<u32>`) are provided by `wolfram_expr::NumericArrayExpressionEnum` itself —
 // no need to redefine them here.
 
 impl NumericArrayConvertMethod {
@@ -850,28 +924,65 @@ impl<T> fmt::Debug for NumericArray<T> {
 // Conversion Impls
 //======================================
 
-// `TryFrom<u32> for NumericArrayDataType` is provided by `wolfram_expr` —
-// re-exported via the `pub use` at the top of the module.
+// No TryFrom<u32> for NumericArrayExpressionEnum — the local enum uses C ABI discriminants
+// directly via #[repr(u32)]; callers can cast self as u32 / as_raw() instead.
 
 //==============================================================================
 // Cross-crate integration with the value-type `wolfram_expr::NumericArray`.
 //
-// `NumericArrayDataType` is a re-export from wolfram-expr (above), so the two
-// enums are now the same type. We only need:
-//   * `wolfram_expr::NumericArrayRead` impl on the runtime-handle `NumericArray<T>`
-//   * `From` / `TryFrom` conversions between runtime-handle and value-type
-//
-// The local `NumericArrayType` trait stays — it adds `sys::mcomplex` to the set of
-// valid element types, which can't move to wolfram-expr (orphan rule).
+// `wolfram_expr` uses `NumericArrayEnum` (WXF wire-byte discriminants) while
+// this crate uses `NumericArrayExpressionEnum` (C ABI discriminants). Conversions
+// between the two live here.
 //==============================================================================
 
 use wolfram_expr::{
-    NumericArray as ExprNumericArray, NumericArrayRead as ExprNumericArrayRead,
+    NumericArrayEnum, NumericArray as ExprNumericArray,
+    NumericArrayRead as ExprNumericArrayRead,
 };
 
+/// Convert from the C ABI `NumericArrayExpressionEnum` to the WXF-based `NumericArrayEnum`.
+impl From<NumericArrayExpressionEnum> for NumericArrayEnum {
+    fn from(dt: NumericArrayExpressionEnum) -> NumericArrayEnum {
+        match dt {
+            NumericArrayExpressionEnum::Bit8  => NumericArrayEnum::Integer8,
+            NumericArrayExpressionEnum::Bit16 => NumericArrayEnum::Integer16,
+            NumericArrayExpressionEnum::Bit32 => NumericArrayEnum::Integer32,
+            NumericArrayExpressionEnum::Bit64 => NumericArrayEnum::Integer64,
+            NumericArrayExpressionEnum::UBit8  => NumericArrayEnum::UnsignedInteger8,
+            NumericArrayExpressionEnum::UBit16 => NumericArrayEnum::UnsignedInteger16,
+            NumericArrayExpressionEnum::UBit32 => NumericArrayEnum::UnsignedInteger32,
+            NumericArrayExpressionEnum::UBit64 => NumericArrayEnum::UnsignedInteger64,
+            NumericArrayExpressionEnum::Real32 => NumericArrayEnum::Real32,
+            NumericArrayExpressionEnum::Real64 => NumericArrayEnum::Real64,
+            NumericArrayExpressionEnum::ComplexReal32 => NumericArrayEnum::ComplexReal32,
+            NumericArrayExpressionEnum::ComplexReal64 => NumericArrayEnum::ComplexReal64,
+        }
+    }
+}
+
+/// Convert from `NumericArrayEnum` back to the C ABI `NumericArrayExpressionEnum`.
+impl From<NumericArrayEnum> for NumericArrayExpressionEnum {
+    fn from(et: NumericArrayEnum) -> NumericArrayExpressionEnum {
+        match et {
+            NumericArrayEnum::Integer8 => NumericArrayExpressionEnum::Bit8,
+            NumericArrayEnum::Integer16 => NumericArrayExpressionEnum::Bit16,
+            NumericArrayEnum::Integer32 => NumericArrayExpressionEnum::Bit32,
+            NumericArrayEnum::Integer64 => NumericArrayExpressionEnum::Bit64,
+            NumericArrayEnum::UnsignedInteger8 => NumericArrayExpressionEnum::UBit8,
+            NumericArrayEnum::UnsignedInteger16 => NumericArrayExpressionEnum::UBit16,
+            NumericArrayEnum::UnsignedInteger32 => NumericArrayExpressionEnum::UBit32,
+            NumericArrayEnum::UnsignedInteger64 => NumericArrayExpressionEnum::UBit64,
+            NumericArrayEnum::Real32 => NumericArrayExpressionEnum::Real32,
+            NumericArrayEnum::Real64 => NumericArrayExpressionEnum::Real64,
+            NumericArrayEnum::ComplexReal32 => NumericArrayExpressionEnum::ComplexReal32,
+            NumericArrayEnum::ComplexReal64 => NumericArrayExpressionEnum::ComplexReal64,
+        }
+    }
+}
+
 impl<T> ExprNumericArrayRead for NumericArray<T> {
-    fn data_type(&self) -> NumericArrayDataType {
-        NumericArray::data_type(self)
+    fn data_type(&self) -> NumericArrayEnum {
+        NumericArrayEnum::from(NumericArray::data_type(self))
     }
 
     fn dimensions(&self) -> &[usize] {
@@ -879,7 +990,8 @@ impl<T> ExprNumericArrayRead for NumericArray<T> {
     }
 
     fn as_bytes(&self) -> &[u8] {
-        let len = self.flattened_length() * self.data_type().size_in_bytes();
+        let len = self.flattened_length()
+            * NumericArrayEnum::from(NumericArray::data_type(self)).size_in_bytes();
         let ptr = self.data_ptr() as *const u8;
         // SAFETY: runtime buffer is at least `len` bytes; lifetime tied to `&self`.
         unsafe { std::slice::from_raw_parts(ptr, len) }
@@ -888,10 +1000,10 @@ impl<T> ExprNumericArrayRead for NumericArray<T> {
 
 /// Copy a runtime-handle [`NumericArray<T>`] into a portable owned
 /// [`wolfram_expr::NumericArray`]. Allocates and copies the byte buffer.
-impl<T: NumericArrayType> From<&NumericArray<T>> for ExprNumericArray {
+impl<T: NumericNumericArrayEnum> From<&NumericArray<T>> for ExprNumericArray {
     fn from(arr: &NumericArray<T>) -> ExprNumericArray {
         ExprNumericArray::new(
-            arr.data_type(),
+            NumericArrayEnum::from(arr.data_type()),
             NumericArray::dimensions(arr).to_vec(),
             ExprNumericArrayRead::as_bytes(arr).to_vec(),
         )
@@ -901,7 +1013,7 @@ impl<T: NumericArrayType> From<&NumericArray<T>> for ExprNumericArray {
 impl From<&NumericArray<()>> for ExprNumericArray {
     fn from(arr: &NumericArray<()>) -> ExprNumericArray {
         ExprNumericArray::new(
-            arr.data_type(),
+            NumericArrayEnum::from(arr.data_type()),
             NumericArray::dimensions(arr).to_vec(),
             ExprNumericArrayRead::as_bytes(arr).to_vec(),
         )
@@ -916,7 +1028,7 @@ impl From<&ExprNumericArray> for NumericArray<()> {
         unsafe {
             let mut raw: sys::MNumericArray = std::ptr::null_mut();
             let err = rtl::MNumericArray_new(
-                src.data_type().as_raw() as sys::numericarray_data_t,
+                NumericArrayExpressionEnum::from(src.data_type()).as_raw() as sys::numericarray_data_t,
                 i64::try_from(dims.len()).expect("rank overflows i64"),
                 dims.as_ptr() as *mut sys::mint,
                 &mut raw,
@@ -934,12 +1046,13 @@ impl From<&ExprNumericArray> for NumericArray<()> {
 
 /// Allocate a fresh typed runtime-handle [`NumericArray<T>`] from a portable owned
 /// [`wolfram_expr::NumericArray`]; errors if `T::TYPE` doesn't match the source tag.
-impl<T: NumericArrayType> TryFrom<&ExprNumericArray> for NumericArray<T> {
-    type Error = NumericArrayDataType;
+impl<T: NumericNumericArrayEnum> TryFrom<&ExprNumericArray> for NumericArray<T> {
+    type Error = NumericArrayEnum;
 
-    fn try_from(src: &ExprNumericArray) -> Result<NumericArray<T>, NumericArrayDataType> {
-        if src.data_type() != T::TYPE {
-            return Err(src.data_type());
+    fn try_from(src: &ExprNumericArray) -> Result<NumericArray<T>, NumericArrayEnum> {
+        let src_et = src.data_type();
+        if src_et != NumericArrayEnum::from(T::TYPE) {
+            return Err(src_et);
         }
         let untyped: NumericArray<()> = src.into();
         unsafe { Ok(NumericArray::<T>::from_raw(untyped.into_raw())) }

@@ -23,7 +23,7 @@ use wolfram_expr::{
     RuleEntry, Symbol,
 };
 
-use crate::wxf::constants::*;
+use wolfram_expr::wxf::ExpressionEnum;
 use crate::wxf::cursor::WxfCursor;
 use crate::Error;
 
@@ -49,7 +49,6 @@ pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> E
     }
 }
 
-pub(crate) use crate::wxf::constants::token_kind_name;
 
 //==============================================================================
 // Expr — replaces the old ExprConsumer's tree-building behavior.
@@ -57,61 +56,46 @@ pub(crate) use crate::wxf::constants::token_kind_name;
 
 impl FromWolfram for Expr {
     fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
-        let tag = c.peek_token()?;
-        match tag {
-            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+        match ExpressionEnum::try_from(c.peek_token()?) {
+            Ok(ExpressionEnum::Integer8 | ExpressionEnum::Integer16 | ExpressionEnum::Integer32 | ExpressionEnum::Integer64) => {
                 Ok(Expr::from(c.read_integer()?))
             },
-            TOKEN_REAL64 => {
+            Ok(ExpressionEnum::Real64) => {
                 let f = c.read_real()?;
                 if f.is_nan() {
                     return Err(Error::InvalidWxf("Real64 token contained NaN".into()));
                 }
                 Ok(Expr::real(f))
             },
-            TOKEN_STRING => {
-                // Expr::string<S: Into<String>> moves the owned String into
-                // ExprKind::String without an intermediate copy.
-                Ok(Expr::string(c.read_string()?))
-            },
-            TOKEN_SYMBOL => Ok(Expr::symbol(c.read_symbol()?)),
-            TOKEN_BINARY_STRING => Ok(Expr::from(c.read_byte_array()?)),
-            TOKEN_BIG_INTEGER => Ok(Expr::from(c.read_big_integer()?)),
-            TOKEN_BIG_REAL => Ok(Expr::from(c.read_big_real()?)),
-            TOKEN_NUMERIC_ARRAY => Ok(Expr::from(c.read_numeric_array()?)),
-            TOKEN_PACKED_ARRAY => Ok(Expr::from(c.read_packed_array()?)),
-            TOKEN_FUNCTION => {
+            Ok(ExpressionEnum::String)       => Ok(Expr::string(c.read_string()?)),
+            Ok(ExpressionEnum::Symbol)       => Ok(Expr::symbol(c.read_symbol()?)),
+            Ok(ExpressionEnum::ByteArray)    => Ok(Expr::from(c.read_byte_array()?)),
+            Ok(ExpressionEnum::BigInteger)   => Ok(Expr::from(c.read_big_integer()?)),
+            Ok(ExpressionEnum::BigReal)      => Ok(Expr::from(c.read_big_real()?)),
+            Ok(ExpressionEnum::NumericArray) => Ok(Expr::from(c.read_numeric_array()?)),
+            Ok(ExpressionEnum::PackedArray)  => Ok(Expr::from(c.read_packed_array()?)),
+            Ok(ExpressionEnum::Function) => {
                 let n = c.read_function_header()?;
                 let head = Expr::from_cursor(c)?;
                 let mut args = Vec::with_capacity(n as usize);
-                for _ in 0..n {
-                    args.push(Expr::from_cursor(c)?);
-                }
+                for _ in 0..n { args.push(Expr::from_cursor(c)?); }
                 Ok(Expr::normal(head, args))
             },
-            TOKEN_ASSOCIATION => {
+            Ok(ExpressionEnum::Association) => {
                 let n = c.read_association_header()?;
                 let mut a = Association::new();
                 for _ in 0..n {
                     let delayed = c.read_rule()?;
                     let key = Expr::from_cursor(c)?;
                     let value = Expr::from_cursor(c)?;
-                    a.push(RuleEntry {
-                        key,
-                        value,
-                        delayed,
-                    });
+                    a.push(RuleEntry { key, value, delayed });
                 }
                 Ok(Expr::from(a))
             },
-            TOKEN_RULE | TOKEN_RULE_DELAYED => Err(Error::InvalidWxf(format!(
-                "unexpected {} outside Association",
-                token_kind_name(tag)
-            ))),
-            other => Err(Error::InvalidWxf(format!(
-                "unknown: {}",
-                token_kind_name(other)
-            ))),
+            Ok(dt @ (ExpressionEnum::Rule | ExpressionEnum::RuleDelayed)) => {
+                Err(Error::InvalidWxf(format!("unexpected {dt} outside Association")))
+            },
+            Err(_) => Err(Error::InvalidWxf("unknown token byte".into())),
         }
     }
 }
@@ -140,34 +124,26 @@ impl_int_from_cursor!(i8, i16, i32, i64, u8, u16, u32, u64);
 
 impl FromWolfram for f32 {
     fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
-        let tag = c.peek_token()?;
-        match tag {
-            TOKEN_REAL64 => Ok(c.read_real()? as f32),
-            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+        match ExpressionEnum::try_from(c.peek_token()?) {
+            Ok(ExpressionEnum::Real64) => Ok(c.read_real()? as f32),
+            Ok(ExpressionEnum::Integer8 | ExpressionEnum::Integer16 | ExpressionEnum::Integer32 | ExpressionEnum::Integer64) => {
                 Ok(c.read_integer()? as f32)
             },
-            other => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "f32",
-                got: token_kind_name(other).into(),
-            }),
+            Ok(other) => Err(Error::Deserialize { path: String::new(), expected: "f32", got: other.name().into() }),
+            Err(_)    => Err(Error::Deserialize { path: String::new(), expected: "f32", got: "<unknown>".into() }),
         }
     }
 }
 
 impl FromWolfram for f64 {
     fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
-        let tag = c.peek_token()?;
-        match tag {
-            TOKEN_REAL64 => c.read_real(),
-            TOKEN_INTEGER8 | TOKEN_INTEGER16 | TOKEN_INTEGER32 | TOKEN_INTEGER64 => {
+        match ExpressionEnum::try_from(c.peek_token()?) {
+            Ok(ExpressionEnum::Real64) => c.read_real(),
+            Ok(ExpressionEnum::Integer8 | ExpressionEnum::Integer16 | ExpressionEnum::Integer32 | ExpressionEnum::Integer64) => {
                 Ok(c.read_integer()? as f64)
             },
-            other => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "f64",
-                got: token_kind_name(other).into(),
-            }),
+            Ok(other) => Err(Error::Deserialize { path: String::new(), expected: "f64", got: other.name().into() }),
+            Err(_)    => Err(Error::Deserialize { path: String::new(), expected: "f64", got: "<unknown>".into() }),
         }
     }
 }
@@ -273,7 +249,7 @@ impl<T: FromWolfram> FromWolfram for Option<T> {
     fn from_cursor(c: &mut WxfCursor) -> Result<Self, Error> {
         // Peek: if it's the System`Null sentinel, consume + return None.
         // Otherwise delegate to T::from_cursor for the value.
-        if c.peek_token()? == TOKEN_SYMBOL {
+        if matches!(ExpressionEnum::try_from(c.peek_token()?), Ok(ExpressionEnum::Symbol)) {
             // We need to commit the read since peek_token only sees the tag,
             // not the symbol payload. Read the symbol; if it's System`Null,
             // return None; otherwise we've already consumed it and need to

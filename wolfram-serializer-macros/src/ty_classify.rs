@@ -16,14 +16,14 @@ pub(crate) enum FieldKind<'a> {
     /// `Vec<u8>` → `serialize_byte_array(&self.field)`
     VecOfU8,
     /// `Vec<T>` for a numeric `T` (i8..i64, u16..u64, f32, f64).
-    /// `dt` is a tokenstream for the `NumericArrayDataType` constant; `elem_ty`
+    /// `dt` is a tokenstream for the `NumericArrayExpressionEnum` constant; `elem_ty`
     /// is the original primitive type.
     VecOfNumeric { elem_ty: &'a Type, dt: TokenStream },
     /// `Vec<T>` for any other `T` — emit a `Function[List, ...]` element-by-element.
     VecOfOther { elem_ty: &'a Type },
     /// Rectangular-homogeneous numeric tensor — built from a tuple, a `[T;N]`,
     /// or a recursive nest of those. `elem_ty` is the leaf primitive,
-    /// `dt` is a tokenstream for the `NumericArrayDataType` constant,
+    /// `dt` is a tokenstream for the `NumericArrayExpressionEnum` constant,
     /// `dims` is the full multi-dim shape of the tensor, and
     /// `flat_indices` enumerates the field accessors needed to read every leaf
     /// in row-major order (e.g. for `((f64, f64), (f64, f64))` it would be
@@ -250,7 +250,7 @@ fn primitive_ident_of(ty: &Type) -> Option<String> {
     Some(path.segments[0].ident.to_string())
 }
 
-/// `NumericArrayDataType::*` token for a primitive ident, or `None` if the
+/// `NumericArrayExpressionEnum::*` token for a primitive ident, or `None` if the
 /// primitive is not a NumericArray element type.
 fn numeric_dt_for(prim: &str) -> Option<TokenStream> {
     let variant = match prim {
@@ -267,7 +267,7 @@ fn numeric_dt_for(prim: &str) -> Option<TokenStream> {
         _ => return None,
     };
     let ident = syn::Ident::new(variant, proc_macro2::Span::call_site());
-    Some(quote! { ::wolfram_serializer::NumericArrayDataType::#ident })
+    Some(quote! { ::wolfram_serializer::NumericArrayEnum::#ident })
 }
 
 fn array_len(expr: &syn::Expr) -> Option<usize> {

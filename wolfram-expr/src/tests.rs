@@ -1,7 +1,7 @@
 use crate::symbol::{ContextRef, RelativeContext, SymbolNameRef, SymbolRef};
 use crate::{
-    Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayDataType,
-    PackedArray, PackedArrayDataType, Symbol,
+    NumericArrayEnum, Association, ByteArray, Expr, ExprKind, NumericArray,
+    PackedArray, PackedArrayEnum, Symbol,
 };
 
 /// `(input, is Symbol, is SymbolName, is Context, is RelativeContext)`
@@ -99,7 +99,7 @@ fn numeric_array_variant_roundtrip() {
     assert!(matches!(expr.kind(), ExprKind::NumericArray(_)));
     let got = expr.try_as_numeric_array().unwrap();
     assert_eq!(got.dimensions(), &[2, 2]);
-    assert_eq!(got.data_type(), NumericArrayDataType::Integer32);
+    assert_eq!(got.data_type(), NumericArrayEnum::Integer32);
     assert_eq!(got.try_as_slice::<i32>(), Some([10, 20, 30, 40].as_slice()));
 }
 
@@ -110,7 +110,7 @@ fn packed_array_variant_roundtrip() {
     assert!(matches!(expr.kind(), ExprKind::PackedArray(_)));
     let got = expr.try_as_packed_array().unwrap();
     assert_eq!(got.dimensions(), &[3]);
-    assert_eq!(got.data_type(), PackedArrayDataType::Real64);
+    assert_eq!(got.data_type(), PackedArrayEnum::Real64);
     assert_eq!(got.try_as_slice::<f64>(), Some([1.0, 2.0, 3.0].as_slice()));
 }
 

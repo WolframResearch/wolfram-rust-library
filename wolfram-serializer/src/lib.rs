@@ -29,7 +29,7 @@ pub mod __derive_support {
 }
 mod derive_support;
 
-pub use wolfram_expr::NumericArrayDataType;
+pub use wolfram_expr::NumericArrayEnum;
 
 pub use crate::from_wolfram::FromWolfram;
 pub use crate::serializer::{Serializer, ToWolfram, WolframStruct};
@@ -149,6 +149,7 @@ impl From<std::io::Error> for Error {
         Error::Io(e)
     }
 }
+
 
 //==============================================================================
 // Top-level API — `serialize` and `deserialize` are the only entry points.

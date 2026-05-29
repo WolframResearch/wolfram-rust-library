@@ -10,15 +10,10 @@
 //! `ByteArray` on the wire is treated as a 1-D `NumericArray<Integer8>` before
 //! the widening rules apply.
 
-use wolfram_expr::NumericArrayDataType as DT;
-
-use crate::wxf::constants::{
-    array_type_from_wxf, token_kind_name, TOKEN_BINARY_STRING, TOKEN_NUMERIC_ARRAY,
-    TOKEN_PACKED_ARRAY,
-};
+use wolfram_expr::{NumericArrayEnum, NumericArrayEnum as DT, PackedArrayEnum};
+use wolfram_expr::wxf::ExpressionEnum;
 use crate::wxf::cursor::WxfCursor;
 use crate::Error;
-use wolfram_expr::PackedArrayDataType;
 
 /// Sealed trait implemented for each numeric primitive that the WXF derive /
 /// hand-impl path can read into. Each impl knows its target [`DT`] and how to
@@ -79,26 +74,22 @@ fn with_numeric_payload<R>(
     path: &str,
     f: impl FnOnce(DT, &[u8]) -> Result<R, String>,
 ) -> Result<R, Error> {
-    let tag = c.peek_token()?;
-    match tag {
-        TOKEN_NUMERIC_ARRAY | TOKEN_PACKED_ARRAY => {
+    match ExpressionEnum::try_from(c.peek_token()?) {
+        Ok(token @ (ExpressionEnum::NumericArray | ExpressionEnum::PackedArray)) => {
             c.read_byte()?; // consume token
             let type_byte = c.read_byte()?;
-            let dt = array_type_from_wxf(type_byte).ok_or_else(|| {
+            let dt = DT::try_from(type_byte).map_err(|_| {
                 Error::InvalidWxf(format!(
                     "unknown array element type: 0x{:02X}",
                     type_byte
                 ))
             })?;
-            let dt = if tag == TOKEN_PACKED_ARRAY {
-                PackedArrayDataType::try_new(dt)
-                    .ok_or_else(|| {
-                        Error::InvalidWxf(format!(
-                            "PackedArray does not support element type {:?}",
-                            dt
-                        ))
-                    })?
-                    .into_numeric()
+            let dt = if token == ExpressionEnum::PackedArray {
+                PackedArrayEnum::try_from(dt)
+                    .map_err(|_| Error::InvalidWxf(format!(
+                        "PackedArray does not support element type {:?}", dt
+                    )))
+                    .map(NumericArrayEnum::from)?
             } else {
                 dt
             };
@@ -111,18 +102,15 @@ fn with_numeric_payload<R>(
             let bytes = c.borrow_n(byte_count)?;
             f(dt, bytes).map_err(|m| err(path, "compatible numeric source", m))
         },
-        TOKEN_BINARY_STRING => {
+        Ok(ExpressionEnum::ByteArray) => {
             // ByteArray → treat as NumericArray<Integer8>, 1-D.
             c.read_byte()?; // consume token
             let len = c.read_varint()? as usize;
             let bytes = c.borrow_n(len)?;
             f(DT::Integer8, bytes).map_err(|m| err(path, "compatible numeric source", m))
         },
-        other => Err(err(
-            path,
-            "NumericArray, PackedArray, or ByteArray",
-            token_kind_name(other).to_string(),
-        )),
+        Ok(other) => Err(err(path, "NumericArray, PackedArray, or ByteArray", other.name().to_string())),
+        Err(_)    => Err(err(path, "NumericArray, PackedArray, or ByteArray", "<unknown>".into())),
     }
 }
 

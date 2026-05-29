@@ -6,7 +6,7 @@ use std::io::Write;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use wolfram_expr::{BigInteger, BigReal};
-use wolfram_expr::{NumericArrayDataType, PackedArrayDataType};
+use wolfram_expr::{NumericArrayEnum, PackedArrayEnum};
 
 use crate::serializer::{Serializer, ToWolfram};
 use crate::Error;
@@ -101,7 +101,7 @@ impl<'w, W: Write> Serializer for WlSerializer<'w, W> {
 
     fn serialize_numeric_array(
         &mut self,
-        data_type: NumericArrayDataType,
+        data_type: NumericArrayEnum,
         _dimensions: &[usize],
         bytes: &[u8],
     ) -> Result<(), Error> {
@@ -115,12 +115,12 @@ impl<'w, W: Write> Serializer for WlSerializer<'w, W> {
 
     fn serialize_packed_array(
         &mut self,
-        data_type: PackedArrayDataType,
+        data_type: PackedArrayEnum,
         _dimensions: &[usize],
         bytes: &[u8],
     ) -> Result<(), Error> {
         self.out.write_all(b"Developer`ToPackedArray[")?;
-        write_array_data_as_list(self, data_type.into_numeric(), bytes)?;
+        write_array_data_as_list(self, NumericArrayEnum::from(data_type), bytes)?;
         self.out.write_all(b"]")?;
         Ok(())
     }
@@ -139,10 +139,10 @@ impl<'w, W: Write> Serializer for WlSerializer<'w, W> {
 /// multi-dim arrays this flattens; structure preservation is a WXF concern.
 fn write_array_data_as_list<W: Write>(
     s: &mut WlSerializer<'_, W>,
-    dt: wolfram_expr::NumericArrayDataType,
+    dt: wolfram_expr::NumericArrayEnum,
     bytes: &[u8],
 ) -> Result<(), Error> {
-    use wolfram_expr::NumericArrayDataType as DT;
+    use wolfram_expr::NumericArrayEnum as DT;
     s.out.write_all(b"{")?;
     macro_rules! emit {
         ($t:ty) => {{

@@ -3,8 +3,8 @@
 
 use crate::Error;
 use wolfram_expr::{
-    ArrayBuf, Association, Expr, ExprKind, NumericArray, NumericArrayDataType,
-    PackedArray, PackedArrayDataType, Symbol,
+    ArrayBuf, NumericArrayEnum, Association, Expr, ExprKind, NumericArray,
+    PackedArray, PackedArrayEnum, Symbol,
 };
 use wolfram_expr::{BigInteger, BigReal};
 
@@ -51,17 +51,17 @@ pub trait Serializer {
     /// allocate + copy the byte buffer).
     fn serialize_numeric_array(
         &mut self,
-        data_type: NumericArrayDataType,
+        data_type: NumericArrayEnum,
         dimensions: &[usize],
         bytes: &[u8],
     ) -> Result<(), Error>;
 
     /// Write a PackedArray as raw parts. Same shape as
     /// [`serialize_numeric_array`][Self::serialize_numeric_array] but with the
-    /// narrower [`PackedArrayDataType`] tag.
+    /// narrower [`PackedArrayEnum`] tag.
     fn serialize_packed_array(
         &mut self,
-        data_type: PackedArrayDataType,
+        data_type: PackedArrayEnum,
         dimensions: &[usize],
         bytes: &[u8],
     ) -> Result<(), Error>;
@@ -197,7 +197,7 @@ macro_rules! impl_vec_numeric {
                         )
                     };
                     s.serialize_numeric_array(
-                        NumericArrayDataType::$variant,
+                        NumericArrayEnum::$variant,
                         &[self.len()],
                         bytes,
                     )
