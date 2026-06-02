@@ -13,6 +13,7 @@ mod numeric_array;
 mod packed_array;
 mod ptr_cmp;
 pub mod wxf;
+mod wxf_impls;
 
 pub mod symbol;
 
@@ -40,6 +41,12 @@ pub use self::complex::{Complex32, Complex64};
 pub use self::wxf::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 pub use self::numeric_array::NumericArray;
 pub use self::packed_array::PackedArray;
+
+// WXF serialization — the traits, derives, and entry points live in the
+// dependency-free `wolfram-wxf` crate; re-exported here for ergonomics.
+pub use wolfram_wxf::{
+    from_wxf, to_wxf, to_wxf_compressed, CompressionLevel, FromWXF, ToWXF,
+};
 
 #[cfg(feature = "unstable_parse")]
 pub use self::ptr_cmp::ExprRefCmp;

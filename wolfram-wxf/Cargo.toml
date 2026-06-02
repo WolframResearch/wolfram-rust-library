@@ -1,16 +1,15 @@
 [package]
-name = "wolfram-serializer"
+name = "wolfram-wxf"
 version = "0.5.0"
 authors = ["Wolfram Research"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
-description = "Serialize and deserialize Wolfram expressions to/from WL InputForm and WXF binary"
+description = "WXF binary wire format: tokens, cursor, ToWXF/FromWXF traits"
 keywords = ["wolfram", "wxf", "wolfram-language", "serialization", "mathematica"]
 categories = ["encoding"]
 
 [dependencies]
-wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
-wolfram-serializer-macros = { version = "0.5.0", path = "../wolfram-serializer-macros" }
+wolfram-wxf-macros = { version = "0.5.0", path = "../wolfram-wxf-macros" }
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
-base64 = { version = "0.22", default-features = false, features = ["std"] }
+num_enum = "0.7"

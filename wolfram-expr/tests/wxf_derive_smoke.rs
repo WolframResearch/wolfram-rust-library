@@ -4,7 +4,7 @@
 //! also lands.
 
 use wolfram_expr::{Association, Expr};
-use wolfram_serializer::{from_wxf, to_wxf, FromWXF, ToWXF};
+use wolfram_expr::{from_wxf, to_wxf, FromWXF, ToWXF};
 
 /// Linear-scan helper for tests. `Association` itself exposes no lookup —
 /// tests iterate to find an entry.

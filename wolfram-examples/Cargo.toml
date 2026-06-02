@@ -15,8 +15,8 @@ named-exports = false
 wolfram-library-link = { version = "0.5.0", path = "../wolfram-library-link" }
 wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
 wolfram-export = { version = "0.5.0", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
-wolfram-serializer = { version = "0.5.0", path = "../wolfram-serializer" }
-wolfram-serializer-macros = { version = "0.5.0", path = "../wolfram-serializer-macros" }
+wolfram-wxf = { version = "0.5.0", path = "../wolfram-wxf" }
+wolfram-wxf-macros = { version = "0.5.0", path = "../wolfram-wxf-macros" }
 
 [[example]]
 name = "legacy_native"

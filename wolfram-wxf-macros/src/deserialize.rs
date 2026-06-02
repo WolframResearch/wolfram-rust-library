@@ -37,11 +37,11 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics ::wolfram_serializer::FromWXF for #name #ty_generics #where_clause {
-            fn from_wxf_with_tag<__R: ::wolfram_serializer::Reader>(
-                __c: &mut ::wolfram_serializer::WxfReader<__R>,
-                __tok: ::wolfram_serializer::ExpressionEnum,
-            ) -> ::core::result::Result<Self, ::wolfram_serializer::Error> {
+        impl #impl_generics ::wolfram_wxf::FromWXF for #name #ty_generics #where_clause {
+            fn from_wxf_with_tag<__R: ::wolfram_wxf::Reader>(
+                __c: &mut ::wolfram_wxf::WxfReader<__R>,
+                __tok: ::wolfram_wxf::ExpressionEnum,
+            ) -> ::core::result::Result<Self, ::wolfram_wxf::Error> {
                 #body
             }
         }
@@ -108,7 +108,7 @@ fn build_named_assoc<'a>(
             } else {
                 let path = format!("{}.{}", err_path_prefix, id);
                 quote_spanned! { span =>
-                    let #id = #slot.ok_or_else(|| ::wolfram_serializer::from_wxf::err_at(
+                    let #id = #slot.ok_or_else(|| ::wolfram_wxf::from_wxf::err_at(
                         #path,
                         "Association entry",
                         format!("missing key {:?}", #k),
@@ -169,11 +169,11 @@ fn expand_struct(
                     quote! { let #id: #t = __slice[#i]; }
                 });
                 quote! {
-                    ::wolfram_serializer::ExpressionEnum::NumericArray
-                    | ::wolfram_serializer::ExpressionEnum::PackedArray
-                    | ::wolfram_serializer::ExpressionEnum::ByteArray => {
+                    ::wolfram_wxf::ExpressionEnum::NumericArray
+                    | ::wolfram_wxf::ExpressionEnum::PackedArray
+                    | ::wolfram_wxf::ExpressionEnum::ByteArray => {
                         let __slice: ::std::vec::Vec<#t> =
-                            ::wolfram_serializer::numeric_in::read_fixed_with_tag::<#t, __R>(
+                            ::wolfram_wxf::numeric_in::read_fixed_with_tag::<#t, __R>(
                                 __c, __tok, #name_str, #arity,
                             )?;
                         #(#assigns)*
@@ -186,7 +186,7 @@ fn expand_struct(
 
             Ok(quote! {
                 match __tok {
-                    ::wolfram_serializer::ExpressionEnum::Association => {
+                    ::wolfram_wxf::ExpressionEnum::Association => {
                         let __n = __c.read_varint()?;
                         #(#slot_decls)*
                         for _ in 0..__n {
@@ -201,11 +201,11 @@ fn expand_struct(
                         ::core::result::Result::Ok(#name { #(#field_idents),* })
                     }
                     #numeric_branch
-                    ::wolfram_serializer::ExpressionEnum::Function => {
+                    ::wolfram_wxf::ExpressionEnum::Function => {
                         let __arity = __c.read_varint()?;
                         if __arity != #arity as u64 {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #name_str,
                                     concat!("Function with ", stringify!(#arity), " arguments"),
                                     format!("Function with {} arguments", __arity),
@@ -217,7 +217,7 @@ fn expand_struct(
                         ::core::result::Result::Ok(#name { #(#field_idents),* })
                     }
                     __other => ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #name_str,
                             "Association, NumericArray, or Function",
                             __other.name().to_string(),
@@ -239,9 +239,9 @@ fn expand_struct(
             });
             let bindings = (0..arity).map(|i| format_ident!("__a{}", i));
             Ok(quote! {
-                if __tok != ::wolfram_serializer::ExpressionEnum::Function {
+                if __tok != ::wolfram_wxf::ExpressionEnum::Function {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #name_str, "Function", __tok.name().to_string(),
                         ),
                     );
@@ -249,7 +249,7 @@ fn expand_struct(
                 let __arity = __c.read_varint()?;
                 if __arity != #arity as u64 {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #name_str,
                             concat!("Function with ", stringify!(#arity), " arguments"),
                             format!("Function with {} arguments", __arity),
@@ -264,17 +264,17 @@ fn expand_struct(
         Fields::Unit => {
             let symbol = qualify_symbol(name_str, attrs);
             Ok(quote! {
-                if __tok != ::wolfram_serializer::ExpressionEnum::Symbol {
+                if __tok != ::wolfram_wxf::ExpressionEnum::Symbol {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #name_str, "Symbol", __tok.name().to_string(),
                         ),
                     );
                 }
-                let __sym = __c.read_symbol()?;
+                let __sym = __c.read_symbol_name()?;
                 if __sym.as_str() != #symbol {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #name_str,
                             concat!("Symbol(", stringify!(#symbol), ")"),
                             format!("Symbol({:?})", __sym.as_str()),
@@ -294,23 +294,23 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
     match classify(ty) {
         FieldKind::VecOfU8 | FieldKind::VecOfNumeric { .. } | FieldKind::Other => {
             quote_spanned! { span =>
-                <#ty as ::wolfram_serializer::FromWXF>::from_wxf(__c)?
+                <#ty as ::wolfram_wxf::FromWXF>::from_wxf(__c)?
             }
         },
         // `Vec<T>` for non-numeric `T` has no blanket `FromWXF` unless `T:
         // WxfStruct`, so read it inline as `Function[List, …]` (mirrors the
         // streaming serialize side).
         FieldKind::VecOfOther { elem_ty } => quote_spanned! { span => {
-            if __c.read_expr_token()? != ::wolfram_serializer::ExpressionEnum::Function {
+            if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Function {
                 return ::core::result::Result::Err(
-                    ::wolfram_serializer::from_wxf::err_at(#err_path, "Function (List)", "other".to_string()),
+                    ::wolfram_wxf::from_wxf::err_at(#err_path, "Function (List)", "other".to_string()),
                 );
             }
             let __n = __c.read_varint()?;
             __c.skip()?; // discard head
             let mut __out: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(__n as usize);
             for _ in 0..__n {
-                __out.push(<#elem_ty as ::wolfram_serializer::FromWXF>::from_wxf(__c)?);
+                __out.push(<#elem_ty as ::wolfram_wxf::FromWXF>::from_wxf(__c)?);
             }
             __out
         }},
@@ -326,7 +326,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                 let tup_ctor = build_tuple_ctor_from_slice(original_ty, &mut 0);
                 quote_spanned! { span => {
                     let __slice: ::std::vec::Vec<#elem_ty> =
-                        ::wolfram_serializer::numeric_in::read_fixed::<#elem_ty, __R>(
+                        ::wolfram_wxf::numeric_in::read_fixed::<#elem_ty, __R>(
                             __c, #err_path, #total_leaves,
                         )?;
                     #tup_ctor
@@ -334,7 +334,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
             } else {
                 quote_spanned! { span => {
                     let __slice: ::std::vec::Vec<#elem_ty> =
-                        ::wolfram_serializer::numeric_in::read_fixed::<#elem_ty, __R>(
+                        ::wolfram_wxf::numeric_in::read_fixed::<#elem_ty, __R>(
                             __c, #err_path, #total_leaves,
                         )?;
                     let mut __out: #original_ty = ::core::default::Default::default();
@@ -362,16 +362,16 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                 expand_field_extract(t, &inner_path, t.span())
             });
             quote_spanned! { span => {
-                if __c.read_expr_token()? != ::wolfram_serializer::ExpressionEnum::Function {
+                if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Function {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(#err_path, "Function", "other".to_string()),
+                        ::wolfram_wxf::from_wxf::err_at(#err_path, "Function", "other".to_string()),
                     );
                 }
                 let __n = __c.read_varint()?;
                 __c.skip()?; // discard head
                 if __n != #arity as u64 {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #err_path,
                             concat!("Function with ", stringify!(#arity), " arguments"),
                             format!("got {} arguments", __n),
@@ -384,16 +384,16 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
         FieldKind::ArrayHetero { arr, len } => {
             let elem_ty = &arr.elem;
             quote_spanned! { span => {
-                if __c.read_expr_token()? != ::wolfram_serializer::ExpressionEnum::Function {
+                if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Function {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(#err_path, "Function", "other".to_string()),
+                        ::wolfram_wxf::from_wxf::err_at(#err_path, "Function", "other".to_string()),
                     );
                 }
                 let __n = __c.read_varint()?;
                 __c.skip()?; // discard head
                 if __n != #len as u64 {
                     return ::core::result::Result::Err(
-                        ::wolfram_serializer::from_wxf::err_at(
+                        ::wolfram_wxf::from_wxf::err_at(
                             #err_path,
                             concat!("Function with ", stringify!(#len), " arguments"),
                             format!("got {} arguments", __n),
@@ -402,10 +402,10 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                 }
                 let mut __vals: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(#len);
                 for _ in 0..#len {
-                    __vals.push(<#elem_ty as ::wolfram_serializer::FromWXF>::from_wxf(__c)?);
+                    __vals.push(<#elem_ty as ::wolfram_wxf::FromWXF>::from_wxf(__c)?);
                 }
                 <[#elem_ty; #len]>::try_from(__vals.as_slice()).map_err(|_| {
-                    ::wolfram_serializer::from_wxf::err_at(
+                    ::wolfram_wxf::from_wxf::err_at(
                         #err_path,
                         concat!("array conversion of length ", stringify!(#len)),
                         "length mismatch".into(),
@@ -453,7 +453,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                     #v_str => {
                         if __n != 1 {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #v_path,
                                     "Association with 1 entry (unit variant)",
                                     format!("Association with {} entries", __n),
@@ -481,7 +481,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                     #v_str => {
                         if __n != 2 {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #v_path,
                                     "Association with 2 entries (tuple variant)",
                                     format!("Association with {} entries", __n),
@@ -492,23 +492,23 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                         let __data_key = __c.read_string()?;
                         if __data_key.as_str() != "Data" {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #v_path,
                                     "Association entry with key \"Data\"",
                                     format!("got key {:?}", __data_key),
                                 ),
                             );
                         }
-                        if __c.read_expr_token()? != ::wolfram_serializer::ExpressionEnum::Function {
+                        if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Function {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(#v_path, "List", "other".to_string()),
+                                ::wolfram_wxf::from_wxf::err_at(#v_path, "List", "other".to_string()),
                             );
                         }
                         let __list_arity = __c.read_varint()?;
                         __c.skip()?; // discard head
                         if __list_arity != #arity as u64 {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #v_path,
                                     concat!("List with ", stringify!(#arity), " elements"),
                                     format!("List with {} elements", __list_arity),
@@ -532,7 +532,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                     #v_str => {
                         if __n != 2 {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #v_path,
                                     "Association with 2 entries (struct variant)",
                                     format!("Association with {} entries", __n),
@@ -543,16 +543,16 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                         let __data_key = __c.read_string()?;
                         if __data_key.as_str() != "Data" {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(
+                                ::wolfram_wxf::from_wxf::err_at(
                                     #v_path,
                                     "Association entry with key \"Data\"",
                                     format!("got key {:?}", __data_key),
                                 ),
                             );
                         }
-                        if __c.read_expr_token()? != ::wolfram_serializer::ExpressionEnum::Association {
+                        if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Association {
                             return ::core::result::Result::Err(
-                                ::wolfram_serializer::from_wxf::err_at(#v_path, "Association", "other".to_string()),
+                                ::wolfram_wxf::from_wxf::err_at(#v_path, "Association", "other".to_string()),
                             );
                         }
                         let __inner_n = __c.read_varint()?;
@@ -574,9 +574,9 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
     }
 
     Ok(quote! {
-        if __tok != ::wolfram_serializer::ExpressionEnum::Association {
+        if __tok != ::wolfram_wxf::ExpressionEnum::Association {
             return ::core::result::Result::Err(
-                ::wolfram_serializer::from_wxf::err_at(
+                ::wolfram_wxf::from_wxf::err_at(
                     #name_str, "Association", __tok.name().to_string(),
                 ),
             );
@@ -584,7 +584,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
         let __n = __c.read_varint()?;
         if __n == 0 {
             return ::core::result::Result::Err(
-                ::wolfram_serializer::from_wxf::err_at(
+                ::wolfram_wxf::from_wxf::err_at(
                     #name_str,
                     "Association with at least an \"Enum\" entry",
                     "empty Association".into(),
@@ -595,7 +595,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
         let __enum_key = __c.read_string()?;
         if __enum_key.as_str() != "Enum" {
             return ::core::result::Result::Err(
-                ::wolfram_serializer::from_wxf::err_at(
+                ::wolfram_wxf::from_wxf::err_at(
                     #name_str,
                     "Association entry with first key \"Enum\"",
                     format!("got first key {:?}", __enum_key),
@@ -607,7 +607,7 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
             #(#variant_arms)*
             _ => {
                 return ::core::result::Result::Err(
-                    ::wolfram_serializer::from_wxf::err_at(
+                    ::wolfram_wxf::from_wxf::err_at(
                         #name_str,
                         "matching enum variant name",
                         format!("\"Enum\" -> {:?}", __variant),

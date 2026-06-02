@@ -4,8 +4,8 @@ resolver = "2"
 members = [
     "wolfram-app-discovery",
     "wolfram-expr",
-    "wolfram-serializer",
-    "wolfram-serializer-macros",
+    "wolfram-wxf",
+    "wolfram-wxf-macros",
     "wstp",
     "wstp-sys",
     "wolfram-library-link",
@@ -24,8 +24,8 @@ members = [
 # scripts use `wolfram-app-discovery` to locate the C headers).
 default-members = [
     "wolfram-expr",
-    "wolfram-serializer",
-    "wolfram-serializer-macros",
+    "wolfram-wxf",
+    "wolfram-wxf-macros",
     "wstp",
     "wolfram-library-link",
     "wolfram-export-macros",

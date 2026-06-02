@@ -267,7 +267,7 @@ fn numeric_dt_for(prim: &str) -> Option<TokenStream> {
         _ => return None,
     };
     let ident = syn::Ident::new(variant, proc_macro2::Span::call_site());
-    Some(quote! { ::wolfram_serializer::NumericArrayEnum::#ident })
+    Some(quote! { ::wolfram_wxf::NumericArrayEnum::#ident })
 }
 
 fn array_len(expr: &syn::Expr) -> Option<usize> {

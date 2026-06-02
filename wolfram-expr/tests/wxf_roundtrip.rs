@@ -4,7 +4,7 @@ use wolfram_expr::{
     Association, ByteArray, Complex32, Complex64, Expr, NumericArray,
     NumericArrayEnum, PackedArray, PackedArrayEnum, RuleEntry, Symbol,
 };
-use wolfram_serializer::{from_wxf, to_wxf, to_wxf_compressed, CompressionLevel};
+use wolfram_expr::{from_wxf, to_wxf, to_wxf_compressed, CompressionLevel};
 
 fn roundtrip(expr: Expr) {
     let bytes = to_wxf(&expr).expect("serialize Wxf");
@@ -135,10 +135,10 @@ fn empty_function() {
 
 #[test]
 fn vec_u8_serializes_as_byte_array() {
-    let bytes = wolfram_serializer::to_wxf(&vec![1u8, 2, 3, 0xff])
+    let bytes = wolfram_expr::to_wxf(&vec![1u8, 2, 3, 0xff])
     .unwrap();
     let parsed: Expr =
-        wolfram_serializer::from_wxf(&bytes).unwrap();
+        wolfram_expr::from_wxf(&bytes).unwrap();
     assert!(matches!(
         parsed.kind(),
         wolfram_expr::ExprKind::ByteArray(_)
@@ -151,10 +151,10 @@ fn vec_u8_serializes_as_byte_array() {
 
 #[test]
 fn vec_i32_serializes_as_numeric_array() {
-    let bytes = wolfram_serializer::to_wxf(&vec![10i32, 20, 30, 40])
+    let bytes = wolfram_expr::to_wxf(&vec![10i32, 20, 30, 40])
     .unwrap();
     let parsed: Expr =
-        wolfram_serializer::from_wxf(&bytes).unwrap();
+        wolfram_expr::from_wxf(&bytes).unwrap();
     let arr = parsed
         .try_as_numeric_array()
         .expect("expected NumericArray");
@@ -165,10 +165,10 @@ fn vec_i32_serializes_as_numeric_array() {
 
 #[test]
 fn vec_f64_serializes_as_numeric_array() {
-    let bytes = wolfram_serializer::to_wxf(&vec![1.5f64, 2.5, 3.5])
+    let bytes = wolfram_expr::to_wxf(&vec![1.5f64, 2.5, 3.5])
     .unwrap();
     let parsed: Expr =
-        wolfram_serializer::from_wxf(&bytes).unwrap();
+        wolfram_expr::from_wxf(&bytes).unwrap();
     let arr = parsed
         .try_as_numeric_array()
         .expect("expected NumericArray");

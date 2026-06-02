@@ -2,11 +2,7 @@
 //! [`WxfWriter`]: compounds write a header then recurse into children. No
 //! intermediate `Vec`, no `&dyn` dispatch — fully monomorphized.
 
-use wolfram_expr::{
-    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray,
-    NumericArrayEnum, PackedArray, Symbol,
-};
-
+use crate::constants::NumericArrayEnum;
 use crate::wxf::writer::WxfWriter;
 use crate::writer::Writer;
 use crate::Error;
@@ -198,97 +194,6 @@ impl<K: ToWXF, V: ToWXF> ToWXF for std::collections::BTreeMap<K, V> {
     }
 }
 
-//==============================================================================
-// wolfram-expr value types
-//==============================================================================
-
-impl ToWXF for Symbol {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        w.write_symbol(self.as_str())
-    }
-}
-
-impl ToWXF for NumericArray {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        w.write_numeric_array(
-            ArrayBuf::data_type(self),
-            ArrayBuf::dimensions(self),
-            ArrayBuf::as_bytes(self),
-        )
-    }
-}
-
-impl ToWXF for PackedArray {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        w.write_packed_array(
-            ArrayBuf::data_type(self),
-            ArrayBuf::dimensions(self),
-            ArrayBuf::as_bytes(self),
-        )
-    }
-}
-
-impl ToWXF for Association {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        w.write_association(self.len())?;
-        for e in self.iter() {
-            w.write_rule(e.delayed)?;
-            e.key.to_wxf(w)?;
-            e.value.to_wxf(w)?;
-        }
-        Ok(())
-    }
-}
-
-impl ToWXF for BigInteger {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        w.write_big_integer(self)
-    }
-}
-
-impl ToWXF for BigReal {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        w.write_big_real(self)
-    }
-}
-
-//==============================================================================
-// Expr — dispatch by ExprKind
-//==============================================================================
-
-impl ToWXF for Expr {
-    fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
-        match self.kind() {
-            ExprKind::Integer(n) => w.write_integer(*n),
-            ExprKind::Real(r) => w.write_real(**r),
-            ExprKind::String(t) => w.write_string(t.as_str()),
-            ExprKind::Symbol(sym) => w.write_symbol(sym.as_str()),
-            ExprKind::Normal(normal) => {
-                w.write_function(normal.elements().len())?;
-                normal.head().to_wxf(w)?;
-                for arg in normal.elements() {
-                    arg.to_wxf(w)?;
-                }
-                Ok(())
-            },
-            ExprKind::ByteArray(b) => w.write_byte_array(b.as_slice()),
-            ExprKind::Association(a) => a.to_wxf(w),
-            ExprKind::NumericArray(arr) => w.write_numeric_array(
-                ArrayBuf::data_type(arr),
-                ArrayBuf::dimensions(arr),
-                ArrayBuf::as_bytes(arr),
-            ),
-            ExprKind::PackedArray(arr) => w.write_packed_array(
-                ArrayBuf::data_type(arr),
-                ArrayBuf::dimensions(arr),
-                ArrayBuf::as_bytes(arr),
-            ),
-            ExprKind::BigInteger(n) => w.write_big_integer(n),
-            ExprKind::BigReal(r) => w.write_big_real(r),
-            other => Err(Error::InvalidWxf(format!(
-                "ToWXF for Expr: unhandled ExprKind variant: {:?}",
-                other
-            ))),
-        }
-    }
-}
+// ToWXF impls for the `wolfram-expr` value types (Expr, Symbol, Association,
+// NumericArray, PackedArray, BigInteger, BigReal) live in `wolfram-expr`, which
+// depends on this crate.

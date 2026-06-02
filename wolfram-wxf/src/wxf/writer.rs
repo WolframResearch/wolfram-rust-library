@@ -5,9 +5,7 @@
 //! [`write_association`][WxfWriter::write_association]) and the caller streams
 //! the children next. No intermediate buffering of the structure, no `dyn`.
 
-use wolfram_expr::wxf::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
-use wolfram_expr::{BigInteger, BigReal};
-
+use crate::constants::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 use crate::writer::Writer;
 use crate::Error;
 
@@ -98,14 +96,14 @@ impl<W: Writer> WxfWriter<W> {
         self.write_length_prefixed(ExpressionEnum::ByteArray, bytes)
     }
 
-    /// Write a `BigInteger` (decimal digit string).
-    pub fn write_big_integer(&mut self, n: &BigInteger) -> Result<(), Error> {
-        self.write_length_prefixed(ExpressionEnum::BigInteger, n.as_str().as_bytes())
+    /// Write a `BigInteger` from its decimal digit string.
+    pub fn write_big_integer(&mut self, digits: &str) -> Result<(), Error> {
+        self.write_length_prefixed(ExpressionEnum::BigInteger, digits.as_bytes())
     }
 
-    /// Write a `BigReal` (digit string).
-    pub fn write_big_real(&mut self, r: &BigReal) -> Result<(), Error> {
-        self.write_length_prefixed(ExpressionEnum::BigReal, r.as_str().as_bytes())
+    /// Write a `BigReal` from its digit string.
+    pub fn write_big_real(&mut self, digits: &str) -> Result<(), Error> {
+        self.write_length_prefixed(ExpressionEnum::BigReal, digits.as_bytes())
     }
 
     /// Write a `NumericArray` from raw parts.

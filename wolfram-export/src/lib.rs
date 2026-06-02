@@ -93,7 +93,7 @@ pub mod macro_utils {
     pub use crate::wstp::macro_utils::*;
 
     #[cfg(feature = "wxf")]
-    pub use ::wolfram_serializer::FromWXF;
+    pub use ::wolfram_wxf::FromWXF;
 
     #[cfg(feature = "wxf")]
     pub use crate::wxf::macro_utils::*;

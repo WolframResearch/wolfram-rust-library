@@ -19,5 +19,5 @@ sha2 = "0.10"
 wolfram-app-discovery  = { version = "0.5.0", path = "../wolfram-app-discovery" }
 wolfram-export-core    = { version = "0.5.0", path = "../wolfram-export-core", default-features = false }
 wolfram-expr           = { version = "0.5.0", path = "../wolfram-expr" }
-wolfram-serializer     = { version = "0.5.0", path = "../wolfram-serializer" }
+wolfram-wxf            = { version = "0.5.0", path = "../wolfram-wxf" }
 wstp                   = { version = "0.5.0", path = "../wstp" }

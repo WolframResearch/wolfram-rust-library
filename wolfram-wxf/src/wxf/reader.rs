@@ -1,13 +1,14 @@
 //! Typed, pull-based WXF reader — sugar over a raw [`Reader`].
 //!
-//! Each WXF enum in [`wolfram_expr::wxf`] gets a reader that consumes its byte
+//! Each WXF enum in [`crate::constants`] gets a reader that consumes its byte
 //! and does the `TryFrom` (failing if the byte isn't that enum). There is **no
 //! peek**: a token is read exactly once via [`WxfReader::read_expr_token`] and
 //! the caller dispatches on it, then reads the matching payload.
+//!
+//! Methods deal only in primitives and raw parts — higher-level value types
+//! (`Symbol`, `NumericArray`, …) are assembled by the consumer (`wolfram-expr`).
 
-use wolfram_expr::wxf::{ExpressionEnum, NumericArrayEnum, PackedArrayEnum};
-use wolfram_expr::{BigInteger, BigReal, NumericArray, PackedArray, Symbol};
-
+use crate::constants::{ExpressionEnum, NumericArrayEnum, PackedArrayEnum};
 use crate::reader::Reader;
 use crate::Error;
 
@@ -106,6 +107,18 @@ impl<R: Reader> WxfReader<R> {
         Ok(f64::from_le_bytes(b.try_into().unwrap()))
     }
 
+    /// Read an integer body for one of the four integer tokens (tag already
+    /// consumed), widening to `i64`. Errors for any non-integer token.
+    pub fn read_integer_body(&mut self, tok: ExpressionEnum) -> Result<i64, Error> {
+        match tok {
+            ExpressionEnum::Integer8 => Ok(i64::from(self.read_i8()?)),
+            ExpressionEnum::Integer16 => Ok(i64::from(self.read_i16()?)),
+            ExpressionEnum::Integer32 => Ok(i64::from(self.read_i32()?)),
+            ExpressionEnum::Integer64 => self.read_i64(),
+            other => Err(Error::InvalidWxf(format!("expected Integer, got {}", other.name()))),
+        }
+    }
+
     //---- length-prefixed payloads (tag already consumed) ----------------
 
     /// Read a `String`/`Symbol`-shaped payload: varint length + UTF-8 bytes.
@@ -125,11 +138,11 @@ impl<R: Reader> WxfReader<R> {
         }
     }
 
-    /// Read a `Symbol` payload and parse it into a [`Symbol`].
-    pub fn read_symbol(&mut self) -> Result<Symbol, Error> {
-        let name = self.read_str()?.to_owned();
-        Symbol::try_from_wxf_name_owned(name)
-            .map_err(|n| Error::InvalidWxf(format!("invalid symbol name: {:?}", n)))
+    /// Read a `Symbol`/`BigInteger`/`BigReal` payload as an owned name/digit
+    /// string (`varint` length + UTF-8). The consumer parses it into the
+    /// appropriate value type.
+    pub fn read_symbol_name(&mut self) -> Result<String, Error> {
+        Ok(self.read_str()?.to_owned())
     }
 
     /// Read a `ByteArray` payload: varint length + raw bytes (zero-copy view).
@@ -138,35 +151,22 @@ impl<R: Reader> WxfReader<R> {
         self.inner.read_bytes(len)
     }
 
-    /// Read a `BigInteger` payload (decimal digit string).
-    pub fn read_big_integer(&mut self) -> Result<BigInteger, Error> {
-        Ok(BigInteger::new(self.read_str()?.to_owned()))
-    }
-
-    /// Read a `BigReal` payload (digit string).
-    pub fn read_big_real(&mut self) -> Result<BigReal, Error> {
-        Ok(BigReal::new(self.read_str()?.to_owned()))
-    }
-
     //---- arrays (tag already consumed) ----------------------------------
 
-    /// Read a `NumericArray` payload: element type + rank + dims + flat bytes.
-    pub fn read_numeric_array(&mut self) -> Result<NumericArray, Error> {
+    /// Read the body of a `NumericArray`/`PackedArray` token (tag already
+    /// consumed): element type + rank + dims + flat little-endian buffer.
+    /// Returns the element type, the dims, and the owned byte buffer.
+    pub fn read_numeric_array_parts(
+        &mut self,
+    ) -> Result<(NumericArrayEnum, Vec<usize>, Vec<u8>), Error> {
         let dt = self.read_numeric_type()?;
         let (dims, bytes) = self.read_array_body(dt.size_in_bytes())?;
-        Ok(NumericArray::new(dt, dims, bytes))
-    }
-
-    /// Read a `PackedArray` payload: element type + rank + dims + flat bytes.
-    pub fn read_packed_array(&mut self) -> Result<PackedArray, Error> {
-        let dt = self.read_packed_type()?;
-        let (dims, bytes) = self.read_array_body(dt.size_in_bytes())?;
-        Ok(PackedArray::new(dt, dims, bytes))
+        Ok((dt, dims, bytes))
     }
 
     /// Shared array tail: rank varint, `rank` dim varints, then the flat
     /// little-endian byte buffer (`prod(dims) * elem_size` bytes).
-    fn read_array_body(&mut self, elem_size: usize) -> Result<(Vec<usize>, Vec<u8>), Error> {
+    pub fn read_array_body(&mut self, elem_size: usize) -> Result<(Vec<usize>, Vec<u8>), Error> {
         let rank = self.read_varint()? as usize;
         let mut dims = Vec::with_capacity(rank);
         for _ in 0..rank {

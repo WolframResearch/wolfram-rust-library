@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use std::io::Read;
 
 use flate2::read::ZlibDecoder;
-use wolfram_expr::wxf::HeaderEnum;
+use crate::constants::HeaderEnum;
 
 use crate::Error;
 

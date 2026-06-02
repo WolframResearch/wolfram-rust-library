@@ -1,7 +1,7 @@
 //! WXF wrapper runtime: the proc-macro emits an inline `fn(NumericArray<u8>)
 //! -> NumericArray<u8>` shim around the user's typed function. That shim
 //! reads the bytes off the input NumericArray, calls
-//! `wolfram_serializer::deserialize::<A>()` to get the typed argument,
+//! `wolfram_wxf::deserialize::<A>()` to get the typed argument,
 //! invokes the user function, and `serialize`s the result back into a fresh
 //! UInt8 NumericArray.
 //!
@@ -16,9 +16,9 @@ use wolfram_expr::{Association, Expr, ExprKind, RuleEntry, Symbol};
 use wolfram_library_link::macro_utils::call_and_catch_as_expr;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::{NativeFunction, NumericArray};
-use wolfram_serializer::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
+use wolfram_wxf::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
 // Re-exported so the `#[export(wxf)]` proc-macro can name them by path.
-pub use wolfram_serializer::{FromWXF, ToWXF};
+pub use wolfram_wxf::{FromWXF, ToWXF};
 
 const FAILED_TO_INIT: c_int = 1001;
 const FAILED_WITH_PANIC: c_int = 1002;
@@ -47,9 +47,9 @@ pub fn decode_args<R, F>(
     read: F,
 ) -> Result<R, String>
 where
-    F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_serializer::Error>,
+    F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_wxf::Error>,
 {
-    let payload = wolfram_serializer::wxf_payload(input.as_slice()).map_err(|e| e.to_string())?;
+    let payload = wolfram_wxf::wxf_payload(input.as_slice()).map_err(|e| e.to_string())?;
     let mut r = WxfReader::new(SliceReader::new(&payload));
     let tok = r.read_expr_token().map_err(|e| e.to_string())?;
     if tok != ExpressionEnum::Function {

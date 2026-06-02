@@ -10,8 +10,8 @@
 //! `ByteArray` on the wire is treated as a 1-D `NumericArray<Integer8>` before
 //! the widening rules apply.
 
-use wolfram_expr::wxf::ExpressionEnum;
-use wolfram_expr::{NumericArrayEnum as DT};
+use crate::constants::ExpressionEnum;
+use crate::constants::NumericArrayEnum as DT;
 
 use crate::reader::Reader;
 use crate::wxf::reader::WxfReader;
@@ -250,58 +250,3 @@ impl_target!(f64, Real64, {
     Real32 => read_f32,
     Real64 => read_f64,
 });
-
-//==============================================================================
-// Tests
-//==============================================================================
-
-#[cfg(test)]
-mod tests {
-    use crate::{from_wxf, to_wxf};
-    use wolfram_expr::{Expr, NumericArray};
-
-    fn serialize_to_wxf<T: crate::ToWXF>(value: &T) -> Vec<u8> {
-        to_wxf(value).unwrap()
-    }
-
-    #[test]
-    fn vec_f64_from_real32_widens() {
-        let na = NumericArray::from_slice::<f32>(vec![3], &[1.0_f32, 2.0, 3.0]);
-        let bytes = serialize_to_wxf(&Expr::from(na));
-        let v: Vec<f64> = from_wxf(&bytes).unwrap();
-        assert_eq!(v, vec![1.0, 2.0, 3.0]);
-    }
-
-    #[test]
-    fn vec_i32_from_byte_array_widens() {
-        // ByteArray{1, 2, 3} → Integer8 → i32
-        let ba: wolfram_expr::ByteArray = vec![1, 2, 3];
-        let bytes = serialize_to_wxf(&Expr::from(ba));
-        let v: Vec<i32> = from_wxf(&bytes).unwrap();
-        assert_eq!(v, vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn vec_i8_from_integer64_rejected() {
-        let na = NumericArray::from_slice::<i64>(vec![3], &[1_i64, 2, 3]);
-        let bytes = serialize_to_wxf(&Expr::from(na));
-        let res: Result<Vec<i8>, _> = from_wxf(&bytes);
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn vec_f32_from_f64_rejected() {
-        let na = NumericArray::from_slice::<f64>(vec![1], &[1.0_f64]);
-        let bytes = serialize_to_wxf(&Expr::from(na));
-        let res: Result<Vec<f32>, _> = from_wxf(&bytes);
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn vec_f64_identity_real64() {
-        let na = NumericArray::from_slice::<f64>(vec![3], &[1.0_f64, 2.0, 3.0]);
-        let bytes = serialize_to_wxf(&Expr::from(na));
-        let v: Vec<f64> = from_wxf(&bytes).unwrap();
-        assert_eq!(v, vec![1.0, 2.0, 3.0]);
-    }
-}

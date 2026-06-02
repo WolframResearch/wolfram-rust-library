@@ -2,7 +2,7 @@
 //!
 //! Streaming: each container writes a header
 //! (`write_association` / `write_function` / `write_symbol`) then writes its
-//! children directly to the [`WxfWriter`][wolfram_serializer::WxfWriter] — no
+//! children directly to the [`WxfWriter`][wolfram_wxf::WxfWriter] — no
 //! intermediate `Vec`, no `&dyn`. Field types are classified via [`ty_classify`]
 //! so `Vec<u8>` → ByteArray, `Vec<numeric>` / numeric tensors → NumericArray,
 //! and everything else delegates through `ToWXF`.
@@ -35,18 +35,18 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics ::wolfram_serializer::ToWXF for #name #ty_generics #where_clause {
-            fn to_wxf<__W: ::wolfram_serializer::Writer>(
+        impl #impl_generics ::wolfram_wxf::ToWXF for #name #ty_generics #where_clause {
+            fn to_wxf<__W: ::wolfram_wxf::Writer>(
                 &self,
-                __w: &mut ::wolfram_serializer::WxfWriter<__W>,
-            ) -> ::core::result::Result<(), ::wolfram_serializer::Error> {
+                __w: &mut ::wolfram_wxf::WxfWriter<__W>,
+            ) -> ::core::result::Result<(), ::wolfram_wxf::Error> {
                 #body
                 ::core::result::Result::Ok(())
             }
         }
 
         #[automatically_derived]
-        impl #impl_generics ::wolfram_serializer::WxfStruct for #name #ty_generics #where_clause {}
+        impl #impl_generics ::wolfram_wxf::WxfStruct for #name #ty_generics #where_clause {}
     })
 }
 
@@ -134,7 +134,7 @@ fn emit_write_field(accessor: &TokenStream, ty: &syn::Type, span: Span) -> Token
             __w.write_function((#accessor).len())?;
             __w.write_symbol("System`List")?;
             for __e in (#accessor).iter() {
-                ::wolfram_serializer::ToWXF::to_wxf(__e, __w)?;
+                ::wolfram_wxf::ToWXF::to_wxf(__e, __w)?;
             }
         }},
         FieldKind::NumericTensor {
@@ -201,7 +201,7 @@ fn emit_write_field(accessor: &TokenStream, ty: &syn::Type, span: Span) -> Token
             }}
         },
         FieldKind::Other => quote_spanned! { span =>
-            ::wolfram_serializer::ToWXF::to_wxf(&(#accessor), __w)?;
+            ::wolfram_wxf::ToWXF::to_wxf(&(#accessor), __w)?;
         },
     }
 }

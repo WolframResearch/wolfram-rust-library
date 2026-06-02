@@ -1,4 +1,4 @@
-//! Serialize and deserialize [Wolfram Language expressions][wolfram_expr::Expr]
+//! Serialize and deserialize Wolfram Language expressions
 //! to and from the WXF binary wire format.
 //!
 //! Two layers:
@@ -7,7 +7,7 @@
 //!   [`SliceReader`] reads zero-copy views over an in-memory buffer; the default
 //!   writer is `Vec<u8>`.
 //! * WXF level — [`WxfReader`] / [`WxfWriter`], typed sugar over the byte layer
-//!   built on the `wolfram_expr::wxf` enums.
+//!   built on the WXF token enums.
 //!
 //! Per-Rust-type encoding/decoding is [`ToWXF`] / [`FromWXF`], both generic over
 //! the byte layer (monomorphized, no `dyn`, streaming). Top-level entry points:
@@ -15,6 +15,7 @@
 
 #![warn(missing_docs)]
 
+pub mod constants;
 pub mod from_wxf;
 pub mod numeric_in;
 pub mod reader;
@@ -22,9 +23,7 @@ pub mod to_wxf;
 pub mod writer;
 pub mod wxf;
 
-pub use wolfram_expr::wxf::ExpressionEnum;
-pub use wolfram_expr::NumericArrayEnum;
-
+pub use crate::constants::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 pub use crate::from_wxf::FromWXF;
 pub use crate::reader::{Reader, SliceReader};
 pub use crate::to_wxf::{ToWXF, WxfStruct};
@@ -33,7 +32,7 @@ pub use crate::wxf::reader::WxfReader;
 pub use crate::wxf::writer::WxfWriter;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
-pub use wolfram_serializer_macros::{FromWXF, ToWXF};
+pub use wolfram_wxf_macros::{FromWXF, ToWXF};
 
 /// zlib compression level used by [`to_wxf_compressed`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -135,7 +134,7 @@ pub fn to_wxf_compressed<T: ToWXF + ?Sized>(
 ) -> Result<Vec<u8>, Error> {
     use flate2::write::ZlibEncoder;
     use flate2::Compression;
-    use wolfram_expr::wxf::HeaderEnum;
+    use crate::constants::HeaderEnum;
 
     // Pre-write the 8C: header into the output Vec, then hand it to the
     // encoder. Everything serialized through the WxfWriter is compressed
@@ -163,7 +162,7 @@ pub fn wxf_payload(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
 ///
 /// Use `T = Expr` for an untyped tree, or any [`FromWXF`] type — including those
 /// produced by `#[derive(FromWXF)]` — for typed deserialization with no
-/// intermediate [`Expr`][wolfram_expr::Expr].
+/// intermediate `Expr`.
 pub fn from_wxf<T: FromWXF>(bytes: &[u8]) -> Result<T, Error> {
     let payload = wxf::strip_header(bytes)?;
     let mut r = WxfReader::new(SliceReader::new(&payload));
