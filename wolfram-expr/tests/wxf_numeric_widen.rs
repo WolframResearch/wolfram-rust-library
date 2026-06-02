@@ -4,7 +4,7 @@
 use wolfram_expr::{from_wxf, to_wxf, Expr, NumericArray, ToWXF};
 
 fn serialize_to_wxf<T: ToWXF>(value: &T) -> Vec<u8> {
-    to_wxf(value).unwrap()
+    to_wxf(value, None).unwrap()
 }
 
 #[test]

@@ -45,7 +45,7 @@ pub use self::packed_array::PackedArray;
 // WXF serialization — the traits, derives, and entry points live in the
 // dependency-free `wolfram-wxf` crate; re-exported here for ergonomics.
 pub use wolfram_wxf::{
-    from_wxf, to_wxf, to_wxf_compressed, CompressionLevel, FromWXF, ToWXF,
+    from_wxf, read_wxf, to_wxf, CompressionLevel, FromWXF, ToWXF,
 };
 
 #[cfg(feature = "unstable_parse")]

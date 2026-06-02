@@ -11,7 +11,7 @@
 //!
 //! Per-Rust-type encoding/decoding is [`ToWXF`] / [`FromWXF`], both generic over
 //! the byte layer (monomorphized, no `dyn`, streaming). Top-level entry points:
-//! [`to_wxf`], [`to_wxf_compressed`], [`from_wxf`].
+//! [`to_wxf`] (compression optional), [`from_wxf`], [`read_wxf`].
 
 #![warn(missing_docs)]
 
@@ -35,7 +35,7 @@ pub use crate::wxf::writer::WxfWriter;
 // macro / type namespaces.
 pub use wolfram_wxf_macros::{FromWXF, ToWXF};
 
-/// zlib compression level used by [`to_wxf_compressed`].
+/// zlib compression level passed to [`to_wxf`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CompressionLevel {
     /// zlib level 1 — fastest, lowest ratio.
@@ -115,48 +115,93 @@ impl From<std::io::Error> for Error {
 // Top-level API
 //==============================================================================
 
-/// Serialize `value` to uncompressed WXF (`8:` header).
-pub fn to_wxf<T: ToWXF + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
-    let mut w = WxfWriter::new(Vec::<u8>::new());
-    w.write_version_header()?;
-    value.to_wxf(&mut w)?;
-    Ok(w.into_inner())
-}
-
-/// Serialize `value` to zlib-compressed WXF (`8C:` header) at `level`.
+/// Serialize `value` to WXF.
 ///
-/// Streams the token body directly through the [`ZlibEncoder`] — no
-/// intermediate uncompressed buffer.
+/// `compression` is `impl Into<Option<CompressionLevel>>`: pass `None` for plain
+/// uncompressed WXF (`8:` header), or a [`CompressionLevel`] for zlib-compressed
+/// WXF (`8C:` header) — e.g. `to_wxf(&v, None)` or
+/// `to_wxf(&v, CompressionLevel::Default)`.
 ///
-/// [`ZlibEncoder`]: flate2::write::ZlibEncoder
-pub fn to_wxf_compressed<T: ToWXF + ?Sized>(
+/// The compressed path streams the token body directly through the
+/// [`ZlibEncoder`][flate2::write::ZlibEncoder] — no intermediate uncompressed
+/// buffer.
+pub fn to_wxf<T: ToWXF + ?Sized>(
     value: &T,
-    level: CompressionLevel,
+    compression: impl Into<Option<CompressionLevel>>,
 ) -> Result<Vec<u8>, Error> {
-    use flate2::write::ZlibEncoder;
-    use flate2::Compression;
     use crate::constants::HeaderEnum;
 
-    // Pre-write the 8C: header into the output Vec, then hand it to the
-    // encoder. Everything serialized through the WxfWriter is compressed
-    // and appended; the header bytes remain uncompressed at the front.
-    let mut out = Vec::new();
-    out.extend_from_slice(&[
-        HeaderEnum::Version as u8,
-        HeaderEnum::Compress as u8,
-        HeaderEnum::Separator as u8,
-    ]);
-    let encoder = ZlibEncoder::new(out, Compression::new(u32::from(level.to_u8())));
-    let mut w = WxfWriter::new(encoder);
-    value.to_wxf(&mut w)?;
-    Ok(w.into_inner().finish()?)
+    // The header (`8:` / `8C:`) is framing, written here — uncompressed and at
+    // the front — mirroring `strip_header` on the read side. The token body is
+    // then written through the appropriate sink (the Vec directly, or a
+    // streaming ZlibEncoder over it for `8C:`).
+    let ver = HeaderEnum::Version as u8;
+    let sep = HeaderEnum::Separator as u8;
+    match compression.into() {
+        None => {
+            let out = vec![ver, sep];
+            let mut w = WxfWriter::new(out);
+            value.to_wxf(&mut w)?;
+            Ok(w.into_inner())
+        },
+        Some(level) => {
+            use flate2::write::ZlibEncoder;
+            use flate2::Compression;
+
+            let out = vec![ver, HeaderEnum::Compress as u8, sep];
+            let encoder = ZlibEncoder::new(out, Compression::new(u32::from(level.to_u8())));
+            let mut w = WxfWriter::new(encoder);
+            value.to_wxf(&mut w)?;
+            Ok(w.into_inner().finish()?)
+        },
+    }
 }
 
-/// Strip the WXF header (decompressing `8C:` payloads), returning the raw token
-/// stream. Use with [`SliceReader`] + [`WxfReader`] to read several top-level
-/// values from one blob (e.g. `Function[List, arg0, arg1, …]`).
-pub fn wxf_payload(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
-    wxf::strip_header(bytes)
+/// Strip the WXF header, returning the raw token stream. `8:` payloads are
+/// borrowed; `8C:` payloads are zlib-decompressed into an owned buffer.
+fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
+    use std::io::Read;
+
+    use crate::constants::HeaderEnum;
+
+    if bytes.len() < 2 {
+        return Err(Error::InvalidWxf("byte stream too short for WXF header".into()));
+    }
+    if bytes[0] != HeaderEnum::Version as u8 {
+        return Err(Error::InvalidWxf(format!(
+            "WXF header version mismatch: expected {:?}, got {:?}",
+            HeaderEnum::Version as u8 as char, bytes[0] as char
+        )));
+    }
+    if bytes[1] == HeaderEnum::Compress as u8 {
+        if bytes.len() < 3 || bytes[2] != HeaderEnum::Separator as u8 {
+            return Err(Error::InvalidWxf("WXF compressed header truncated".into()));
+        }
+        let mut decoded = Vec::new();
+        flate2::read::ZlibDecoder::new(&bytes[3..])
+            .read_to_end(&mut decoded)
+            .map_err(|e| Error::InvalidWxf(format!("zlib decompress failed: {}", e)))?;
+        Ok(std::borrow::Cow::Owned(decoded))
+    } else if bytes[1] == HeaderEnum::Separator as u8 {
+        Ok(std::borrow::Cow::Borrowed(&bytes[2..]))
+    } else {
+        Err(Error::InvalidWxf(format!(
+            "WXF header separator mismatch: expected ':' or 'C', got {:?}",
+            bytes[1] as char
+        )))
+    }
+}
+
+/// Read from a WXF blob (`8:` / `8C:` auto-detected) via a [`WxfReader`]. The
+/// closure can pull one or more top-level values — e.g. a `Function[List, …]`
+/// wrapper around several arguments. For a single value, prefer [`from_wxf`].
+pub fn read_wxf<T>(
+    bytes: &[u8],
+    f: impl for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<T, Error>,
+) -> Result<T, Error> {
+    let payload = strip_header(bytes)?;
+    let mut r = WxfReader::new(SliceReader::new(&payload));
+    f(&mut r)
 }
 
 /// Deserialize `bytes` (WXF; `8:` or `8C:` auto-detected) into a typed `T`.
@@ -165,7 +210,5 @@ pub fn wxf_payload(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
 /// produced by `#[derive(FromWXF)]` — for typed deserialization with no
 /// intermediate `Expr`.
 pub fn from_wxf<T: FromWXF>(bytes: &[u8]) -> Result<T, Error> {
-    let payload = wxf::strip_header(bytes)?;
-    let mut r = WxfReader::new(SliceReader::new(&payload));
-    T::from_wxf(&mut r)
+    read_wxf(bytes, |r| T::from_wxf(r))
 }

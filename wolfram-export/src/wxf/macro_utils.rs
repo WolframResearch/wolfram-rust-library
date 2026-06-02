@@ -49,18 +49,25 @@ pub fn decode_args<R, F>(
 where
     F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_wxf::Error>,
 {
-    let payload = wolfram_wxf::wxf_payload(input.as_slice()).map_err(|e| e.to_string())?;
-    let mut r = WxfReader::new(SliceReader::new(&payload));
-    let tok = r.read_expr_token().map_err(|e| e.to_string())?;
-    if tok != ExpressionEnum::Function {
-        return Err(format!("expected Function, got {}", tok.name()));
-    }
-    let n = r.read_varint().map_err(|e| e.to_string())?;
-    r.skip().map_err(|e| e.to_string())?; // discard head — any shape ok
-    if n != n_expected {
-        return Err(format!("expected {} args, got {}", n_expected, n));
-    }
-    read(&mut r).map_err(|e| e.to_string())
+    wolfram_wxf::read_wxf(input.as_slice(), |r| {
+        let tok = r.read_expr_token()?;
+        if tok != ExpressionEnum::Function {
+            return Err(wolfram_wxf::Error::InvalidWxf(format!(
+                "expected Function, got {}",
+                tok.name()
+            )));
+        }
+        let n = r.read_varint()?;
+        r.skip()?; // discard head — any shape ok
+        if n != n_expected {
+            return Err(wolfram_wxf::Error::InvalidWxf(format!(
+                "expected {} args, got {}",
+                n_expected, n
+            )));
+        }
+        read(r)
+    })
+    .map_err(|e| e.to_string())
 }
 
 /// Build a `Failure["WxfDeserialize", <|"MessageTemplate" -> msg|>]` Expr.
@@ -75,7 +82,7 @@ pub fn deserialize_failure_expr(msg: &str) -> wolfram_expr::Expr {
 
 /// Serialize `value` to WXF bytes and wrap them in a UInt8 NumericArray.
 pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
-    let bytes: Vec<u8> = to_wxf(value)
+    let bytes: Vec<u8> = to_wxf(value, None)
         .unwrap_or_else(|e| panic!("WXF serialize failed: {}", e));
     NumericArray::<u8>::from_slice(&bytes)
 }

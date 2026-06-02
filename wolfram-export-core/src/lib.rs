@@ -92,7 +92,7 @@ inventory::collect!(ExportEntry);
 pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
     let assoc: Expr = exported_library_functions_association(None);
     let bytes: Vec<u8> =
-        wolfram_wxf::to_wxf(&assoc)
+        wolfram_wxf::to_wxf(&assoc, None)
             .expect("manifest WXF serialization");
     // Leak the buffer so the pointer remains valid after this function returns.
     // The manifest is small and the caller (cargo-wolfram-manifest) only calls
@@ -145,7 +145,7 @@ pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
         })
         .collect();
 
-    let wxf = wolfram_wxf::to_wxf(&entries)
+    let wxf = wolfram_wxf::to_wxf(&entries, None)
         .expect("manifest WXF serialization failed");
     // Prepend the payload length as 8 little-endian bytes so the caller needs
     // no out-parameter — one zero-arg call, read [0..8] for the length, [8..] for WXF.

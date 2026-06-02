@@ -5,7 +5,7 @@
 //! [`write_association`][WxfWriter::write_association]) and the caller streams
 //! the children next. No intermediate buffering of the structure, no `dyn`.
 
-use crate::constants::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
+use crate::constants::{ExpressionEnum, NumericArrayEnum, PackedArrayEnum};
 use crate::writer::Writer;
 use crate::Error;
 
@@ -15,9 +15,8 @@ pub struct WxfWriter<W> {
 }
 
 impl<W: Writer> WxfWriter<W> {
-    /// Wrap a raw writer (no header emitted — see [`write_version_header`]).
-    ///
-    /// [`write_version_header`]: WxfWriter::write_version_header
+    /// Wrap a raw writer. The writer emits only the WXF token stream — the
+    /// `8:` / `8C:` header is framing, written by [`crate::to_wxf`].
     pub fn new(inner: W) -> Self {
         WxfWriter { inner }
     }
@@ -28,12 +27,6 @@ impl<W: Writer> WxfWriter<W> {
     }
 
     //---- raw / framing --------------------------------------------------
-
-    /// Write the uncompressed WXF header `8:`.
-    pub fn write_version_header(&mut self) -> Result<(), Error> {
-        self.inner
-            .write_bytes(&[HeaderEnum::Version as u8, HeaderEnum::Separator as u8])
-    }
 
     /// Write a WXF varint (LEB128, 7-bit groups, little-endian).
     pub fn write_varint(&mut self, n: u64) -> Result<(), Error> {

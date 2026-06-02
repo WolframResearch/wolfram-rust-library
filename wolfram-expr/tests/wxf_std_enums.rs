@@ -4,7 +4,7 @@
 use wolfram_expr::{from_wxf, to_wxf, Expr, FromWXF, ToWXF};
 
 fn roundtrip<T: ToWXF + FromWXF + PartialEq + std::fmt::Debug>(v: T) {
-    let bytes = to_wxf(&v).unwrap();
+    let bytes = to_wxf(&v, None).unwrap();
     let back: T = from_wxf(&bytes).unwrap();
     assert_eq!(back, v);
 }
@@ -28,7 +28,7 @@ fn result_roundtrips() {
 
 #[test]
 fn none_is_enum_association() {
-    let bytes = to_wxf(&Option::<i64>::None).unwrap();
+    let bytes = to_wxf(&Option::<i64>::None, None).unwrap();
     let e: Expr = from_wxf(&bytes).unwrap();
     let a = e.try_as_association().expect("None ⇒ Association");
     let enum_val = a.iter().find(|r| r.key == Expr::from("Enum")).unwrap();
@@ -45,8 +45,8 @@ enum MaybeInt {
 #[test]
 fn user_enum_matches_option_wire_format() {
     // Just(5) and Some(5) differ only by variant names; structure is identical.
-    let just = to_wxf(&MaybeInt::Just(5)).unwrap();
-    let some: Vec<u8> = to_wxf(&Some(5i64)).unwrap();
+    let just = to_wxf(&MaybeInt::Just(5), None).unwrap();
+    let some: Vec<u8> = to_wxf(&Some(5i64), None).unwrap();
     // Same length and same shape (Association/Enum/Data/List); the variant name
     // string bytes differ ("Just" vs "Some"), so compare structure via Expr.
     let je: Expr = from_wxf(&just).unwrap();

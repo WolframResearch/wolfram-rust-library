@@ -66,7 +66,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
         name: "ada".into(),
         tag: Some(7),
     };
-    let bytes = to_wxf(&f).unwrap();
+    let bytes = to_wxf(&f, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
     let assoc = expr
         .try_as_association()
@@ -102,7 +102,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
 #[test]
 fn point_tuple_struct_emits_function() {
     let p = Point(1.5, 2.5);
-    let bytes = to_wxf(&p).unwrap();
+    let bytes = to_wxf(&p, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
     let normal = expr.try_as_normal().expect("Point should be Function[…]");
     // Tuple structs share the head `System`List` — they're identified by
@@ -115,7 +115,7 @@ fn point_tuple_struct_emits_function() {
 #[test]
 fn marker_unit_struct_emits_symbol() {
     let m = Marker;
-    let bytes = to_wxf(&m).unwrap();
+    let bytes = to_wxf(&m, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
     let s = expr.try_as_symbol().expect("Marker should be Symbol");
     assert_eq!(s.as_str(), "Global`Marker");
@@ -130,7 +130,7 @@ fn tensor_fields_become_numeric_arrays() {
         nested_tup: ((1.0, 2.0), (3.0, 4.0)),
         hetero: (42i64, "hello".into()),
     };
-    let bytes = to_wxf(&t).unwrap();
+    let bytes = to_wxf(&t, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
     let assoc = expr.try_as_association().unwrap();
 
@@ -170,7 +170,7 @@ fn frame_roundtrips_through_from_wolfram() {
         name: "ada".into(),
         tag: Some(7),
     };
-    let bytes = to_wxf(&f).unwrap();
+    let bytes = to_wxf(&f, None).unwrap();
     let back: Frame = from_wxf(&bytes).unwrap();
     assert_eq!(f, back);
 }
@@ -183,7 +183,7 @@ fn frame_with_none_tag_roundtrips() {
         name: "empty".into(),
         tag: None,
     };
-    let bytes = to_wxf(&f).unwrap();
+    let bytes = to_wxf(&f, None).unwrap();
     let back: Frame = from_wxf(&bytes).unwrap();
     assert_eq!(f, back);
 }
@@ -191,7 +191,7 @@ fn frame_with_none_tag_roundtrips() {
 #[test]
 fn point_tuple_struct_roundtrips() {
     let p = Point(1.5, 2.5);
-    let bytes = to_wxf(&p).unwrap();
+    let bytes = to_wxf(&p, None).unwrap();
     let back: Point = from_wxf(&bytes).unwrap();
     assert_eq!(p, back);
 }
@@ -199,7 +199,7 @@ fn point_tuple_struct_roundtrips() {
 #[test]
 fn marker_unit_struct_roundtrips() {
     let m = Marker;
-    let bytes = to_wxf(&m).unwrap();
+    let bytes = to_wxf(&m, None).unwrap();
     let back: Marker = from_wxf(&bytes).unwrap();
     assert_eq!(m, back);
 }
@@ -213,7 +213,7 @@ fn tensor_struct_roundtrips() {
         nested_tup: ((1.0, 2.0), (3.0, 4.0)),
         hetero: (42i64, "hello".into()),
     };
-    let bytes = to_wxf(&t).unwrap();
+    let bytes = to_wxf(&t, None).unwrap();
     let back: Tensor1 = from_wxf(&bytes).unwrap();
     assert_eq!(t, back);
 }
@@ -226,7 +226,7 @@ fn enum_roundtrips_all_variant_shapes() {
         Shape::Rect(1.0, 2.0),
         Shape::Circle { radius: 3.0 },
     ] {
-        let bytes = to_wxf(&v).unwrap();
+        let bytes = to_wxf(&v, None).unwrap();
         let back: Shape = from_wxf(&bytes).unwrap();
         assert_eq!(v, back);
     }
@@ -251,14 +251,14 @@ fn enum_variants_emit_proper_shapes() {
     }
 
     // Unit variant: 1-entry Association with only "Enum".
-    let bytes = to_wxf(&Shape::Origin).unwrap();
+    let bytes = to_wxf(&Shape::Origin, None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
     let assoc = s.try_as_association().expect("Association");
     assert_eq!(assoc.len(), 1);
     assert_eq!(find(assoc, "Enum").try_as_str().unwrap(), "Origin");
 
     // Tuple variant (1 arg): "Data" → List of args.
-    let bytes = to_wxf(&Shape::Square(2.0)).unwrap();
+    let bytes = to_wxf(&Shape::Square(2.0), None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
     let data = assert_enum_key(&s, "Square");
     let list = data.try_as_normal().expect("Data is a List Function");
@@ -266,7 +266,7 @@ fn enum_variants_emit_proper_shapes() {
     assert_eq!(list.elements().len(), 1);
 
     // Tuple variant (2 args): "Data" → List of 2 args.
-    let bytes = to_wxf(&Shape::Rect(1.0, 2.0)).unwrap();
+    let bytes = to_wxf(&Shape::Rect(1.0, 2.0), None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
     let data = assert_enum_key(&s, "Rect");
     let list = data.try_as_normal().unwrap();
@@ -274,7 +274,7 @@ fn enum_variants_emit_proper_shapes() {
     assert_eq!(list.elements().len(), 2);
 
     // Struct variant: "Data" → inner Association of named fields.
-    let bytes = to_wxf(&Shape::Circle { radius: 3.0 }).unwrap();
+    let bytes = to_wxf(&Shape::Circle { radius: 3.0 }, None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
     let data = assert_enum_key(&s, "Circle");
     let inner = data.try_as_association().expect("Data is an Association");
