@@ -1,176 +1,49 @@
-//! WXF binary wire format — serializer + cursor-based reader.
+//! WXF binary wire format — typed [`WxfReader`] / [`WxfWriter`] plus the
+//! header + compression framing used by [`crate::to_wxf`] / [`crate::from_wxf`].
 
-pub mod cursor;
+pub mod reader;
 pub mod varint;
+pub mod writer;
 
-use std::io::Write;
+use std::borrow::Cow;
+use std::io::Read;
 
-use flate2::write::ZlibEncoder;
-use flate2::Compression;
-use wolfram_expr::{NumericArrayEnum, BigInteger, BigReal, PackedArrayEnum};
-use wolfram_expr::wxf::{ExpressionEnum, HeaderEnum};
+use flate2::read::ZlibDecoder;
+use wolfram_expr::wxf::HeaderEnum;
 
-use crate::serializer::{Serializer, ToWolfram};
-use crate::{CompressionLevel, Error};
+use crate::Error;
 
-use self::varint::write_varint;
+pub use self::reader::WxfReader;
+pub use self::writer::WxfWriter;
 
-pub use self::cursor::WxfCursor;
-
-/// Serialize `value` with a `8C:` (zlib-compressed) WXF header.
-pub(crate) fn serialize_compressed<T, W>(
-    value: &T,
-    writer: &mut W,
-    level: CompressionLevel,
-) -> Result<(), Error>
-where
-    T: ToWolfram + ?Sized,
-    W: Write,
-{
-    writer.write_all(&[HeaderEnum::Version as u8, HeaderEnum::Compress as u8, HeaderEnum::Separator as u8])?;
-    let mut encoder = ZlibEncoder::new(writer, Compression::new(u32::from(level.to_u8())));
-    {
-        let mut s = WxfSerializer::without_header(&mut encoder);
-        value.serialize(&mut s)?;
+/// Strip the WXF header, returning the raw token payload. `8:` payloads are
+/// borrowed; `8C:` payloads are zlib-decompressed into an owned buffer. Either
+/// way the result is a contiguous token stream ready for a [`crate::SliceReader`].
+pub(crate) fn strip_header(input: &[u8]) -> Result<Cow<'_, [u8]>, Error> {
+    if input.len() < 2 {
+        return Err(Error::InvalidWxf("byte stream too short for WXF header".into()));
     }
-    encoder.finish()?;
-    Ok(())
-}
-
-/// WXF binary serializer. Wraps any [`Write`] sink.
-pub struct WxfSerializer<'w, W: Write> {
-    out: &'w mut W,
-}
-
-impl<'w, W: Write> WxfSerializer<'w, W> {
-    /// Construct + write the WXF header (`8:`).
-    pub fn new(writer: &'w mut W) -> Result<Self, Error> {
-        writer.write_all(&[HeaderEnum::Version as u8, HeaderEnum::Separator as u8])?;
-        Ok(WxfSerializer { out: writer })
+    if input[0] != HeaderEnum::Version as u8 {
+        return Err(Error::InvalidWxf(format!(
+            "WXF header version mismatch: expected {:?}, got {:?}",
+            HeaderEnum::Version as u8 as char, input[0] as char
+        )));
     }
-
-    pub(crate) fn without_header(writer: &'w mut W) -> Self {
-        WxfSerializer { out: writer }
-    }
-}
-
-fn write_token<W: Write>(w: &mut W, token: ExpressionEnum) -> Result<(), Error> {
-    w.write_all(&[token as u8])?;
-    Ok(())
-}
-
-fn write_length_prefixed<W: Write>(
-    w: &mut W,
-    token: ExpressionEnum,
-    bytes: &[u8],
-) -> Result<(), Error> {
-    write_token(w, token)?;
-    write_varint(w, bytes.len() as u64)?;
-    w.write_all(bytes)?;
-    Ok(())
-}
-
-impl<'w, W: Write> Serializer for WxfSerializer<'w, W> {
-    fn serialize_integer(&mut self, n: i64) -> Result<(), Error> {
-        if let Ok(v) = i8::try_from(n) {
-            write_token(self.out, ExpressionEnum::Integer8)?;
-            self.out.write_all(&v.to_le_bytes())?;
-        } else if let Ok(v) = i16::try_from(n) {
-            write_token(self.out, ExpressionEnum::Integer16)?;
-            self.out.write_all(&v.to_le_bytes())?;
-        } else if let Ok(v) = i32::try_from(n) {
-            write_token(self.out, ExpressionEnum::Integer32)?;
-            self.out.write_all(&v.to_le_bytes())?;
-        } else {
-            write_token(self.out, ExpressionEnum::Integer64)?;
-            self.out.write_all(&n.to_le_bytes())?;
+    if input[1] == HeaderEnum::Compress as u8 {
+        if input.len() < 3 || input[2] != HeaderEnum::Separator as u8 {
+            return Err(Error::InvalidWxf("WXF compressed header truncated".into()));
         }
-        Ok(())
-    }
-
-    fn serialize_real(&mut self, f: f64) -> Result<(), Error> {
-        write_token(self.out, ExpressionEnum::Real64)?;
-        self.out.write_all(&f.to_le_bytes())?;
-        Ok(())
-    }
-
-    fn serialize_string(&mut self, s: &str) -> Result<(), Error> {
-        write_length_prefixed(self.out, ExpressionEnum::String, s.as_bytes())
-    }
-
-    fn serialize_symbol(&mut self, name: &str) -> Result<(), Error> {
-        write_length_prefixed(self.out, ExpressionEnum::Symbol, name.as_bytes())
-    }
-
-    fn serialize_byte_array(&mut self, bytes: &[u8]) -> Result<(), Error> {
-        write_length_prefixed(self.out, ExpressionEnum::ByteArray, bytes)
-    }
-
-    fn serialize_function(
-        &mut self,
-        head: &dyn ToWolfram,
-        args: &[&dyn ToWolfram],
-    ) -> Result<(), Error> {
-        write_token(self.out, ExpressionEnum::Function)?;
-        write_varint(self.out, args.len() as u64)?;
-        head.serialize(self)?;
-        for arg in args {
-            arg.serialize(self)?;
-        }
-        Ok(())
-    }
-
-    fn serialize_association(
-        &mut self,
-        entries: &[(&dyn ToWolfram, &dyn ToWolfram, bool)],
-    ) -> Result<(), Error> {
-        write_token(self.out, ExpressionEnum::Association)?;
-        write_varint(self.out, entries.len() as u64)?;
-        for (k, v, delayed) in entries {
-            write_token(self.out, if *delayed { ExpressionEnum::RuleDelayed } else { ExpressionEnum::Rule })?;
-            k.serialize(self)?;
-            v.serialize(self)?;
-        }
-        Ok(())
-    }
-
-    fn serialize_numeric_array(
-        &mut self,
-        data_type: NumericArrayEnum,
-        dimensions: &[usize],
-        bytes: &[u8],
-    ) -> Result<(), Error> {
-        write_token(self.out, ExpressionEnum::NumericArray)?;
-        self.out.write_all(&[data_type as u8])?;
-        write_varint(self.out, dimensions.len() as u64)?;
-        for d in dimensions {
-            write_varint(self.out, *d as u64)?;
-        }
-        self.out.write_all(bytes)?;
-        Ok(())
-    }
-
-    fn serialize_packed_array(
-        &mut self,
-        data_type: PackedArrayEnum,
-        dimensions: &[usize],
-        bytes: &[u8],
-    ) -> Result<(), Error> {
-        write_token(self.out, ExpressionEnum::PackedArray)?;
-        self.out.write_all(&[NumericArrayEnum::from(data_type) as u8])?;
-        write_varint(self.out, dimensions.len() as u64)?;
-        for d in dimensions {
-            write_varint(self.out, *d as u64)?;
-        }
-        self.out.write_all(bytes)?;
-        Ok(())
-    }
-
-    fn serialize_big_integer(&mut self, n: &BigInteger) -> Result<(), Error> {
-        write_length_prefixed(self.out, ExpressionEnum::BigInteger, n.as_str().as_bytes())
-    }
-
-    fn serialize_big_real(&mut self, r: &BigReal) -> Result<(), Error> {
-        write_length_prefixed(self.out, ExpressionEnum::BigReal, r.as_str().as_bytes())
+        let mut decoded = Vec::new();
+        ZlibDecoder::new(&input[3..])
+            .read_to_end(&mut decoded)
+            .map_err(|e| Error::InvalidWxf(format!("zlib decompress failed: {}", e)))?;
+        Ok(Cow::Owned(decoded))
+    } else if input[1] == HeaderEnum::Separator as u8 {
+        Ok(Cow::Borrowed(&input[2..]))
+    } else {
+        Err(Error::InvalidWxf(format!(
+            "WXF header separator mismatch: expected ':' or 'C', got {:?}",
+            input[1] as char
+        )))
     }
 }

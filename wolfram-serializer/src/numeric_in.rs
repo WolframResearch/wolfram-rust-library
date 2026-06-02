@@ -10,9 +10,11 @@
 //! `ByteArray` on the wire is treated as a 1-D `NumericArray<Integer8>` before
 //! the widening rules apply.
 
-use wolfram_expr::{NumericArrayEnum, NumericArrayEnum as DT, PackedArrayEnum};
 use wolfram_expr::wxf::ExpressionEnum;
-use crate::wxf::cursor::WxfCursor;
+use wolfram_expr::{NumericArrayEnum as DT};
+
+use crate::reader::Reader;
+use crate::wxf::reader::WxfReader;
 use crate::Error;
 
 /// Sealed trait implemented for each numeric primitive that the WXF derive /
@@ -28,29 +30,64 @@ pub trait NumericTarget: Sized + Copy + 'static {
 }
 
 //==============================================================================
-// Public read helpers
+// Public read helpers — generic over the reader, tag-aware (peek-free)
 //==============================================================================
 
-/// Read the next WXF token as a flat `Vec<T>`. Accepts `NumericArray`,
-/// `PackedArray` (any rank — multi-dim payloads flatten row-major), or
-/// `ByteArray` (treated as a 1-D `NumericArray<Integer8>`).
-///
-/// The caller checks total-length constraints against any fixed-size
-/// target (e.g. `[T; N]`).
-pub fn read_vec<T: NumericTarget>(
-    c: &mut WxfCursor,
+/// Read the next value as a flat `Vec<T>`. Accepts `NumericArray`,
+/// `PackedArray` (any rank — multi-dim flattens row-major), or `ByteArray`
+/// (treated as a 1-D `NumericArray<Integer8>`).
+pub fn read_vec<T: NumericTarget, R: Reader>(
+    r: &mut WxfReader<R>,
     path: &str,
 ) -> Result<Vec<T>, Error> {
-    with_numeric_payload(c, path, |src, bytes| T::widen_from(src, bytes))
+    let tok = r.read_expr_token()?;
+    read_vec_with_tag::<T, R>(r, tok, path)
+}
+
+/// [`read_vec`] given an already-consumed expression token.
+pub fn read_vec_with_tag<T: NumericTarget, R: Reader>(
+    r: &mut WxfReader<R>,
+    tok: ExpressionEnum,
+    path: &str,
+) -> Result<Vec<T>, Error> {
+    match tok {
+        ExpressionEnum::NumericArray | ExpressionEnum::PackedArray => {
+            let dt = r.read_numeric_type()?;
+            let rank = r.read_varint()? as usize;
+            let mut count = 1usize;
+            for _ in 0..rank {
+                count *= r.read_varint()? as usize;
+            }
+            let bytes = r.read_bytes(count * dt.size_in_bytes())?;
+            T::widen_from(dt, bytes).map_err(|m| err(path, "compatible numeric source", m))
+        },
+        ExpressionEnum::ByteArray => {
+            let len = r.read_varint()? as usize;
+            let bytes = r.read_bytes(len)?;
+            T::widen_from(DT::Integer8, bytes).map_err(|m| err(path, "compatible numeric source", m))
+        },
+        other => Err(err(path, "NumericArray, PackedArray, or ByteArray", other.name().to_string())),
+    }
 }
 
 /// Like [`read_vec`] but errors if the resulting buffer length doesn't equal `n`.
-pub fn read_fixed<T: NumericTarget>(
-    c: &mut WxfCursor,
+pub fn read_fixed<T: NumericTarget, R: Reader>(
+    r: &mut WxfReader<R>,
     path: &str,
     n: usize,
 ) -> Result<Vec<T>, Error> {
-    let v = read_vec::<T>(c, path)?;
+    let tok = r.read_expr_token()?;
+    read_fixed_with_tag::<T, R>(r, tok, path, n)
+}
+
+/// [`read_fixed`] given an already-consumed expression token.
+pub fn read_fixed_with_tag<T: NumericTarget, R: Reader>(
+    r: &mut WxfReader<R>,
+    tok: ExpressionEnum,
+    path: &str,
+    n: usize,
+) -> Result<Vec<T>, Error> {
+    let v = read_vec_with_tag::<T, R>(r, tok, path)?;
     if v.len() != n {
         return Err(err(
             path,
@@ -59,59 +96,6 @@ pub fn read_fixed<T: NumericTarget>(
         ));
     }
     Ok(v)
-}
-
-//==============================================================================
-// Internal: token-dispatch + payload extraction
-//==============================================================================
-
-/// Parse a numeric array header and call `f` with the element type and a
-/// zero-copy byte slice of the payload. Avoids the two extra copies that
-/// would result from going through `NumericArray`/`PackedArray` wrappers
-/// (one allocation in `read_n`, one in `as_bytes().to_vec()`).
-fn with_numeric_payload<R>(
-    c: &mut WxfCursor,
-    path: &str,
-    f: impl FnOnce(DT, &[u8]) -> Result<R, String>,
-) -> Result<R, Error> {
-    match ExpressionEnum::try_from(c.peek_token()?) {
-        Ok(token @ (ExpressionEnum::NumericArray | ExpressionEnum::PackedArray)) => {
-            c.read_byte()?; // consume token
-            let type_byte = c.read_byte()?;
-            let dt = DT::try_from(type_byte).map_err(|_| {
-                Error::InvalidWxf(format!(
-                    "unknown array element type: 0x{:02X}",
-                    type_byte
-                ))
-            })?;
-            let dt = if token == ExpressionEnum::PackedArray {
-                PackedArrayEnum::try_from(dt)
-                    .map_err(|_| Error::InvalidWxf(format!(
-                        "PackedArray does not support element type {:?}", dt
-                    )))
-                    .map(NumericArrayEnum::from)?
-            } else {
-                dt
-            };
-            let rank = c.read_varint()? as usize;
-            let mut dims = Vec::with_capacity(rank);
-            for _ in 0..rank {
-                dims.push(c.read_varint()? as usize);
-            }
-            let byte_count = dims.iter().product::<usize>() * dt.size_in_bytes();
-            let bytes = c.borrow_n(byte_count)?;
-            f(dt, bytes).map_err(|m| err(path, "compatible numeric source", m))
-        },
-        Ok(ExpressionEnum::ByteArray) => {
-            // ByteArray → treat as NumericArray<Integer8>, 1-D.
-            c.read_byte()?; // consume token
-            let len = c.read_varint()? as usize;
-            let bytes = c.borrow_n(len)?;
-            f(DT::Integer8, bytes).map_err(|m| err(path, "compatible numeric source", m))
-        },
-        Ok(other) => Err(err(path, "NumericArray, PackedArray, or ByteArray", other.name().to_string())),
-        Err(_)    => Err(err(path, "NumericArray, PackedArray, or ByteArray", "<unknown>".into())),
-    }
 }
 
 fn err(path: &str, expected: &'static str, got: String) -> Error {
@@ -273,18 +257,18 @@ impl_target!(f64, Real64, {
 
 #[cfg(test)]
 mod tests {
-    use crate::{deserialize, serialize, Format};
+    use crate::{from_wxf, to_wxf};
     use wolfram_expr::{Expr, NumericArray};
 
-    fn serialize_to_wxf<T: crate::ToWolfram>(value: &T) -> Vec<u8> {
-        serialize(value, Format::Wxf).unwrap()
+    fn serialize_to_wxf<T: crate::ToWXF>(value: &T) -> Vec<u8> {
+        to_wxf(value).unwrap()
     }
 
     #[test]
     fn vec_f64_from_real32_widens() {
         let na = NumericArray::from_slice::<f32>(vec![3], &[1.0_f32, 2.0, 3.0]);
         let bytes = serialize_to_wxf(&Expr::from(na));
-        let v: Vec<f64> = deserialize(&bytes, Format::Wxf).unwrap();
+        let v: Vec<f64> = from_wxf(&bytes).unwrap();
         assert_eq!(v, vec![1.0, 2.0, 3.0]);
     }
 
@@ -293,7 +277,7 @@ mod tests {
         // ByteArray{1, 2, 3} → Integer8 → i32
         let ba: wolfram_expr::ByteArray = vec![1, 2, 3];
         let bytes = serialize_to_wxf(&Expr::from(ba));
-        let v: Vec<i32> = deserialize(&bytes, Format::Wxf).unwrap();
+        let v: Vec<i32> = from_wxf(&bytes).unwrap();
         assert_eq!(v, vec![1, 2, 3]);
     }
 
@@ -301,7 +285,7 @@ mod tests {
     fn vec_i8_from_integer64_rejected() {
         let na = NumericArray::from_slice::<i64>(vec![3], &[1_i64, 2, 3]);
         let bytes = serialize_to_wxf(&Expr::from(na));
-        let res: Result<Vec<i8>, _> = deserialize(&bytes, Format::Wxf);
+        let res: Result<Vec<i8>, _> = from_wxf(&bytes);
         assert!(res.is_err());
     }
 
@@ -309,7 +293,7 @@ mod tests {
     fn vec_f32_from_f64_rejected() {
         let na = NumericArray::from_slice::<f64>(vec![1], &[1.0_f64]);
         let bytes = serialize_to_wxf(&Expr::from(na));
-        let res: Result<Vec<f32>, _> = deserialize(&bytes, Format::Wxf);
+        let res: Result<Vec<f32>, _> = from_wxf(&bytes);
         assert!(res.is_err());
     }
 
@@ -317,7 +301,7 @@ mod tests {
     fn vec_f64_identity_real64() {
         let na = NumericArray::from_slice::<f64>(vec![3], &[1.0_f64, 2.0, 3.0]);
         let bytes = serialize_to_wxf(&Expr::from(na));
-        let v: Vec<f64> = deserialize(&bytes, Format::Wxf).unwrap();
+        let v: Vec<f64> = from_wxf(&bytes).unwrap();
         assert_eq!(v, vec![1.0, 2.0, 3.0]);
     }
 }

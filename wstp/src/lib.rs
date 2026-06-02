@@ -990,7 +990,7 @@ impl Link {
                 self.put_u8_array(bytes, &[bytes.len()])?;
             },
             ExprKind::BigInteger(_) | ExprKind::BigReal(_) | ExprKind::PackedArray(_) | ExprKind::NumericArray(_) => {
-                let wxf = wolfram_serializer::serialize(expr, wolfram_serializer::Format::Wxf)
+                let wxf = wolfram_serializer::to_wxf(expr)
                     .map_err(|e| Error::custom(format!("put_expr: WXF serialization failed: {e}")))?;
                 self.put_raw_type(i32::from(sys::WSTKFUNC))?;
                 self.put_arg_count(1)?;

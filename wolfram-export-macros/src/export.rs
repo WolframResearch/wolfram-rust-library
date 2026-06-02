@@ -307,11 +307,11 @@ fn export_wxf_function(
         },
         _ => quote! { (#(#arg_idents),*) },
     };
-    // Tuple-expression of `<Ti as FromWolfram>::from_cursor(__c)?` calls.
+    // Tuple-expression of `<Ti as FromWXF>::from_wxf(__c)?` calls.
     let from_cursor_calls: Vec<_> = param_types
         .iter()
         .map(|t| {
-            quote! { <#t as #p::macro_utils::FromWolfram>::from_cursor(__c)? }
+            quote! { <#t as #p::macro_utils::FromWXF>::from_wxf(__c)? }
         })
         .collect();
     let tuple_read = match from_cursor_calls.len() {

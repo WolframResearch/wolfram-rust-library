@@ -1,5 +1,5 @@
 use wolfram_expr::Expr;
-use wolfram_serializer_macros::{FromWolfram, ToWolfram};
+use wolfram_serializer_macros::{FromWXF, ToWXF};
 
 // ── Shared computation helpers ────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ pub fn duplicate(e: Expr) -> Expr {
 
 // ── Typed structs (used by types_wxf) ────────────────────────────────────────
 
-#[derive(Debug, Clone, FromWolfram, ToWolfram)]
+#[derive(Debug, Clone, FromWXF, ToWXF)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -31,7 +31,7 @@ pub fn echo_point(p: Point) -> Point {
     p
 }
 
-#[derive(Debug, Clone, FromWolfram, ToWolfram)]
+#[derive(Debug, Clone, FromWXF, ToWXF)]
 pub struct Dataset {
     pub name: String,
     pub values: Vec<f64>,

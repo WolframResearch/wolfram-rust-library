@@ -1,12 +1,11 @@
-//! Expansion for `#[derive(ToWolfram)]`.
+//! Expansion for `#[derive(ToWXF)]`.
 //!
-//! Strategy: for each container shape (named struct, tuple struct, unit
-//! struct, enum), build a body that calls the appropriate
-//! [`crate::Serializer`] method on the user-supplied serializer. For each
-//! field within a named struct or struct-variant we classify the field type
-//! via [`ty_classify`] and emit specialized code for the WXF-aware shapes
-//! (ByteArray / NumericArray / List), or delegate via
-//! `<FieldType as ToWolfram>::serialize` for everything else.
+//! Streaming: each container writes a header
+//! (`write_association` / `write_function` / `write_symbol`) then writes its
+//! children directly to the [`WxfWriter`][wolfram_serializer::WxfWriter] — no
+//! intermediate `Vec`, no `&dyn`. Field types are classified via [`ty_classify`]
+//! so `Vec<u8>` → ByteArray, `Vec<numeric>` / numeric tensors → NumericArray,
+//! and everything else delegates through `ToWXF`.
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
@@ -29,17 +28,17 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
         Data::Union(_) => {
             return Err(syn::Error::new_spanned(
                 input,
-                "#[derive(ToWolfram)] does not support unions",
+                "#[derive(ToWXF)] does not support unions",
             ))
         },
     };
 
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics ::wolfram_serializer::ToWolfram for #name #ty_generics #where_clause {
-            fn serialize(
+        impl #impl_generics ::wolfram_serializer::ToWXF for #name #ty_generics #where_clause {
+            fn to_wxf<__W: ::wolfram_serializer::Writer>(
                 &self,
-                __s: &mut dyn ::wolfram_serializer::Serializer,
+                __w: &mut ::wolfram_serializer::WxfWriter<__W>,
             ) -> ::core::result::Result<(), ::wolfram_serializer::Error> {
                 #body
                 ::core::result::Result::Ok(())
@@ -47,7 +46,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
         }
 
         #[automatically_derived]
-        impl #impl_generics ::wolfram_serializer::WolframStruct for #name #ty_generics #where_clause {}
+        impl #impl_generics ::wolfram_serializer::WxfStruct for #name #ty_generics #where_clause {}
     })
 }
 
@@ -62,185 +61,82 @@ fn expand_struct(
 ) -> Result<TokenStream> {
     match &data.fields {
         Fields::Named(named) => {
-            // Named struct → emit Association keyed by field names.
-            let entries = expand_named_field_entries(
-                named.named.iter().collect::<Vec<_>>().as_slice(),
-                quote! { self },
-            )?;
+            let fields: Vec<&syn::Field> = named.named.iter().collect();
+            let arity = fields.len();
+            let writes = emit_named_entries(&fields, &|id| quote! { self.#id })?;
             Ok(quote! {
-                #entries
-                __s.serialize_association(__entries)?;
+                __w.write_association(#arity)?;
+                #(#writes)*
             })
         },
         Fields::Unnamed(unnamed) => {
-            // Tuple struct → emit Function[Symbol("System`List"), arg0, arg1, …].
-            // The head is fixed; tuple structs identify themselves by the
-            // positions and types of their data, not by a name on the wire.
             let _ = attrs; // `#[wolfram(symbol = ...)]` ignored for tuple structs.
-            let args = expand_unnamed_field_args(
-                unnamed.unnamed.iter().collect::<Vec<_>>().as_slice(),
-                quote! { self },
-            )?;
+            let fields: Vec<&syn::Field> = unnamed.unnamed.iter().collect();
+            let arity = fields.len();
+            let writes = fields.iter().enumerate().map(|(i, f)| {
+                let idx = syn::Index::from(i);
+                emit_write_field(&quote! { self.#idx }, &f.ty, f.ty.span())
+            });
             Ok(quote! {
-                #args
-                let __head = ::wolfram_serializer::__derive_support::HeadSymbol("System`List");
-                __s.serialize_function(&__head as &dyn ::wolfram_serializer::ToWolfram, __args)?;
+                __w.write_function(#arity)?;
+                __w.write_symbol("System`List")?;
+                #(#writes)*
             })
         },
         Fields::Unit => {
-            // Unit struct → emit Symbol("Global`Name").
             let symbol = qualify_symbol(&name.to_string(), attrs);
             Ok(quote! {
-                __s.serialize_symbol(#symbol)?;
+                __w.write_symbol(#symbol)?;
             })
         },
     }
 }
 
-/// Build the Association entries for a named struct or struct-variant. Yields
-/// a `let __entries: &[(&dyn ToWolfram, &dyn ToWolfram, bool)] = …` binding
-/// in scope after the emitted block. `accessor` is the prefix used to refer
-/// to each field (e.g. `quote! { self }` for a struct, or a binding pattern
-/// for an enum variant — see [`expand_enum`]).
-fn expand_named_field_entries(
+/// Per-field statements for a named struct / struct-variant Association: each
+/// entry is `write_rule(false); write_string(KEY); <write field value>`.
+fn emit_named_entries(
     fields: &[&syn::Field],
-    accessor: TokenStream,
-) -> Result<TokenStream> {
-    // For each field, generate:
-    //   1. an optional preamble (e.g. let __field_bytes = … for numeric Vec/array)
-    //   2. an Association entry (the value half wrapped in the right thunk or
-    //      delegated through ToWolfram)
-    let mut preambles: Vec<TokenStream> = Vec::with_capacity(fields.len());
-    let mut entries: Vec<TokenStream> = Vec::with_capacity(fields.len());
-
+    accessor: &dyn Fn(&syn::Ident) -> TokenStream,
+) -> Result<Vec<TokenStream>> {
+    let mut out = Vec::with_capacity(fields.len());
     for f in fields {
         let f_attrs = parse_field_attrs(&f.attrs)?;
         let ident = f.ident.as_ref().expect("named field");
         let key = f_attrs.rename.clone().unwrap_or_else(|| ident.to_string());
-        let path = quote! { #accessor.#ident };
         let span = f.ty.span();
-
-        let (preamble, value_expr) = expand_field_value(&path, &f.ty, ident, span)?;
-        preambles.push(preamble);
-        entries.push(quote_spanned! { span =>
-            (
-                &(#key) as &dyn ::wolfram_serializer::ToWolfram,
-                #value_expr,
-                false,
-            )
+        let write_val = emit_write_field(&accessor(ident), &f.ty, span);
+        out.push(quote_spanned! { span =>
+            __w.write_rule(false)?;
+            __w.write_string(#key)?;
+            #write_val
         });
     }
-
-    Ok(quote! {
-        #(#preambles)*
-        let __entries: &[(
-            &dyn ::wolfram_serializer::ToWolfram,
-            &dyn ::wolfram_serializer::ToWolfram,
-            bool,
-        )] = &[ #(#entries),* ];
-    })
+    Ok(out)
 }
 
-/// Build the function-application args for a tuple struct or tuple-variant.
-/// Yields a `let __args: &[&dyn ToWolfram] = …` binding.
-fn expand_unnamed_field_args(
-    fields: &[&syn::Field],
-    accessor: TokenStream,
-) -> Result<TokenStream> {
-    let mut preambles: Vec<TokenStream> = Vec::with_capacity(fields.len());
-    let mut args: Vec<TokenStream> = Vec::with_capacity(fields.len());
-
-    for (i, f) in fields.iter().enumerate() {
-        let idx = syn::Index::from(i);
-        let path = quote! { #accessor.#idx };
-        // Synthetic ident for use as an internal variable name (e.g. for the
-        // numeric-Vec preamble's __ field_bytes binding).
-        let synthetic = format_ident!("field_{}", i);
-        let span = f.ty.span();
-        let (preamble, value_expr) = expand_field_value(&path, &f.ty, &synthetic, span)?;
-        preambles.push(preamble);
-        args.push(value_expr);
-    }
-
-    Ok(quote! {
-        #(#preambles)*
-        let __args: &[&dyn ::wolfram_serializer::ToWolfram] = &[ #(#args),* ];
-    })
-}
-
-/// For one field, produce a `(preamble, value_expression)` pair where the
-/// value expression is a `&dyn ToWolfram` reference suitable for inclusion
-/// in an Association entry list or a Function args list.
-///
-/// `accessor` is the path to the field (e.g. `self.payload`, or `__0` for
-/// an enum-bound variable). `field_ident` is a friendly name used to derive
-/// internal binding names.
-fn expand_field_value(
-    accessor: &TokenStream,
-    ty: &syn::Type,
-    field_ident: &syn::Ident,
-    span: Span,
-) -> Result<(TokenStream, TokenStream)> {
-    let kind = classify(ty);
-    let bytes_var = format_ident!("__{}_bytes", field_ident);
-    let dims_var = format_ident!("__{}_dims", field_ident);
-    let buf_var = format_ident!("__{}_buf", field_ident);
-    let thunk_var = format_ident!("__{}_thunk", field_ident);
-
-    match kind {
-        FieldKind::VecOfU8 => {
-            // ByteArray fast path.
-            let preamble = quote_spanned! { span =>
-                let #thunk_var = ::wolfram_serializer::__derive_support::ByteArrayThunk(
-                    (#accessor).as_slice(),
-                );
-            };
-            Ok((
-                preamble,
-                quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
-            ))
+/// Emit statements that write the field at `accessor` to `__w`, choosing the
+/// WXF-optimal shape for its type.
+fn emit_write_field(accessor: &TokenStream, ty: &syn::Type, span: Span) -> TokenStream {
+    match classify(ty) {
+        FieldKind::VecOfU8 => quote_spanned! { span =>
+            __w.write_byte_array((#accessor).as_slice())?;
         },
-        FieldKind::VecOfNumeric { elem_ty, dt } => {
-            let preamble = quote_spanned! { span =>
-                let #bytes_var: &[u8] = unsafe {
-                    ::core::slice::from_raw_parts(
-                        (#accessor).as_ptr() as *const u8,
-                        ::core::mem::size_of::<#elem_ty>() * (#accessor).len(),
-                    )
-                };
-                let #dims_var: [usize; 1] = [(#accessor).len()];
-                let #thunk_var = ::wolfram_serializer::__derive_support::NumericArrayThunk {
-                    data_type: #dt,
-                    dimensions: &#dims_var,
-                    bytes: #bytes_var,
-                };
+        FieldKind::VecOfNumeric { elem_ty, dt } => quote_spanned! { span => {
+            let __bytes: &[u8] = unsafe {
+                ::core::slice::from_raw_parts(
+                    (#accessor).as_ptr() as *const u8,
+                    ::core::mem::size_of::<#elem_ty>() * (#accessor).len(),
+                )
             };
-            Ok((
-                preamble,
-                quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
-            ))
-        },
-        FieldKind::VecOfOther { elem_ty } => {
-            // List path: build a Vec<&dyn ToWolfram> and wrap in ListThunk.
-            // Also emit the debug-only generic-Vec warning helper — only
-            // useful when T is a generic param that resolves to numeric, but
-            // it's a no-op for non-numeric T at runtime.
-            let elems_var = format_ident!("__{}_elems", field_ident);
-            let field_str = field_ident.to_string();
-            let preamble = quote_spanned! { span =>
-                #[cfg(debug_assertions)]
-                ::wolfram_serializer::__derive_support::warn_if_numeric_in_list::<#elem_ty>(
-                    file!(), line!(), #field_str,
-                );
-                let #elems_var: ::std::vec::Vec<&dyn ::wolfram_serializer::ToWolfram> =
-                    (#accessor).iter().map(|__e| __e as &dyn ::wolfram_serializer::ToWolfram).collect();
-                let #thunk_var = ::wolfram_serializer::__derive_support::ListThunk(&#elems_var);
-            };
-            Ok((
-                preamble,
-                quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
-            ))
-        },
+            __w.write_numeric_array(#dt, &[(#accessor).len()], __bytes)?;
+        }},
+        FieldKind::VecOfOther { elem_ty: _ } => quote_spanned! { span => {
+            __w.write_function((#accessor).len())?;
+            __w.write_symbol("System`List")?;
+            for __e in (#accessor).iter() {
+                ::wolfram_serializer::ToWXF::to_wxf(__e, __w)?;
+            }
+        }},
         FieldKind::NumericTensor {
             elem_ty,
             dt,
@@ -248,102 +144,69 @@ fn expand_field_value(
             tuple_paths,
             original_ty,
         } => {
-            let dims_lits: Vec<TokenStream> =
-                dims.iter().map(|d| quote! { #d }).collect();
+            let dims_lits: Vec<TokenStream> = dims.iter().map(|d| quote! { #d }).collect();
             let total_leaves: usize = dims.iter().product();
             let rank = dims.len();
-            let preamble = if let Some(paths) = tuple_paths {
-                // Tuple-rooted: must copy each leaf into a stack [T; N] before
-                // the byte cast, because Rust tuple layout is unspecified.
+            if let Some(paths) = tuple_paths {
                 let leaf_exprs = paths.iter().map(|p| {
                     let toks = parse_dotted_index_path(p, span);
                     quote_spanned! { span => (#accessor) #toks }
                 });
-                quote_spanned! { span =>
-                    let #buf_var: [#elem_ty; #total_leaves] = [ #(#leaf_exprs),* ];
-                    let #bytes_var: &[u8] = unsafe {
+                quote_spanned! { span => {
+                    let __buf: [#elem_ty; #total_leaves] = [ #(#leaf_exprs),* ];
+                    let __bytes: &[u8] = unsafe {
                         ::core::slice::from_raw_parts(
-                            (#buf_var).as_ptr() as *const u8,
-                            ::core::mem::size_of_val(&#buf_var),
+                            (__buf).as_ptr() as *const u8,
+                            ::core::mem::size_of_val(&__buf),
                         )
                     };
-                    let #dims_var: [usize; #rank] = [ #(#dims_lits),* ];
-                }
+                    __w.write_numeric_array(#dt, &[ #(#dims_lits),* ], __bytes)?;
+                }}
             } else {
-                // Array-rooted: direct byte cast over the field. `[T; N]` and
-                // `[[T; M]; N]` etc. all have defined contiguous layout.
-                quote_spanned! { span =>
-                    let #bytes_var: &[u8] = unsafe {
+                quote_spanned! { span => {
+                    let __bytes: &[u8] = unsafe {
                         ::core::slice::from_raw_parts(
                             (&(#accessor)) as *const #original_ty as *const u8,
                             ::core::mem::size_of::<#original_ty>(),
                         )
                     };
-                    let #dims_var: [usize; #rank] = [ #(#dims_lits),* ];
-                }
-            };
-            // Build the thunk (ditto regardless of root shape).
-            let preamble_full = quote_spanned! { span =>
-                #preamble
-                let #thunk_var = ::wolfram_serializer::__derive_support::NumericArrayThunk {
-                    data_type: #dt,
-                    dimensions: &#dims_var,
-                    bytes: #bytes_var,
-                };
-            };
-            Ok((
-                preamble_full,
-                quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
-            ))
+                    let __dims: [usize; #rank] = [ #(#dims_lits),* ];
+                    __w.write_numeric_array(#dt, &__dims, __bytes)?;
+                }}
+            }
         },
         FieldKind::TupleHetero { tup } => {
-            let elem_refs = tup.elems.iter().enumerate().map(|(i, _ty)| {
+            let arity = tup.elems.len();
+            let elem_writes = tup.elems.iter().enumerate().map(|(i, t)| {
                 let idx = syn::Index::from(i);
-                quote_spanned! { span =>
-                    &(#accessor.#idx) as &dyn ::wolfram_serializer::ToWolfram
-                }
+                emit_write_field(&quote! { #accessor.#idx }, t, t.span())
             });
-            let elems_var = format_ident!("__{}_elems", field_ident);
-            let preamble = quote_spanned! { span =>
-                let #elems_var: &[&dyn ::wolfram_serializer::ToWolfram] = &[ #(#elem_refs),* ];
-                let #thunk_var = ::wolfram_serializer::__derive_support::ListThunk(#elems_var);
-            };
-            Ok((
-                preamble,
-                quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
-            ))
+            quote_spanned! { span => {
+                __w.write_function(#arity)?;
+                __w.write_symbol("System`List")?;
+                #(#elem_writes)*
+            }}
         },
-        FieldKind::ArrayHetero { len, .. } => {
-            let elems_var = format_ident!("__{}_elems", field_ident);
-            let idx_iter = (0..len).map(|i| {
+        FieldKind::ArrayHetero { arr, len } => {
+            let elem_ty = &arr.elem;
+            let _ = elem_ty;
+            let idx_writes = (0..len).map(|i| {
                 let li = syn::LitInt::new(&i.to_string(), span);
-                quote_spanned! { span =>
-                    &(#accessor[#li]) as &dyn ::wolfram_serializer::ToWolfram
-                }
+                emit_write_field(&quote! { #accessor[#li] }, &arr.elem, span)
             });
-            let preamble = quote_spanned! { span =>
-                let #elems_var: &[&dyn ::wolfram_serializer::ToWolfram] = &[ #(#idx_iter),* ];
-                let #thunk_var = ::wolfram_serializer::__derive_support::ListThunk(#elems_var);
-            };
-            Ok((
-                preamble,
-                quote_spanned! { span => &#thunk_var as &dyn ::wolfram_serializer::ToWolfram },
-            ))
+            quote_spanned! { span => {
+                __w.write_function(#len)?;
+                __w.write_symbol("System`List")?;
+                #(#idx_writes)*
+            }}
         },
-        FieldKind::Other => {
-            // Delegate to <FieldTy as ToWolfram>::serialize via the existing
-            // blanket / hand-written impls. No preamble needed — we just
-            // borrow the field directly.
-            Ok((
-                TokenStream::new(),
-                quote_spanned! { span => &(#accessor) as &dyn ::wolfram_serializer::ToWolfram },
-            ))
+        FieldKind::Other => quote_spanned! { span =>
+            ::wolfram_serializer::ToWXF::to_wxf(&(#accessor), __w)?;
         },
     }
 }
 
-/// Convert a dotted-int path like "0.1.2" into a token stream of `.0.1.2`
-/// suitable for appending to a base accessor.
+/// Convert a dotted-int path like "0.1.2" into `.0.1.2`.
 fn parse_dotted_index_path(p: &str, span: Span) -> TokenStream {
     let mut out = TokenStream::new();
     for seg in p.split('.') {
@@ -357,126 +220,66 @@ fn parse_dotted_index_path(p: &str, span: Span) -> TokenStream {
 // Enums
 //==============================================================================
 
-// Wire format: each variant becomes an Association keyed by `"Enum"`
-// (variant name as a String) and optionally `"Data"` (the variant's payload
-// — a List for tuple variants, an Association for struct variants):
-//
-//   Origin              ↔ <|"Enum" -> "Origin"|>
-//   Square(2.5)         ↔ <|"Enum" -> "Square", "Data" -> {2.5}|>
-//   Rect(1.0, 2.0)      ↔ <|"Enum" -> "Rect",   "Data" -> {1.0, 2.0}|>
-//   Circle{radius:3.0}  ↔ <|"Enum" -> "Circle", "Data" -> <|"radius" -> 3.0|>|>
-//
-// `"Enum"` is always the first entry on the wire (we emit it first; the
-// deserializer requires it in that position).
+// Each variant becomes an Association keyed by `"Enum"` (variant name) and
+// optionally `"Data"` (a List for tuple variants, an Association for struct
+// variants). `"Enum"` is always written first.
 fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
     let mut arms = Vec::with_capacity(data.variants.len());
     for v in &data.variants {
-        let _v_attrs = parse_container_attrs(&v.attrs)?; // reserved for future #[wolfram(rename)] etc.
+        let _v_attrs = parse_container_attrs(&v.attrs)?;
         let v_name = &v.ident;
         let v_str = v_name.to_string();
         match &v.fields {
             Fields::Unit => {
                 arms.push(quote! {
                     #name :: #v_name => {
-                        let __entries: &[(
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            bool,
-                        )] = &[
-                            (&"Enum" as &dyn ::wolfram_serializer::ToWolfram,
-                             &#v_str as &dyn ::wolfram_serializer::ToWolfram,
-                             false),
-                        ];
-                        __s.serialize_association(__entries)?;
+                        __w.write_association(1)?;
+                        __w.write_rule(false)?;
+                        __w.write_string("Enum")?;
+                        __w.write_string(#v_str)?;
                     }
                 });
             },
             Fields::Unnamed(unnamed) => {
-                // Bind each tuple element to a synthetic ident `__bind_0`, …
-                let bindings: Vec<syn::Ident> = (0..unnamed.unnamed.len())
+                let arity = unnamed.unnamed.len();
+                let bindings: Vec<syn::Ident> = (0..arity)
                     .map(|i| format_ident!("__bind_{}", i))
                     .collect();
-                let mut preambles = Vec::with_capacity(unnamed.unnamed.len());
-                let mut args = Vec::with_capacity(unnamed.unnamed.len());
-                for (i, f) in unnamed.unnamed.iter().enumerate() {
-                    let bind = &bindings[i];
-                    let path = quote! { #bind };
-                    let synthetic = format_ident!("v{}_field_{}", v_name, i);
-                    let span = f.ty.span();
-                    let (pre, val) = expand_field_value(&path, &f.ty, &synthetic, span)?;
-                    preambles.push(pre);
-                    args.push(val);
-                }
+                let elem_writes = unnamed.unnamed.iter().zip(&bindings).map(|(f, b)| {
+                    emit_write_field(&quote! { #b }, &f.ty, f.ty.span())
+                });
                 arms.push(quote! {
                     #name :: #v_name ( #(#bindings),* ) => {
-                        #(#preambles)*
-                        let __data_args: &[&dyn ::wolfram_serializer::ToWolfram] = &[ #(#args),* ];
-                        let __data_list =
-                            ::wolfram_serializer::__derive_support::ListThunk(__data_args);
-                        let __entries: &[(
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            bool,
-                        )] = &[
-                            (&"Enum" as &dyn ::wolfram_serializer::ToWolfram,
-                             &#v_str as &dyn ::wolfram_serializer::ToWolfram,
-                             false),
-                            (&"Data" as &dyn ::wolfram_serializer::ToWolfram,
-                             &__data_list as &dyn ::wolfram_serializer::ToWolfram,
-                             false),
-                        ];
-                        __s.serialize_association(__entries)?;
+                        __w.write_association(2)?;
+                        __w.write_rule(false)?;
+                        __w.write_string("Enum")?;
+                        __w.write_string(#v_str)?;
+                        __w.write_rule(false)?;
+                        __w.write_string("Data")?;
+                        __w.write_function(#arity)?;
+                        __w.write_symbol("System`List")?;
+                        #(#elem_writes)*
                     }
                 });
             },
             Fields::Named(named) => {
-                let bindings: Vec<&syn::Ident> = named
-                    .named
+                let fields: Vec<&syn::Field> = named.named.iter().collect();
+                let arity = fields.len();
+                let bindings: Vec<&syn::Ident> = fields
                     .iter()
                     .map(|f| f.ident.as_ref().expect("named field"))
                     .collect();
-                let mut preambles = Vec::with_capacity(named.named.len());
-                let mut entries = Vec::with_capacity(named.named.len());
-                for f in named.named.iter() {
-                    let f_attrs = parse_field_attrs(&f.attrs)?;
-                    let ident = f.ident.as_ref().unwrap();
-                    let key = f_attrs.rename.clone().unwrap_or_else(|| ident.to_string());
-                    let path = quote! { #ident };
-                    let synthetic = format_ident!("v{}_{}", v_name, ident);
-                    let span = f.ty.span();
-                    let (pre, val) = expand_field_value(&path, &f.ty, &synthetic, span)?;
-                    preambles.push(pre);
-                    entries.push(quote_spanned! { span =>
-                        (
-                            &(#key) as &dyn ::wolfram_serializer::ToWolfram,
-                            #val,
-                            false,
-                        )
-                    });
-                }
+                let entry_writes = emit_named_entries(&fields, &|id| quote! { #id })?;
                 arms.push(quote! {
                     #name :: #v_name { #(#bindings),* } => {
-                        #(#preambles)*
-                        let __data_entries: &[(
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            bool,
-                        )] = &[ #(#entries),* ];
-                        let __data_assoc =
-                            ::wolfram_serializer::__derive_support::AssocThunk(__data_entries);
-                        let __entries: &[(
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            &dyn ::wolfram_serializer::ToWolfram,
-                            bool,
-                        )] = &[
-                            (&"Enum" as &dyn ::wolfram_serializer::ToWolfram,
-                             &#v_str as &dyn ::wolfram_serializer::ToWolfram,
-                             false),
-                            (&"Data" as &dyn ::wolfram_serializer::ToWolfram,
-                             &__data_assoc as &dyn ::wolfram_serializer::ToWolfram,
-                             false),
-                        ];
-                        __s.serialize_association(__entries)?;
+                        __w.write_association(2)?;
+                        __w.write_rule(false)?;
+                        __w.write_string("Enum")?;
+                        __w.write_string(#v_str)?;
+                        __w.write_rule(false)?;
+                        __w.write_string("Data")?;
+                        __w.write_association(#arity)?;
+                        #(#entry_writes)*
                     }
                 });
             },

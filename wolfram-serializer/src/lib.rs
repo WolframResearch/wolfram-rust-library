@@ -1,69 +1,41 @@
-//! Serialize and deserialize [Wolfram Language expressions][wolfram_expr::Expr] to and
-//! from Wolfram Language `InputForm` text and the WXF binary wire format.
+//! Serialize and deserialize [Wolfram Language expressions][wolfram_expr::Expr]
+//! to and from the WXF binary wire format.
 //!
-//! Mirrors the architectural pattern of [`wolframclient.serializers`][wolframclient]
-//! in Python: a single [`serialize`] entry point produces bytes (WL or WXF), a single
-//! [`deserialize`] entry point reads WXF bytes back into [`Expr`].
+//! Two layers:
 //!
-//! WL parsing (text → Expr) is out of V1 scope: [`deserialize`] called with [`Format::Wl`]
-//! returns [`Error::UnsupportedImportFormat`].
+//! * Byte level — [`Reader`] / [`Writer`] (two methods each). The default
+//!   [`SliceReader`] reads zero-copy views over an in-memory buffer; the default
+//!   writer is `Vec<u8>`.
+//! * WXF level — [`WxfReader`] / [`WxfWriter`], typed sugar over the byte layer
+//!   built on the `wolfram_expr::wxf` enums.
 //!
-//! [wolframclient]: https://github.com/WolframResearch/WolframClientForPython
+//! Per-Rust-type encoding/decoding is [`ToWXF`] / [`FromWXF`], both generic over
+//! the byte layer (monomorphized, no `dyn`, streaming). Top-level entry points:
+//! [`to_wxf`], [`to_wxf_compressed`], [`from_wxf`].
 
 #![warn(missing_docs)]
 
-pub mod from_wolfram;
+pub mod from_wxf;
 pub mod numeric_in;
-pub mod serializer;
-pub mod wl;
+pub mod reader;
+pub mod to_wxf;
+pub mod writer;
 pub mod wxf;
 
-#[doc(hidden)]
-pub mod __derive_support {
-    //! Re-export of the `derive_support` module under a `__`-prefixed name.
-    //!
-    //! Hidden from rustdoc and not part of the stable API; only generated
-    //! code from `#[derive(ToWolfram)]` / `#[derive(FromWolfram)]` should
-    //! reference items here.
-    pub use crate::derive_support::*;
-}
-mod derive_support;
-
+pub use wolfram_expr::wxf::ExpressionEnum;
 pub use wolfram_expr::NumericArrayEnum;
 
-pub use crate::from_wolfram::FromWolfram;
-pub use crate::serializer::{Serializer, ToWolfram, WolframStruct};
-pub use crate::wxf::cursor::WxfCursor;
+pub use crate::from_wxf::FromWXF;
+pub use crate::reader::{Reader, SliceReader};
+pub use crate::to_wxf::{ToWXF, WxfStruct};
+pub use crate::writer::Writer;
+pub use crate::wxf::reader::WxfReader;
+pub use crate::wxf::writer::WxfWriter;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
-pub use wolfram_serializer_macros::{FromWolfram, ToWolfram};
+pub use wolfram_serializer_macros::{FromWXF, ToWXF};
 
-/// Output format selector for [`serialize`] / [`deserialize`].
-///
-/// The default ([`Format::Wxf`]) is what you get when you pass `None` as the
-/// `format` argument to [`serialize`] / [`deserialize`].
-///
-/// `deserialize` only needs `Format::Wxf` — the WXF wire header (`8:` vs `8C:`)
-/// self-describes whether the payload is compressed, so deserialization
-/// transparently auto-detects.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum Format {
-    /// Wolfram Language `InputForm` (UTF-8 text). Export-only in V1.
-    Wl,
-    /// WXF binary wire format, uncompressed (`8:` header).
-    Wxf,
-    /// WXF binary wire format, zlib-compressed (`8C:` header) at the given level.
-    WxfCompressed(CompressionLevel),
-}
-
-impl Default for Format {
-    /// `Format::Wxf` — uncompressed WXF, the canonical default.
-    fn default() -> Self {
-        Format::Wxf
-    }
-}
-
-/// zlib compression level used by [`Format::WxfCompressed`].
+/// zlib compression level used by [`to_wxf_compressed`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CompressionLevel {
     /// zlib level 1 — fastest, lowest ratio.
@@ -87,22 +59,19 @@ impl CompressionLevel {
     }
 }
 
-/// Errors returned by [`serialize`] / [`deserialize`].
+/// Errors returned by [`to_wxf`] / [`from_wxf`].
 #[derive(Debug)]
 pub enum Error {
-    /// Wraps an underlying [`std::io::Error`] from a writer or reader.
+    /// Wraps an underlying [`std::io::Error`] from a writer.
     Io(std::io::Error),
-    /// `deserialize(_, Format::Wl)` — WL parsing is not implemented in V1.
-    UnsupportedImportFormat,
     /// WXF byte stream is malformed (header mismatch, unexpected token,
     /// truncation, …) or an unhandled internal serialize/deserialize state.
     InvalidWxf(String),
-    /// Type mismatch during typed deserialization via [`FromWolfram`].
+    /// Type mismatch during typed deserialization via [`FromWXF`].
     /// `path` is a dotted accessor (e.g. `"Frame.payload"`); `expected` and
-    /// `got` describe the WXF / `ExprKind` shape the deserializer wanted vs.
-    /// what it found.
+    /// `got` describe the wire shape the deserializer wanted vs. what it found.
     Deserialize {
-        /// Field path threaded by the derived `FromWolfram` impl.
+        /// Field path threaded by the derived `FromWXF` impl.
         path: String,
         /// Human-readable description of the expected wire shape.
         expected: &'static str,
@@ -115,16 +84,8 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Io(e) => write!(f, "I/O error: {}", e),
-            Error::UnsupportedImportFormat => write!(
-                f,
-                "deserialize(): the requested Format does not support deserialization"
-            ),
             Error::InvalidWxf(msg) => write!(f, "invalid WXF: {}", msg),
-            Error::Deserialize {
-                path,
-                expected,
-                got,
-            } => {
+            Error::Deserialize { path, expected, got } => {
                 if path.is_empty() {
                     write!(f, "expected {}, got {}", expected, got)
                 } else {
@@ -150,65 +111,61 @@ impl From<std::io::Error> for Error {
     }
 }
 
-
 //==============================================================================
-// Top-level API — `serialize` and `deserialize` are the only entry points.
+// Top-level API
 //==============================================================================
 
-/// Serialize `value` using `format`, returning the bytes.
-///
-/// `format` is `impl Into<Option<Format>>`: pass `None` for the default
-/// ([`Format::Wxf`] — uncompressed WXF), or any [`Format`] variant directly
-/// for an explicit override.
-///
-/// ```ignore
-/// let bytes = serialize(&expr, None)?;                            // default: Wxf
-/// let bytes = serialize(&expr, Format::WxfCompressed(level))?;    // explicit override
-/// ```
-pub fn serialize<T: ToWolfram + ?Sized>(
-    value: &T,
-    format: impl Into<Option<Format>>,
-) -> Result<Vec<u8>, Error> {
-    let mut out: Vec<u8> = Vec::new();
-    match format.into().unwrap_or_default() {
-        Format::Wl => {
-            let mut s = wl::WlSerializer::new(&mut out);
-            value.serialize(&mut s)?;
-        },
-        Format::Wxf => {
-            let mut s = wxf::WxfSerializer::new(&mut out)?;
-            value.serialize(&mut s)?;
-        },
-        Format::WxfCompressed(level) => {
-            wxf::serialize_compressed(value, &mut out, level)?;
-        },
-    }
-    Ok(out)
+/// Serialize `value` to uncompressed WXF (`8:` header).
+pub fn to_wxf<T: ToWXF + ?Sized>(value: &T) -> Result<Vec<u8>, Error> {
+    let mut w = WxfWriter::new(Vec::<u8>::new());
+    w.write_version_header()?;
+    value.to_wxf(&mut w)?;
+    Ok(w.into_inner())
 }
 
-/// Deserialize `bytes` using `format` into a typed `T` via [`FromWolfram`].
+/// Serialize `value` to zlib-compressed WXF (`8C:` header) at `level`.
 ///
-/// Use `T = Expr` for an untyped tree; specify any other [`FromWolfram`] type
-/// — including types produced by `#[derive(FromWolfram)]` — for streaming
-/// typed deserialization (no intermediate [`Expr`] tree).
+/// Streams the token body directly through the [`ZlibEncoder`] — no
+/// intermediate uncompressed buffer.
 ///
-/// `format` is `impl Into<Option<Format>>`: pass `None` for the default
-/// ([`Format::Wxf`]), or any [`Format`] variant directly for an explicit
-/// override. The WXF wire header (`8:` vs `8C:`) self-describes whether the
-/// payload is compressed, so `Format::Wxf` and `Format::WxfCompressed(_)`
-/// both decode through the same cursor.
+/// [`ZlibEncoder`]: flate2::write::ZlibEncoder
+pub fn to_wxf_compressed<T: ToWXF + ?Sized>(
+    value: &T,
+    level: CompressionLevel,
+) -> Result<Vec<u8>, Error> {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use wolfram_expr::wxf::HeaderEnum;
+
+    // Pre-write the 8C: header into the output Vec, then hand it to the
+    // encoder. Everything serialized through the WxfWriter is compressed
+    // and appended; the header bytes remain uncompressed at the front.
+    let mut out = Vec::new();
+    out.extend_from_slice(&[
+        HeaderEnum::Version as u8,
+        HeaderEnum::Compress as u8,
+        HeaderEnum::Separator as u8,
+    ]);
+    let encoder = ZlibEncoder::new(out, Compression::new(u32::from(level.to_u8())));
+    let mut w = WxfWriter::new(encoder);
+    value.to_wxf(&mut w)?;
+    Ok(w.into_inner().finish()?)
+}
+
+/// Strip the WXF header (decompressing `8C:` payloads), returning the raw token
+/// stream. Use with [`SliceReader`] + [`WxfReader`] to read several top-level
+/// values from one blob (e.g. `Function[List, arg0, arg1, …]`).
+pub fn wxf_payload(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
+    wxf::strip_header(bytes)
+}
+
+/// Deserialize `bytes` (WXF; `8:` or `8C:` auto-detected) into a typed `T`.
 ///
-/// `format = Format::Wl` returns [`Error::UnsupportedImportFormat`] — text WL
-/// parsing is not implemented in V1.
-pub fn deserialize<T: FromWolfram>(
-    bytes: &[u8],
-    format: impl Into<Option<Format>>,
-) -> Result<T, Error> {
-    match format.into().unwrap_or_default() {
-        Format::Wl => Err(Error::UnsupportedImportFormat),
-        Format::Wxf | Format::WxfCompressed(_) => {
-            let mut cursor = WxfCursor::new(bytes)?;
-            T::from_cursor(&mut cursor)
-        },
-    }
+/// Use `T = Expr` for an untyped tree, or any [`FromWXF`] type — including those
+/// produced by `#[derive(FromWXF)]` — for typed deserialization with no
+/// intermediate [`Expr`][wolfram_expr::Expr].
+pub fn from_wxf<T: FromWXF>(bytes: &[u8]) -> Result<T, Error> {
+    let payload = wxf::strip_header(bytes)?;
+    let mut r = WxfReader::new(SliceReader::new(&payload));
+    T::from_wxf(&mut r)
 }

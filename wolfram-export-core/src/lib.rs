@@ -17,12 +17,12 @@
 pub use inventory;
 
 use wolfram_expr::{Association, Expr, ExprKind, RuleEntry, Symbol};
-use wolfram_serializer::{FromWolfram, ToWolfram};
+use wolfram_serializer::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
 /// via [`__wolfram_manifest_data__`]. Defined here so the CLI can share the
 /// type and deserialize directly with [`wolfram_serializer::deserialize`].
-#[derive(ToWolfram, FromWolfram, Debug)]
+#[derive(ToWXF, FromWXF, Debug)]
 #[allow(missing_docs)]
 pub struct FunctionEntry {
     pub name: String,
@@ -92,7 +92,7 @@ inventory::collect!(ExportEntry);
 pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
     let assoc: Expr = exported_library_functions_association(None);
     let bytes: Vec<u8> =
-        wolfram_serializer::serialize(&assoc, wolfram_serializer::Format::Wxf)
+        wolfram_serializer::to_wxf(&assoc)
             .expect("manifest WXF serialization");
     // Leak the buffer so the pointer remains valid after this function returns.
     // The manifest is small and the caller (cargo-wolfram-manifest) only calls
@@ -145,7 +145,7 @@ pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
         })
         .collect();
 
-    let wxf = wolfram_serializer::serialize(&entries, wolfram_serializer::Format::Wxf)
+    let wxf = wolfram_serializer::to_wxf(&entries)
         .expect("manifest WXF serialization failed");
     // Prepend the payload length as 8 little-endian bytes so the caller needs
     // no out-parameter — one zero-arg call, read [0..8] for the length, [8..] for WXF.

@@ -13,7 +13,7 @@
 //! you add a test case or want to refresh against a newer kernel.
 
 use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
-use wolfram_serializer::{deserialize, Format};
+use wolfram_serializer::from_wxf;
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;
@@ -22,7 +22,7 @@ mod fix;
 /// `expected`.
 #[track_caller]
 fn assert_parses_to(bytes: &[u8], expected: Expr) {
-    let parsed: Expr = deserialize(bytes, Format::Wxf).expect("deserialize kernel WXF");
+    let parsed: Expr = from_wxf(bytes).expect("deserialize kernel WXF");
     assert_eq!(parsed, expected);
 }
 
@@ -119,7 +119,7 @@ fn compressed_range_100() {
     // Kernel size-optimizes Range[100] into PackedArray[..., "Integer8"]
     // wrapped in an `8C:` zlib-compressed payload — exercises both the
     // compression handling and packed-array decoding.
-    let parsed: Expr = deserialize(fix::COMPRESSED_RANGE_100, Format::Wxf)
+    let parsed: Expr = from_wxf(fix::COMPRESSED_RANGE_100)
         .expect("deserialize compressed kernel WXF");
     let arr = parsed
         .try_as_packed_array()

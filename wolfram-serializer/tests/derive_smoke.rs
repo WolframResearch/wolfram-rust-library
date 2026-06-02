@@ -1,10 +1,10 @@
-//! Smoke test for `#[derive(ToWolfram)]` — minimal coverage just to ensure
+//! Smoke test for `#[derive(ToWXF)]` — minimal coverage just to ensure
 //! the macro produces compilable code for each shape we support. The full
 //! coverage matrix lives in `tests/derive.rs` once the deserialize side
 //! also lands.
 
 use wolfram_expr::{Association, Expr};
-use wolfram_serializer::{deserialize, serialize, Format, FromWolfram, ToWolfram};
+use wolfram_serializer::{from_wxf, to_wxf, FromWXF, ToWXF};
 
 /// Linear-scan helper for tests. `Association` itself exposes no lookup —
 /// tests iterate to find an entry.
@@ -16,7 +16,7 @@ fn find<'a>(assoc: &'a Association, key: &str) -> &'a Expr {
         .value
 }
 
-#[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
 struct Frame {
     payload: Vec<u8>,
     samples: Vec<i32>,
@@ -24,13 +24,13 @@ struct Frame {
     tag: Option<u32>,
 }
 
-#[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
 struct Point(f64, f64);
 
-#[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
 struct Marker;
 
-#[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
 struct Tensor1 {
     fixed: [i32; 4],
     nested: [[f64; 3]; 2],
@@ -43,14 +43,14 @@ struct Tensor1 {
 /// `optional_field_missing_key_yields_none` to verify that an absent
 /// Association entry for an `Option<T>` field deserializes as `None`
 /// (not as a "missing key" error).
-#[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
 struct TwoOrThree {
     a: i64,
     b: i64,
     c: Option<String>,
 }
 
-#[derive(Debug, PartialEq, ToWolfram, FromWolfram)]
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
 enum Shape {
     Origin,
     Square(f64),
@@ -66,8 +66,8 @@ fn frame_roundtrips_with_correct_wire_shapes() {
         name: "ada".into(),
         tag: Some(7),
     };
-    let bytes = serialize(&f, Format::Wxf).unwrap();
-    let expr: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&f).unwrap();
+    let expr: Expr = from_wxf(&bytes).unwrap();
     let assoc = expr
         .try_as_association()
         .expect("Frame should be Association");
@@ -95,8 +95,8 @@ fn frame_roundtrips_with_correct_wire_shapes() {
 #[test]
 fn point_tuple_struct_emits_function() {
     let p = Point(1.5, 2.5);
-    let bytes = serialize(&p, Format::Wxf).unwrap();
-    let expr: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&p).unwrap();
+    let expr: Expr = from_wxf(&bytes).unwrap();
     let normal = expr.try_as_normal().expect("Point should be Function[…]");
     // Tuple structs share the head `System`List` — they're identified by
     // their positional data, not by name.
@@ -108,8 +108,8 @@ fn point_tuple_struct_emits_function() {
 #[test]
 fn marker_unit_struct_emits_symbol() {
     let m = Marker;
-    let bytes = serialize(&m, Format::Wxf).unwrap();
-    let expr: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&m).unwrap();
+    let expr: Expr = from_wxf(&bytes).unwrap();
     let s = expr.try_as_symbol().expect("Marker should be Symbol");
     assert_eq!(s.as_str(), "Global`Marker");
 }
@@ -123,8 +123,8 @@ fn tensor_fields_become_numeric_arrays() {
         nested_tup: ((1.0, 2.0), (3.0, 4.0)),
         hetero: (42i64, "hello".into()),
     };
-    let bytes = serialize(&t, Format::Wxf).unwrap();
-    let expr: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&t).unwrap();
+    let expr: Expr = from_wxf(&bytes).unwrap();
     let assoc = expr.try_as_association().unwrap();
 
     let na = find(assoc, "fixed")
@@ -163,8 +163,8 @@ fn frame_roundtrips_through_from_wolfram() {
         name: "ada".into(),
         tag: Some(7),
     };
-    let bytes = serialize(&f, Format::Wxf).unwrap();
-    let back: Frame = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&f).unwrap();
+    let back: Frame = from_wxf(&bytes).unwrap();
     assert_eq!(f, back);
 }
 
@@ -176,24 +176,24 @@ fn frame_with_none_tag_roundtrips() {
         name: "empty".into(),
         tag: None,
     };
-    let bytes = serialize(&f, Format::Wxf).unwrap();
-    let back: Frame = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&f).unwrap();
+    let back: Frame = from_wxf(&bytes).unwrap();
     assert_eq!(f, back);
 }
 
 #[test]
 fn point_tuple_struct_roundtrips() {
     let p = Point(1.5, 2.5);
-    let bytes = serialize(&p, Format::Wxf).unwrap();
-    let back: Point = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&p).unwrap();
+    let back: Point = from_wxf(&bytes).unwrap();
     assert_eq!(p, back);
 }
 
 #[test]
 fn marker_unit_struct_roundtrips() {
     let m = Marker;
-    let bytes = serialize(&m, Format::Wxf).unwrap();
-    let back: Marker = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&m).unwrap();
+    let back: Marker = from_wxf(&bytes).unwrap();
     assert_eq!(m, back);
 }
 
@@ -206,8 +206,8 @@ fn tensor_struct_roundtrips() {
         nested_tup: ((1.0, 2.0), (3.0, 4.0)),
         hetero: (42i64, "hello".into()),
     };
-    let bytes = serialize(&t, Format::Wxf).unwrap();
-    let back: Tensor1 = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&t).unwrap();
+    let back: Tensor1 = from_wxf(&bytes).unwrap();
     assert_eq!(t, back);
 }
 
@@ -219,8 +219,8 @@ fn enum_roundtrips_all_variant_shapes() {
         Shape::Rect(1.0, 2.0),
         Shape::Circle { radius: 3.0 },
     ] {
-        let bytes = serialize(&v, Format::Wxf).unwrap();
-        let back: Shape = deserialize(&bytes, Format::Wxf).unwrap();
+        let bytes = to_wxf(&v).unwrap();
+        let back: Shape = from_wxf(&bytes).unwrap();
         assert_eq!(v, back);
     }
 }
@@ -244,31 +244,31 @@ fn enum_variants_emit_proper_shapes() {
     }
 
     // Unit variant: 1-entry Association with only "Enum".
-    let bytes = serialize(&Shape::Origin, Format::Wxf).unwrap();
-    let s: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&Shape::Origin).unwrap();
+    let s: Expr = from_wxf(&bytes).unwrap();
     let assoc = s.try_as_association().expect("Association");
     assert_eq!(assoc.len(), 1);
     assert_eq!(find(assoc, "Enum").try_as_str().unwrap(), "Origin");
 
     // Tuple variant (1 arg): "Data" → List of args.
-    let bytes = serialize(&Shape::Square(2.0), Format::Wxf).unwrap();
-    let s: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&Shape::Square(2.0)).unwrap();
+    let s: Expr = from_wxf(&bytes).unwrap();
     let data = assert_enum_key(&s, "Square");
     let list = data.try_as_normal().expect("Data is a List Function");
     assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
     assert_eq!(list.elements().len(), 1);
 
     // Tuple variant (2 args): "Data" → List of 2 args.
-    let bytes = serialize(&Shape::Rect(1.0, 2.0), Format::Wxf).unwrap();
-    let s: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&Shape::Rect(1.0, 2.0)).unwrap();
+    let s: Expr = from_wxf(&bytes).unwrap();
     let data = assert_enum_key(&s, "Rect");
     let list = data.try_as_normal().unwrap();
     assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
     assert_eq!(list.elements().len(), 2);
 
     // Struct variant: "Data" → inner Association of named fields.
-    let bytes = serialize(&Shape::Circle { radius: 3.0 }, Format::Wxf).unwrap();
-    let s: Expr = deserialize(&bytes, Format::Wxf).unwrap();
+    let bytes = to_wxf(&Shape::Circle { radius: 3.0 }).unwrap();
+    let s: Expr = from_wxf(&bytes).unwrap();
     let data = assert_enum_key(&s, "Circle");
     let inner = data.try_as_association().expect("Data is an Association");
     assert!(inner.iter().any(|e| e.key == Expr::from("radius")));
@@ -300,7 +300,7 @@ fn optional_field_missing_key_yields_none() {
     ];
 
     let parsed: TwoOrThree =
-        deserialize(bytes, Format::Wxf).expect("deserialize should succeed");
+        from_wxf(bytes).expect("deserialize should succeed");
     assert_eq!(
         parsed,
         TwoOrThree {
@@ -321,7 +321,7 @@ fn optional_field_missing_key_yields_none() {
             0x53, 0x01, 0x61,
             0x43, 0x01,
     ];
-    let err = deserialize::<TwoOrThree>(missing_required, Format::Wxf)
+    let err = from_wxf::<TwoOrThree>(missing_required)
         .expect_err("missing `b` should error");
     let msg = format!("{}", err);
     assert!(
