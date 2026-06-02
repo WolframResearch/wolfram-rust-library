@@ -19,6 +19,7 @@ pub mod constants;
 pub mod from_wxf;
 pub mod numeric_in;
 pub mod reader;
+pub mod strategy;
 pub mod to_wxf;
 pub mod writer;
 pub mod wxf;

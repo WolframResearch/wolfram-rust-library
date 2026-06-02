@@ -488,33 +488,8 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
                                 ),
                             );
                         }
-                        let _delayed = __c.read_rule()?;
-                        let __data_key = __c.read_string()?;
-                        if __data_key.as_str() != "Data" {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(
-                                    #v_path,
-                                    "Association entry with key \"Data\"",
-                                    format!("got key {:?}", __data_key),
-                                ),
-                            );
-                        }
-                        if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Function {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(#v_path, "List", "other".to_string()),
-                            );
-                        }
-                        let __list_arity = __c.read_varint()?;
-                        __c.skip()?; // discard head
-                        if __list_arity != #arity as u64 {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(
-                                    #v_path,
-                                    concat!("List with ", stringify!(#arity), " elements"),
-                                    format!("List with {} elements", __list_arity),
-                                ),
-                            );
-                        }
+                        // Reads `"Data" -> List[…]` header, validating arity.
+                        ::wolfram_wxf::strategy::read_data_header(__c, #arity)?;
                         #(#extracts)*
                         return ::core::result::Result::Ok(#name :: #v_name ( #(#bindings),* ));
                     }
@@ -574,35 +549,9 @@ fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<Tok
     }
 
     Ok(quote! {
-        if __tok != ::wolfram_wxf::ExpressionEnum::Association {
-            return ::core::result::Result::Err(
-                ::wolfram_wxf::from_wxf::err_at(
-                    #name_str, "Association", __tok.name().to_string(),
-                ),
-            );
-        }
-        let __n = __c.read_varint()?;
-        if __n == 0 {
-            return ::core::result::Result::Err(
-                ::wolfram_wxf::from_wxf::err_at(
-                    #name_str,
-                    "Association with at least an \"Enum\" entry",
-                    "empty Association".into(),
-                ),
-            );
-        }
-        let _enum_delayed = __c.read_rule()?;
-        let __enum_key = __c.read_string()?;
-        if __enum_key.as_str() != "Enum" {
-            return ::core::result::Result::Err(
-                ::wolfram_wxf::from_wxf::err_at(
-                    #name_str,
-                    "Association entry with first key \"Enum\"",
-                    format!("got first key {:?}", __enum_key),
-                ),
-            );
-        }
-        let __variant = __c.read_string()?;
+        // Reads the Association header + validates `"Enum" -> <name>`, returning
+        // the entry count and variant name (shared with Option/Result).
+        let (__n, __variant) = ::wolfram_wxf::strategy::read_enum_header(__c, __tok)?;
         match __variant.as_str() {
             #(#variant_arms)*
             _ => {

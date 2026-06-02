@@ -88,8 +88,15 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     );
     assert_eq!(na.dimensions(), &[3]);
 
-    // tag → Integer (since Some)
-    assert_eq!(find(assoc, "tag"), &Expr::from(7i64));
+    // tag → Option is an enum: Some(7) ⇒ <|"Enum" -> "Some", "Data" -> {7}|>
+    let tag = find(assoc, "tag")
+        .try_as_association()
+        .expect("tag (Some) should be an enum Association");
+    assert_eq!(find(tag, "Enum"), &Expr::from("Some"));
+
+    // typed round-trip
+    let back: Frame = from_wxf(&bytes).unwrap();
+    assert_eq!(back, f);
 }
 
 #[test]

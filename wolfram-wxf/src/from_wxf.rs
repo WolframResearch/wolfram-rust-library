@@ -144,24 +144,37 @@ impl FromWXF for () {
     }
 }
 
+// Option<T> / Result<T, E> read the same enum-association format the derive
+// emits (and that `Option`/`Result` ToWXF writes) — via the shared
+// `read_enum_header` / `read_data_header` helpers.
 impl<T: FromWXF> FromWXF for Option<T> {
     fn from_wxf_with_tag<R: Reader>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
-        if tok == ExpressionEnum::Symbol {
-            // Distinguish System`Null (None) from a symbol-shaped value. Reading
-            // the name consumes it, so a non-Null symbol can't be rebuilt into
-            // an arbitrary T — same documented limitation as before.
-            match r.read_str()? {
-                "System`Null" | "Null" => return Ok(None),
-                other => {
-                    return Err(Error::Deserialize {
-                        path: String::new(),
-                        expected: "Some(T) where T isn't symbol-shaped, or Null for None",
-                        got: format!("Symbol({:?})", other),
-                    })
-                },
-            }
+        let (_n, variant) = crate::strategy::read_enum_header(r, tok)?;
+        match variant.as_str() {
+            "None" => Ok(None),
+            "Some" => {
+                crate::strategy::read_data_header(r, 1)?;
+                Ok(Some(T::from_wxf(r)?))
+            },
+            other => Err(err_at("Option", "\"None\" or \"Some\"", format!("{:?}", other))),
         }
-        Ok(Some(T::from_wxf_with_tag(r, tok)?))
+    }
+}
+
+impl<T: FromWXF, E: FromWXF> FromWXF for Result<T, E> {
+    fn from_wxf_with_tag<R: Reader>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+        let (_n, variant) = crate::strategy::read_enum_header(r, tok)?;
+        match variant.as_str() {
+            "Ok" => {
+                crate::strategy::read_data_header(r, 1)?;
+                Ok(Ok(T::from_wxf(r)?))
+            },
+            "Err" => {
+                crate::strategy::read_data_header(r, 1)?;
+                Ok(Err(E::from_wxf(r)?))
+            },
+            other => Err(err_at("Result", "\"Ok\" or \"Err\"", format!("{:?}", other))),
+        }
     }
 }
 

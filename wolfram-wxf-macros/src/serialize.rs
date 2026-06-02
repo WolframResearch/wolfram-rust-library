@@ -233,10 +233,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
             Fields::Unit => {
                 arms.push(quote! {
                     #name :: #v_name => {
-                        __w.write_association(1)?;
-                        __w.write_rule(false)?;
-                        __w.write_string("Enum")?;
-                        __w.write_string(#v_str)?;
+                        ::wolfram_wxf::strategy::write_unit_variant(__w, #v_str)?;
                     }
                 });
             },
@@ -250,14 +247,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                 });
                 arms.push(quote! {
                     #name :: #v_name ( #(#bindings),* ) => {
-                        __w.write_association(2)?;
-                        __w.write_rule(false)?;
-                        __w.write_string("Enum")?;
-                        __w.write_string(#v_str)?;
-                        __w.write_rule(false)?;
-                        __w.write_string("Data")?;
-                        __w.write_function(#arity)?;
-                        __w.write_symbol("System`List")?;
+                        ::wolfram_wxf::strategy::begin_data_variant(__w, #v_str, #arity)?;
                         #(#elem_writes)*
                     }
                 });
