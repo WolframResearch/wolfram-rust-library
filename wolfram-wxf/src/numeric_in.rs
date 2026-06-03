@@ -188,11 +188,11 @@ macro_rules! impl_target {
     };
 }
 
-impl_target!(i8,  Integer8,          read_i8,  {});
+impl_target!(i8, Integer8, read_i8, {});
 impl_target!(i16, Integer16,         read_i16, { Integer8 => read_i8, UnsignedInteger8 => read_u8 });
 impl_target!(i32, Integer32,         read_i32, { Integer8 => read_i8, Integer16 => read_i16, UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16 });
 impl_target!(i64, Integer64,         read_i64, { Integer8 => read_i8, Integer16 => read_i16, Integer32 => read_i32, UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16, UnsignedInteger32 => read_u32 });
-impl_target!(u8,  UnsignedInteger8,  read_u8,  {});
+impl_target!(u8, UnsignedInteger8, read_u8, {});
 impl_target!(u16, UnsignedInteger16, read_u16, { UnsignedInteger8 => read_u8 });
 impl_target!(u32, UnsignedInteger32, read_u32, { UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16 });
 impl_target!(u64, UnsignedInteger64, read_u64, { UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16, UnsignedInteger32 => read_u32 });

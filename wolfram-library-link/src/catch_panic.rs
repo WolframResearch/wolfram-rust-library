@@ -47,8 +47,8 @@ impl CaughtPanic {
             backtrace,
         } = self.clone();
 
-        let message = Expr::string(message.unwrap_or("Rust panic (no message)".into()));
-        let location = Expr::string(location.unwrap_or("Unknown".into()));
+        let message = message.unwrap_or("Rust panic (no message)".into());
+        let location = location.unwrap_or("Unknown".into());
 
         #[cfg(feature = "panic-failure-backtraces")]
         let backtrace = display_backtrace(backtrace);
@@ -56,16 +56,10 @@ impl CaughtPanic {
         #[cfg(not(feature = "panic-failure-backtraces"))]
         let backtrace = crate::expr::expr!(Missing["NotEnabled"]);
 
-        // Failure["RustPanic", <|
-        //     "MessageTemplate" -> "`message`",
-        //     "MessageParameters" -> <|"message" -> "..."|>,
-        //     "SourceLocation" -> "...",
-        //     "Backtrace" -> ...
-        // |>]
         crate::expr::expr!(Failure["RustPanic", {
-            "MessageTemplate"  -> message,
-            "SourceLocation"   -> location,
-            "Backtrace"        -> backtrace
+            "MessageTemplate"   -> message,
+            "SourceLocation"    -> location,
+            "Backtrace"         -> backtrace
         }])
     }
 }
@@ -111,32 +105,25 @@ fn display_backtrace(bt: Option<Backtrace>) -> Expr {
             // Only make a clickable link if the file actually exists on disk.
             // This naturally excludes /rustc/... and other phantom paths baked
             // in by the compiler that are not present on the user's machine.
-            let courier = crate::expr::expr!({"FontFamily" -> "Courier"});
             let location = if file_exists {
-                let rgb = crate::expr::expr!(RGBColor[0.25f64, 0.48f64, 1.0f64]);
-                let style = crate::expr::expr!(Style[label, rgb, "Small", courier]);
                 let path_clone = path_str.clone();
-                let open = crate::expr::expr!(SystemOpen[path_clone]);
-                crate::expr::expr!(Button[style, open, {"Appearance" -> "Frameless"}])
+                crate::expr::expr!(Button[Style[label, RGBColor[0.25f64, 0.48f64, 1.0f64], "Small", "FontFamily" -> "Courier"], SystemOpen[path_clone], "Appearance" -> "Frameless"])
             } else {
-                crate::expr::expr!(Style[label, "Small", courier])
+                crate::expr::expr!(Style[label, "Small", "FontFamily" -> "Courier"])
             };
 
             let row = if path_str.is_empty() {
                 Expr::string(name.clone())
             } else {
                 let name_expr = name.clone();
-                let items = crate::expr::expr!(List[location, " in ", name_expr]);
-                crate::expr::expr!(Row[items])
+                crate::expr::expr!(Row[List[location, " in ", name_expr]])
             };
 
             frames.push(row);
         }
 
         let frames_list = Expr::list(frames);
-        let courier = crate::expr::expr!({"FontFamily" -> "Courier"});
-        let col = crate::expr::expr!(Column[frames_list]);
-        crate::expr::expr!(Style[col, courier])
+        crate::expr::expr!(Style[Column[frames_list], "FontFamily" -> "Courier"])
     } else {
         Expr::string("<unable to capture backtrace>")
     };

@@ -1,7 +1,7 @@
 use crate::symbol::{ContextRef, RelativeContext, SymbolNameRef, SymbolRef};
 use crate::{
-    Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayEnum, PackedArray,
-    PackedArrayEnum, Symbol,
+    expr, Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayEnum,
+    PackedArray, PackedArrayEnum, RuleEntry, Symbol,
 };
 
 /// `(input, is Symbol, is SymbolName, is Context, is RelativeContext)`
@@ -168,6 +168,55 @@ fn big_integer_variant_roundtrip() {
         other => panic!("expected BigInteger, got {:?}", other),
     }
 }
+#[test]
+fn expr_macro_nested_head_in_arg() {
+    // Style[Foo[2]] — nested function call in arg position
+    let by_macro = expr!(Style[Foo[2]]);
+    let by_hand = Expr::normal(
+        Symbol::new("System`Style"),
+        vec![Expr::normal(Symbol::new("System`Foo"), vec![Expr::from(2)])],
+    );
+    assert_eq!(by_macro, by_hand);
+
+    // Deeply nested: Style[Foo[Bar[3]], "x" -> "y"]
+    let by_macro = expr!(Style[Foo[Bar[3]], "x" -> "y"]);
+    let by_hand = Expr::normal(
+        Symbol::new("System`Style"),
+        vec![
+            Expr::normal(
+                Symbol::new("System`Foo"),
+                vec![Expr::normal(Symbol::new("System`Bar"), vec![Expr::from(3)])],
+            ),
+            Expr::normal(
+                Symbol::new("System`Rule"),
+                vec![Expr::from("x"), Expr::from("y")],
+            ),
+        ],
+    );
+    assert_eq!(by_macro, by_hand);
+}
+
+#[test]
+fn expr_macro_inline_rule() {
+    // expr!(Style[col, "FontFamily" -> "Courier"]) must equal the hand-built form
+    let col = Expr::from("content");
+    let by_macro = expr!(Style[col, "FontFamily" -> "Courier"]);
+
+    let col = Expr::from("content");
+    let by_hand = Expr::normal(
+        Symbol::new("System`Style"),
+        vec![
+            col,
+            Expr::normal(
+                Symbol::new("System`Rule"),
+                vec![Expr::from("FontFamily"), Expr::from("Courier")],
+            ),
+        ],
+    );
+
+    assert_eq!(by_macro, by_hand);
+}
+
 #[test]
 fn big_real_variant_roundtrip() {
     use crate::BigReal;

@@ -99,11 +99,21 @@ impl<'de> FromWXF<'de> for &'de [u8] {
 //
 // Helper: map a wire-token identifier to its WxfReader read call.
 macro_rules! read_wire {
-    (Integer8,  $r:expr) => { $r.read_i8()?  as _ };
-    (Integer16, $r:expr) => { $r.read_i16()? as _ };
-    (Integer32, $r:expr) => { $r.read_i32()? as _ };
-    (Integer64, $r:expr) => { $r.read_i64()? as _ };
-    (Real64,    $r:expr) => { $r.read_f64()? as _ };
+    (Integer8,  $r:expr) => {
+        $r.read_i8()? as _
+    };
+    (Integer16, $r:expr) => {
+        $r.read_i16()? as _
+    };
+    (Integer32, $r:expr) => {
+        $r.read_i32()? as _
+    };
+    (Integer64, $r:expr) => {
+        $r.read_i64()? as _
+    };
+    (Real64,    $r:expr) => {
+        $r.read_f64()? as _
+    };
 }
 
 macro_rules! impl_numeric_from_wxf {
@@ -128,7 +138,7 @@ macro_rules! impl_numeric_from_wxf {
 
 // Signed integers: accept only wire tokens whose values always fit (same or
 // smaller width). No runtime range check — the type of the wire read guarantees it.
-impl_numeric_from_wxf!(i8,  [Integer8]);
+impl_numeric_from_wxf!(i8, [Integer8]);
 impl_numeric_from_wxf!(i16, [Integer8, Integer16]);
 impl_numeric_from_wxf!(i32, [Integer8, Integer16, Integer32]);
 impl_numeric_from_wxf!(i64, [Integer8, Integer16, Integer32, Integer64]);
@@ -139,7 +149,6 @@ impl_numeric_from_wxf!(i64, [Integer8, Integer16, Integer32, Integer64]);
 // f64 mantissa = 52 bits: i8, i16, i32 (31-bit) fit; i64 (63-bit) does not.
 impl_numeric_from_wxf!(f32, [Integer8, Integer16]);
 impl_numeric_from_wxf!(f64, [Integer8, Integer16, Integer32, Real64]);
-
 
 impl<'de> FromWXF<'de> for bool {
     fn from_wxf_with_tag<R: Reader<'de>>(

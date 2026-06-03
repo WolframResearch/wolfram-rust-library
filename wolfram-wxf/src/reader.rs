@@ -49,7 +49,6 @@ impl<'a> SliceReader<'a> {
     pub fn new(bytes: &'a [u8]) -> Self {
         SliceReader { bytes, pos: 0 }
     }
-
 }
 
 impl<'de> Reader<'de> for SliceReader<'de> {

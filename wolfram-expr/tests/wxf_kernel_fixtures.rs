@@ -29,7 +29,11 @@ fn assert_parses_to(bytes: &[u8], expected: Expr) {
 #[track_caller]
 fn assert_serializes_to(expr: Expr, fixture: &[u8]) {
     let bytes = to_wxf(&expr, None).expect("serialize WXF");
-    assert_eq!(bytes.as_slice(), fixture, "serialized bytes don't match kernel fixture");
+    assert_eq!(
+        bytes.as_slice(),
+        fixture,
+        "serialized bytes don't match kernel fixture"
+    );
 }
 
 #[test]
@@ -129,7 +133,7 @@ fn numeric_array_int32() {
 
 #[test]
 fn expr_macro_integers() {
-    assert_serializes_to(expr!(42),            fix::INTEGER_42);
+    assert_serializes_to(expr!(42), fix::INTEGER_42);
     assert_serializes_to(expr!(-1_234_567_890i64), fix::INTEGER_NEG_LARGE);
 }
 
@@ -145,10 +149,7 @@ fn expr_macro_string() {
 
 #[test]
 fn expr_macro_association() {
-    assert_serializes_to(
-        expr!({ "a" -> 1, "b" -> 2 }),
-        fix::ASSOCIATION_PLAIN,
-    );
+    assert_serializes_to(expr!({ "a" -> 1, "b" -> 2 }), fix::ASSOCIATION_PLAIN);
 }
 
 #[test]

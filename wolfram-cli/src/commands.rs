@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use wolfram_app_discovery::{SystemID, WolframApp};
-use wolfram_expr::{Expr, ExprKind, RuleEntry, Symbol};
+use wolfram_expr::{expr, Expr, ExprKind};
 
 use crate::build::{
     collect_dylib_info, generate_package, resolve_paclet_config, run_cargo_build,
@@ -78,13 +78,6 @@ fn run_wl_script(
 
     drain_packets(link)?;
 
-    let fn_expr = Expr::normal(
-        Symbol::new("System`ToExpression"),
-        vec![
-            Expr::string(content.trim()),
-            Expr::from(Symbol::new("System`InputForm")),
-        ],
-    );
     let cwd = std::env::current_dir().context("failed to get current directory")?;
     let abs_files: Vec<String> = files
         .iter()
@@ -116,23 +109,17 @@ fn run_wl_script(
             })
             .collect::<Result<_>>()?,
     );
-    let assoc = Expr::new(ExprKind::Association(vec![
-        RuleEntry::rule(Expr::string("Files"), files_list),
-        RuleEntry::rule(Expr::string("Cwd"), Expr::string(cwd_str)),
-        RuleEntry::rule(Expr::string("LibPaths"), lib_paths_list),
-    ]));
 
     let out_path = out.unwrap_or_else(temp_wxf_path);
     let out_str = out_path.to_str().context("out path is not valid UTF-8")?;
 
-    let call = Expr::normal(
-        Symbol::new("System`Export"),
-        vec![
-            Expr::string(out_str),
-            Expr::normal(fn_expr, vec![assoc]),
-            Expr::string("WXF"),
-        ],
-    );
+    let content_str = content.trim();
+
+    let call = expr!(Export[out_str, Apply[ToExpression[content_str, "InputForm"], List[{
+        "Files"    -> files_list,
+        "Cwd"      -> cwd_str,
+        "LibPaths" -> lib_paths_list
+    }]], "WXF"]);
 
     link.put_eval_packet(&call)
         .map_err(|e| anyhow::anyhow!("failed to send eval packet: {:?}", e))?;

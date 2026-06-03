@@ -14,8 +14,8 @@ use wolfram_wxf::{
 };
 
 use crate::{
-    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray, PackedArray,
-    RuleEntry, Symbol,
+    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray,
+    PackedArray, RuleEntry, Symbol,
 };
 
 //==============================================================================

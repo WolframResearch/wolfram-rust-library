@@ -17,10 +17,6 @@
 pub use inventory;
 
 use wolfram_expr::{Expr, Symbol};
-// Only the `exported_library_functions_association` manifest builder (gated on
-// this feature) constructs an Association.
-#[cfg(feature = "automate-function-loading-boilerplate")]
-use wolfram_expr::{Association, ExprKind, RuleEntry};
 use wolfram_wxf::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
@@ -178,21 +174,14 @@ pub fn exported_library_functions_association(
             .expect("unable to automatically determine Rust LibraryLink dynamic library file path. Suggestion: pass the library name or path to exported_library_functions_association(..)")
     });
 
-    let mut assoc: Association = Vec::new();
-
-    for entry in inventory::iter::<ExportEntry> {
-        let code = match entry.loading_code(&library) {
-            Ok(code) => code,
-            // Skip entries whose signature() failed (e.g. raw
-            // `fn(&[MArgument], MArgument)` functions for which we can't derive
-            // a typed signature).
-            Err(_) => continue,
-        };
-
-        assoc.push(RuleEntry::rule(Expr::string(entry.name()), code));
-    }
-
-    Expr::new(ExprKind::Association(assoc))
+    use wolfram_expr::{Association, RuleEntry};
+    let assoc: Association = inventory::iter::<ExportEntry>()
+        .filter_map(|entry| {
+            let code = entry.loading_code(&library).ok()?;
+            Some(RuleEntry::rule(Expr::from(entry.name()), code))
+        })
+        .collect();
+    Expr::from(assoc)
 }
 
 #[cfg_attr(
@@ -209,112 +198,42 @@ impl ExportEntry {
     }
 
     fn loading_code(&self, library: &std::path::PathBuf) -> Result<Expr, String> {
-        fn sys(name: &str) -> Symbol {
-            Symbol::new(&format!("System`{}", name))
-        }
+        use wolfram_expr::expr;
 
-        let lib_func_load = sys("LibraryFunctionLoad");
-        let link_object = Expr::from(sys("LinkObject"));
-        let byte_array = Expr::from(sys("ByteArray"));
-        let library = Expr::string(
-            library
-                .to_str()
-                .expect("unable to convert library file path to str"),
-        );
+        let library = library
+            .to_str()
+            .expect("unable to convert library file path to str");
 
         let code = match self {
             ExportEntry::Native { name, signature } => {
                 let (args, ret) = signature()?;
-
-                Expr::normal(
-                    &lib_func_load,
-                    vec![
-                        library.clone(),
-                        Expr::string(*name),
-                        Expr::normal(sys("List"), args),
-                        ret,
-                    ],
-                )
+                let name = *name;
+                let args_list = Expr::normal(Symbol::new("System`List"), args);
+                let lfl = expr!(LibraryFunctionLoad[library, name, args_list, ret]);
+                lfl
             },
-            // WSTP-mode loading code, preserved verbatim from the legacy
-            // LibraryLinkFunction::Wstp arm — wraps LibraryFunctionLoad in
-            // a Function[Block[...]] that resets $Context for predictable
-            // symbol context across the link.
+            // WSTP-mode: wraps LibraryFunctionLoad in Function[Block[...]] that
+            // resets $Context for predictable symbol resolution across the link.
             ExportEntry::Wstp { name } => {
-                let load_call = Expr::normal(
-                    &lib_func_load,
-                    vec![
-                        library.clone(),
-                        Expr::string(*name),
-                        link_object.clone(),
-                        link_object,
-                    ],
-                );
-
+                let name = *name;
+                let load_call =
+                    expr!(LibraryFunctionLoad[library, name, "LinkObject", "LinkObject"]);
                 let var = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
-
-                Expr::normal(
-                    sys("With"),
-                    vec![
-                        Expr::normal(
-                            sys("List"),
-                            vec![Expr::normal(sys("Set"), vec![var.clone(), load_call])],
-                        ),
-                        Expr::normal(
-                            sys("Function"),
-                            vec![Expr::normal(
-                                sys("Block"),
-                                vec![
-                                    Expr::normal(
-                                        sys("List"),
-                                        vec![
-                                            Expr::normal(
-                                                sys("Set"),
-                                                vec![
-                                                    Expr::from(sys("$Context")),
-                                                    Expr::string(
-                                                        "RustLinkWSTPPrivateContext`",
-                                                    ),
-                                                ],
-                                            ),
-                                            Expr::normal(
-                                                sys("Set"),
-                                                vec![
-                                                    Expr::from(sys("$ContextPath")),
-                                                    Expr::normal(sys("List"), vec![]),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                    Expr::normal(
-                                        var,
-                                        vec![Expr::normal(
-                                            sys("SlotSequence"),
-                                            vec![Expr::from(1)],
-                                        )],
-                                    ),
-                                ],
-                            )],
-                        ),
-                    ],
-                )
+                let ctx = Expr::from(Symbol::new("System`$Context"));
+                let ctx_path = Expr::from(Symbol::new("System`$ContextPath"));
+                let set_ctx = expr!(Set[ctx, "RustLinkWSTPPrivateContext`"]);
+                let set_ctx_path = expr!(Set[ctx_path, List[]]);
+                let var2 = var.clone();
+                let set_var = expr!(Set[var2, load_call]);
+                let slot_seq = expr!(SlotSequence[1]);
+                let body = Expr::normal(var, vec![slot_seq]);
+                expr!(With[List[set_var], Function[Block[List[set_ctx, set_ctx_path], body]]])
             },
-            // Wxf-mode: the wire shape at the LibraryLink C ABI level is
-            // always `{ByteArray} -> ByteArray`. The typed argument/return
-            // types from `signature()` are intentionally NOT embedded in the
-            // emitted LibraryFunctionLoad call — they live in the manifest
-            // for display/documentation only. Callers are expected to wrap
-            // calls with BinarySerialize/BinaryDeserialize (or use a helper
-            // generated alongside the manifest).
-            ExportEntry::Wxf { name, .. } => Expr::normal(
-                &lib_func_load,
-                vec![
-                    library.clone(),
-                    Expr::string(*name),
-                    Expr::normal(sys("List"), vec![byte_array.clone()]),
-                    byte_array,
-                ],
-            ),
+            // Wxf-mode: wire shape is always {ByteArray} -> ByteArray.
+            ExportEntry::Wxf { name, .. } => {
+                let name = *name;
+                expr!(LibraryFunctionLoad[library, name, List["ByteArray"], "ByteArray"])
+            },
         };
 
         Ok(code)

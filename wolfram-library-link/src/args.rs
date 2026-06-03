@@ -32,7 +32,7 @@ pub trait FromArg<'a> {
     /// assert_eq!(&i64::parameter_type().to_string(), "System`Integer");
     /// assert_eq!(
     ///     &<&NumericArray<i8>>::parameter_type().to_string(),
-    ///     r#"System`List[System`LibraryDataType[System`NumericArray, "Integer8"], "Constant"]"#
+    ///     r#"System`List[System`LibraryDataType["NumericArray", "Integer8"], "Constant"]"#
     /// );
     /// ```
     ///

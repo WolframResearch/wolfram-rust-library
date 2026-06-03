@@ -54,7 +54,6 @@ pub type Complex64 = Complex<f64>;
 /// exists in `WolframLibrary.h`, so this type is wolfram-expr-only.
 pub type Complex32 = Complex<f32>;
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
