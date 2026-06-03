@@ -229,6 +229,12 @@ impl From<Association> for Expr {
     }
 }
 
+impl From<Vec<Expr>> for Expr {
+    fn from(v: Vec<Expr>) -> Expr {
+        Expr::list(v)
+    }
+}
+
 impl From<NumericArray> for Expr {
     fn from(a: NumericArray) -> Expr {
         Expr {

@@ -208,9 +208,7 @@ impl ExportEntry {
             ExportEntry::Native { name, signature } => {
                 let (args, ret) = signature()?;
                 let name = *name;
-                let args_list = Expr::normal(Symbol::new("System`List"), args);
-                let lfl = expr!(LibraryFunctionLoad[library, name, args_list, ret]);
-                lfl
+                expr!(LibraryFunctionLoad[library, name, args, ret])
             },
             // WSTP-mode: wraps LibraryFunctionLoad in Function[Block[...]] that
             // resets $Context for predictable symbol resolution across the link.
@@ -218,8 +216,8 @@ impl ExportEntry {
                 let name = *name;
                 let load_call =
                     expr!(LibraryFunctionLoad[library, name, "LinkObject", "LinkObject"]);
-                let var  = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
-                let ctx  = Expr::from(Symbol::new("System`$Context"));
+                let var = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
+                let ctx = Expr::from(Symbol::new("System`$Context"));
                 let ctx_path = Expr::from(Symbol::new("System`$ContextPath"));
                 let var2 = var.clone();
                 let body = Expr::normal(var, vec![expr!(SlotSequence[1])]);
