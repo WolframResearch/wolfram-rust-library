@@ -63,8 +63,7 @@ impl CaughtPanic {
         //     "Backtrace" -> ...
         // |>]
         crate::expr::expr!(Failure["RustPanic", {
-            "MessageTemplate"  -> "`message`",
-            "MessageParameters" -> {"message" -> message},
+            "MessageTemplate"  -> message,
             "SourceLocation"   -> location,
             "Backtrace"        -> backtrace
         }])
