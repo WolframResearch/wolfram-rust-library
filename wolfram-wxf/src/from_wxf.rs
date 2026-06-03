@@ -13,7 +13,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::constants::ExpressionEnum;
-use crate::reader::RefReader;
+use crate::reader::Reader;
 use crate::wxf::reader::WxfReader;
 use crate::Error;
 
@@ -28,13 +28,13 @@ use crate::Error;
 /// borrowed types (e.g. `&'de str`) name it in `Self`.
 pub trait FromWXF<'de>: Sized {
     /// Read a complete value: its expression token, then its body.
-    fn from_wxf<R: RefReader<'de>>(r: &mut WxfReader<R>) -> Result<Self, Error> {
+    fn from_wxf<R: Reader<'de>>(r: &mut WxfReader<R>) -> Result<Self, Error> {
         let tok = r.read_expr_token()?;
         Self::from_wxf_with_tag(r, tok)
     }
 
     /// Read the body given the already-consumed expression token.
-    fn from_wxf_with_tag<R: RefReader<'de>>(
+    fn from_wxf_with_tag<R: Reader<'de>>(
         r: &mut WxfReader<R>,
         tok: ExpressionEnum,
     ) -> Result<Self, Error>;
@@ -58,20 +58,20 @@ pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> E
 //==============================================================================
 
 impl<'de> FromWXF<'de> for &'de str {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::String {
             return Err(Error::Deserialize { path: String::new(), expected: "String (&str)", got: tok.name().into() });
         }
-        r.read_str_ref()
+        r.read_str()
     }
 }
 
 impl<'de> FromWXF<'de> for &'de [u8] {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::ByteArray {
             return Err(Error::Deserialize { path: String::new(), expected: "ByteArray (&[u8])", got: tok.name().into() });
         }
-        r.read_byte_array_ref()
+        r.read_byte_array()
     }
 }
 
@@ -83,7 +83,7 @@ macro_rules! impl_int_from_wxf {
     ($($t:ty),+) => {
         $(
             impl<'de> FromWXF<'de> for $t {
-                fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+                fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
                     let n = r.read_integer_body(tok)?;
                     <$t>::try_from(n).map_err(|_| Error::Deserialize {
                         path: String::new(),
@@ -98,7 +98,7 @@ macro_rules! impl_int_from_wxf {
 impl_int_from_wxf!(i8, i16, i32, i64, u8, u16, u32, u64);
 
 impl<'de> FromWXF<'de> for f32 {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         match tok {
             ExpressionEnum::Real64 => Ok(r.read_f64()? as f32),
             ExpressionEnum::Integer8
@@ -111,7 +111,7 @@ impl<'de> FromWXF<'de> for f32 {
 }
 
 impl<'de> FromWXF<'de> for f64 {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         match tok {
             ExpressionEnum::Real64 => r.read_f64(),
             ExpressionEnum::Integer8
@@ -124,7 +124,7 @@ impl<'de> FromWXF<'de> for f64 {
 }
 
 impl<'de> FromWXF<'de> for bool {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
             return Err(Error::Deserialize {
                 path: String::new(),
@@ -146,7 +146,7 @@ impl<'de> FromWXF<'de> for bool {
 
 // Owned `String` is the borrowed `&str` read + a copy.
 impl<'de> FromWXF<'de> for String {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         <&str as FromWXF<'de>>::from_wxf_with_tag(r, tok).map(str::to_owned)
     }
 }
@@ -156,7 +156,7 @@ impl<'de> FromWXF<'de> for String {
 //==============================================================================
 
 impl<'de> FromWXF<'de> for () {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
             return Err(Error::Deserialize { path: String::new(), expected: "() (Null symbol)", got: tok.name().into() });
         }
@@ -175,7 +175,7 @@ impl<'de> FromWXF<'de> for () {
 // emits (and that `Option`/`Result` ToWXF writes) — via the shared
 // `read_enum_header` / `read_data_header` helpers.
 impl<'de, T: FromWXF<'de>> FromWXF<'de> for Option<T> {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         let (_n, variant) = crate::strategy::read_enum_header(r, tok)?;
         match variant.as_str() {
             "None" => Ok(None),
@@ -189,7 +189,7 @@ impl<'de, T: FromWXF<'de>> FromWXF<'de> for Option<T> {
 }
 
 impl<'de, T: FromWXF<'de>, E: FromWXF<'de>> FromWXF<'de> for Result<T, E> {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         let (_n, variant) = crate::strategy::read_enum_header(r, tok)?;
         match variant.as_str() {
             "Ok" => {
@@ -210,7 +210,7 @@ where
     K: FromWXF<'de> + Eq + std::hash::Hash,
     V: FromWXF<'de>,
 {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::Association {
             return Err(Error::Deserialize { path: String::new(), expected: "Association", got: tok.name().into() });
         }
@@ -231,7 +231,7 @@ where
     K: FromWXF<'de> + Ord,
     V: FromWXF<'de>,
 {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::Association {
             return Err(Error::Deserialize { path: String::new(), expected: "Association", got: tok.name().into() });
         }
@@ -253,7 +253,7 @@ where
 
 // Owned `Vec<u8>` (= `wolfram_expr::ByteArray`) is the borrowed `&[u8]` read + a copy.
 impl<'de> FromWXF<'de> for Vec<u8> {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         <&[u8] as FromWXF<'de>>::from_wxf_with_tag(r, tok).map(<[u8]>::to_vec)
     }
 }
@@ -263,7 +263,7 @@ macro_rules! impl_vec_numeric_from_wxf {
     ($($t:ty),+ $(,)?) => {
         $(
             impl<'de> FromWXF<'de> for Vec<$t> {
-                fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+                fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
                     crate::numeric_in::read_vec_with_tag::<$t, R>(r, tok, "")
                 }
             }
@@ -274,7 +274,7 @@ impl_vec_numeric_from_wxf!(i8, i16, i32, i64, u16, u32, u64, f32, f64);
 
 // `Vec<T>` for derived structs/enums → `Function[List, …]`.
 impl<'de, T: FromWXF<'de> + crate::to_wxf::WxfStruct> FromWXF<'de> for Vec<T> {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::Function {
             return Err(Error::Deserialize { path: String::new(), expected: "Function (List)", got: tok.name().into() });
         }

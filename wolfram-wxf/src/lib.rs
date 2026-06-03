@@ -3,9 +3,9 @@
 //!
 //! Two layers:
 //!
-//! * Byte level — [`Reader`] / [`Writer`] (two methods each). The default
-//!   [`SliceReader`] reads zero-copy views over an in-memory buffer; the default
-//!   writer is `Vec<u8>`.
+//! * Byte level — [`Reader`] / [`Writer`]. [`Reader`] lends zero-copy
+//!   buffer-lifetime views (`&'de`), so the default [`SliceReader`] reads
+//!   straight out of an in-memory buffer; the default writer is `Vec<u8>`.
 //! * WXF level — [`WxfReader`] / [`WxfWriter`], typed sugar over the byte layer
 //!   built on the WXF token enums.
 //!
@@ -26,7 +26,7 @@ pub mod wxf;
 
 pub use crate::constants::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 pub use crate::from_wxf::FromWXF;
-pub use crate::reader::{Reader, RefReader, SliceReader};
+pub use crate::reader::{Reader, SliceReader};
 pub use crate::to_wxf::{ToWXF, WxfStruct};
 pub use crate::writer::Writer;
 pub use crate::wxf::reader::WxfReader;

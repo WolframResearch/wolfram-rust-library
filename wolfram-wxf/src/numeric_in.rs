@@ -36,7 +36,7 @@ pub trait NumericTarget: Sized + Copy + 'static {
 /// Read the next value as a flat `Vec<T>`. Accepts `NumericArray`,
 /// `PackedArray` (any rank — multi-dim flattens row-major), or `ByteArray`
 /// (treated as a 1-D `NumericArray<Integer8>`).
-pub fn read_vec<T: NumericTarget, R: Reader>(
+pub fn read_vec<'de, T: NumericTarget, R: Reader<'de>>(
     r: &mut WxfReader<R>,
     path: &str,
 ) -> Result<Vec<T>, Error> {
@@ -45,7 +45,7 @@ pub fn read_vec<T: NumericTarget, R: Reader>(
 }
 
 /// [`read_vec`] given an already-consumed expression token.
-pub fn read_vec_with_tag<T: NumericTarget, R: Reader>(
+pub fn read_vec_with_tag<'de, T: NumericTarget, R: Reader<'de>>(
     r: &mut WxfReader<R>,
     tok: ExpressionEnum,
     path: &str,
@@ -71,7 +71,7 @@ pub fn read_vec_with_tag<T: NumericTarget, R: Reader>(
 }
 
 /// Like [`read_vec`] but errors if the resulting buffer length doesn't equal `n`.
-pub fn read_fixed<T: NumericTarget, R: Reader>(
+pub fn read_fixed<'de, T: NumericTarget, R: Reader<'de>>(
     r: &mut WxfReader<R>,
     path: &str,
     n: usize,
@@ -81,7 +81,7 @@ pub fn read_fixed<T: NumericTarget, R: Reader>(
 }
 
 /// [`read_fixed`] given an already-consumed expression token.
-pub fn read_fixed_with_tag<T: NumericTarget, R: Reader>(
+pub fn read_fixed_with_tag<'de, T: NumericTarget, R: Reader<'de>>(
     r: &mut WxfReader<R>,
     tok: ExpressionEnum,
     path: &str,

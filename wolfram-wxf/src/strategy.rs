@@ -56,7 +56,7 @@ pub fn begin_data_variant<W: Writer>(
 /// Read an enum-association header (token already consumed): validates the first
 /// entry is `"Enum" -> <variant name>` and returns `(entry_count, variant_name)`.
 /// The caller dispatches on the name; data variants then call [`read_data_header`].
-pub fn read_enum_header<R: Reader>(
+pub fn read_enum_header<'de, R: Reader<'de>>(
     r: &mut WxfReader<R>,
     tok: ExpressionEnum,
 ) -> Result<(u64, String), Error> {
@@ -82,7 +82,7 @@ pub fn read_enum_header<R: Reader>(
 /// After [`read_enum_header`] yields a data variant, read the `"Data"` entry: the
 /// `Data` key + a `List` header, validating its arity equals `n_data`. The caller
 /// then reads the `n_data` payload values.
-pub fn read_data_header<R: Reader>(r: &mut WxfReader<R>, n_data: usize) -> Result<(), Error> {
+pub fn read_data_header<'de, R: Reader<'de>>(r: &mut WxfReader<R>, n_data: usize) -> Result<(), Error> {
     r.read_rule()?;
     let key = r.read_string()?;
     if key != "Data" {

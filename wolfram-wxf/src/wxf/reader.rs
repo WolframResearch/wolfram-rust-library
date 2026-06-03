@@ -9,7 +9,7 @@
 //! (`Symbol`, `NumericArray`, …) are assembled by the consumer (`wolfram-expr`).
 
 use crate::constants::{ExpressionEnum, NumericArrayEnum, PackedArrayEnum};
-use crate::reader::{Reader, RefReader};
+use crate::reader::Reader;
 use crate::Error;
 
 /// Typed WXF reader wrapping a raw byte [`Reader`].
@@ -17,7 +17,7 @@ pub struct WxfReader<R> {
     inner: R,
 }
 
-impl<R: Reader> WxfReader<R> {
+impl<'de, R: Reader<'de>> WxfReader<R> {
     /// Wrap a raw reader. The reader is assumed to be positioned at the start of
     /// the WXF payload (header already consumed — see [`crate::from_wxf`]).
     pub fn new(inner: R) -> Self {
@@ -31,8 +31,8 @@ impl<R: Reader> WxfReader<R> {
         self.inner.read_byte()
     }
 
-    /// Consume `n` raw bytes as a zero-copy view.
-    pub fn read_bytes(&mut self, n: usize) -> Result<&[u8], Error> {
+    /// Consume `n` raw bytes as a zero-copy, buffer-lifetime view.
+    pub fn read_bytes(&mut self, n: usize) -> Result<&'de [u8], Error> {
         self.inner.read_bytes(n)
     }
 
@@ -122,8 +122,9 @@ impl<R: Reader> WxfReader<R> {
     //---- length-prefixed payloads (tag already consumed) ----------------
 
     /// Read a `String`/`Symbol`-shaped payload: varint length + UTF-8 bytes.
-    /// Zero-copy — returns a view into the underlying buffer.
-    pub fn read_str(&mut self) -> Result<&str, Error> {
+    /// Zero-copy — returns a `&'de str` view into the underlying buffer, so it
+    /// serves both the owned path (`.to_owned()`) and borrowed fields (`&'de str`).
+    pub fn read_str(&mut self) -> Result<&'de str, Error> {
         let len = self.read_varint()? as usize;
         let bytes = self.inner.read_bytes(len)?;
         std::str::from_utf8(bytes).map_err(|_| Error::InvalidWxf("payload not valid UTF-8".into()))
@@ -145,8 +146,10 @@ impl<R: Reader> WxfReader<R> {
         Ok(self.read_str()?.to_owned())
     }
 
-    /// Read a `ByteArray` payload: varint length + raw bytes (zero-copy view).
-    pub fn read_byte_array(&mut self) -> Result<&[u8], Error> {
+    /// Read a `ByteArray` payload: varint length + raw bytes. Zero-copy — returns
+    /// a `&'de [u8]` view into the underlying buffer (owned path copies via
+    /// `.to_vec()`; borrowed `&'de [u8]` fields keep it).
+    pub fn read_byte_array(&mut self) -> Result<&'de [u8], Error> {
         let len = self.read_varint()? as usize;
         self.inner.read_bytes(len)
     }
@@ -259,25 +262,5 @@ impl<R: Reader> WxfReader<R> {
             },
         }
         Ok(())
-    }
-}
-
-/// Borrowed (zero-copy) payload reads — available when the underlying reader can
-/// lend buffer-lifetime views ([`RefReader`]). Used by `#[derive(FromWxfRef)]`.
-impl<'de, R: RefReader<'de>> WxfReader<R> {
-    /// Read a `String` payload as a `&'de str` borrowing the input buffer
-    /// (tag already consumed). Zero-copy — no allocation.
-    pub fn read_str_ref(&mut self) -> Result<&'de str, Error> {
-        let len = self.read_varint()? as usize;
-        let bytes = self.inner.read_bytes_ref(len)?;
-        std::str::from_utf8(bytes)
-            .map_err(|_| Error::InvalidWxf("String payload not valid UTF-8".into()))
-    }
-
-    /// Read a `ByteArray` payload as a `&'de [u8]` borrowing the input buffer
-    /// (tag already consumed). Zero-copy — no allocation.
-    pub fn read_byte_array_ref(&mut self) -> Result<&'de [u8], Error> {
-        let len = self.read_varint()? as usize;
-        self.inner.read_bytes_ref(len)
     }
 }

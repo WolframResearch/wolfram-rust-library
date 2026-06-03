@@ -62,7 +62,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics ::wolfram_wxf::FromWXF<'de> for #name #ty_generics #where_clause {
-            fn from_wxf_with_tag<__R: ::wolfram_wxf::RefReader<'de>>(
+            fn from_wxf_with_tag<__R: ::wolfram_wxf::Reader<'de>>(
                 __c: &mut ::wolfram_wxf::WxfReader<__R>,
                 __tok: ::wolfram_wxf::ExpressionEnum,
             ) -> ::core::result::Result<Self, ::wolfram_wxf::Error> {
@@ -348,7 +348,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                     ::wolfram_wxf::from_wxf::err_at(#err_path, "String (&str)", "other".to_string()),
                 );
             }
-            __c.read_str_ref()?
+            __c.read_str()?
         }};
     }
     if is_ref_u8_slice(ty) {
@@ -358,7 +358,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                     ::wolfram_wxf::from_wxf::err_at(#err_path, "ByteArray (&[u8])", "other".to_string()),
                 );
             }
-            __c.read_byte_array_ref()?
+            __c.read_byte_array()?
         }};
     }
     match classify(ty) {

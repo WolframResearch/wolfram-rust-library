@@ -8,7 +8,7 @@
 use std::convert::TryFrom;
 
 use wolfram_wxf::{
-    ExpressionEnum, FromWXF, NumericArrayEnum, PackedArrayEnum, RefReader, ToWXF, WxfReader,
+    ExpressionEnum, FromWXF, NumericArrayEnum, PackedArrayEnum, Reader, ToWXF, WxfReader,
     WxfWriter, Writer,
 };
 use wolfram_wxf::Error;
@@ -137,7 +137,7 @@ fn packed_array_from_parts(
 }
 
 impl<'de> FromWXF<'de> for Symbol {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
             return Err(Error::Deserialize { path: String::new(), expected: "Symbol", got: tok.name().into() });
         }
@@ -146,7 +146,7 @@ impl<'de> FromWXF<'de> for Symbol {
 }
 
 impl<'de> FromWXF<'de> for NumericArray {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::NumericArray {
             return Err(Error::Deserialize { path: String::new(), expected: "NumericArray", got: tok.name().into() });
         }
@@ -156,7 +156,7 @@ impl<'de> FromWXF<'de> for NumericArray {
 }
 
 impl<'de> FromWXF<'de> for PackedArray {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::PackedArray {
             return Err(Error::Deserialize { path: String::new(), expected: "PackedArray", got: tok.name().into() });
         }
@@ -169,7 +169,7 @@ impl<'de> FromWXF<'de> for PackedArray {
 // (orphan rule); use [`read_association`] directly, or deserialize as `Expr`.
 
 impl<'de> FromWXF<'de> for BigInteger {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::BigInteger {
             return Err(Error::Deserialize { path: String::new(), expected: "BigInteger", got: tok.name().into() });
         }
@@ -178,7 +178,7 @@ impl<'de> FromWXF<'de> for BigInteger {
 }
 
 impl<'de> FromWXF<'de> for BigReal {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         if tok != ExpressionEnum::BigReal {
             return Err(Error::Deserialize { path: String::new(), expected: "BigReal", got: tok.name().into() });
         }
@@ -187,7 +187,7 @@ impl<'de> FromWXF<'de> for BigReal {
 }
 
 /// Read an Association body (token already consumed): `count` × (rule, key, value).
-fn read_association<'de, R: RefReader<'de>>(r: &mut WxfReader<R>) -> Result<Association, Error> {
+fn read_association<'de, R: Reader<'de>>(r: &mut WxfReader<R>) -> Result<Association, Error> {
     let n = r.read_varint()?;
     let mut a = Association::new();
     for _ in 0..n {
@@ -200,7 +200,7 @@ fn read_association<'de, R: RefReader<'de>>(r: &mut WxfReader<R>) -> Result<Asso
 }
 
 impl<'de> FromWXF<'de> for Expr {
-    fn from_wxf_with_tag<R: RefReader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
         match tok {
             ExpressionEnum::Integer8
             | ExpressionEnum::Integer16
