@@ -782,6 +782,12 @@ pub fn aborted() -> bool {
     val == 1
 }
 
+/// Environment variable that opts in to backtrace resolution in caught-panic
+/// `Failure["RustPanic", …]` expressions (the `panic-failure-backtraces` feature
+/// must also be enabled). Resolving symbols is slow, so it's off unless set.
+#[cfg(feature = "panic-failure-backtraces")]
+const BACKTRACE_ENV_VAR: &str = "LIBRARY_LINK_RUST_BACKTRACE";
+
 // TODO: Instead of making these public, add new evaluate(..) alternative that
 //       takes a WstpExpr type.
 #[cfg(feature = "wstp")]

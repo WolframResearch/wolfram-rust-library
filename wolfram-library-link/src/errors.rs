@@ -28,10 +28,14 @@ pub const FAILED_WITH_PANIC: c_int = OFFSET + 2;
 pub enum LibraryError {
     /// A Rust panic caught while running an exported function. The `backtrace`
     /// is a renderable [`Expr`] (a clickable `Column` of frames when the
-    /// `panic-failure-backtraces` feature is on, else `Missing[…]`).
+    /// `panic-failure-backtraces` feature is on *and* the backtrace env var is
+    /// set, else `Missing[…]`).
+    ///
+    /// Renders to the same `Failure["RustPanic", …]` shape as upstream: a
+    /// `MessageTemplate` with a `` `message` `` slot filled by `MessageParameters`.
     RustPanic {
-        /// Human-readable panic message (the WL `MessageTemplate`).
-        message_template: String,
+        /// The panic message (substituted into the `MessageTemplate`).
+        message: String,
         /// `file:line` where the panic originated.
         source_location: String,
         /// The backtrace as a renderable expression.
@@ -69,14 +73,17 @@ impl LibraryError {
     /// Render this error as its `Failure["Variant", <|…|>]` [`Expr`].
     pub fn to_expr(&self) -> Expr {
         match self.clone() {
+            // Same shape as upstream: a MessageTemplate with a `message` slot
+            // filled by MessageParameters, plus SourceLocation and Backtrace.
             LibraryError::RustPanic {
-                message_template,
+                message,
                 source_location,
                 backtrace,
             } => expr!(Failure["RustPanic", {
-                "MessageTemplate" -> message_template,
-                "SourceLocation"  -> source_location,
-                "Backtrace"       -> backtrace
+                "MessageTemplate"   -> "Rust LibraryLink function panic: `message`",
+                "MessageParameters" -> {"message" -> message},
+                "SourceLocation"    -> source_location,
+                "Backtrace"         -> backtrace
             }]),
             LibraryError::Loader {
                 message,
@@ -131,7 +138,7 @@ mod tests {
             vec![Expr::string("NotEnabled")],
         );
         let err = LibraryError::RustPanic {
-            message_template: "boom".into(),
+            message: "boom".into(),
             source_location: "src/x.rs:1".into(),
             backtrace: backtrace.clone(),
         };
@@ -149,7 +156,20 @@ mod tests {
                 .find(|e| e.key == Expr::from(k))
                 .map(|e| e.value.clone())
         };
-        assert_eq!(find("MessageTemplate"), Some(Expr::from("boom")));
+        // Upstream-compatible shape: template + MessageParameters carry the message.
+        assert_eq!(
+            find("MessageTemplate"),
+            Some(Expr::from("Rust LibraryLink function panic: `message`"))
+        );
+        let params = find("MessageParameters").unwrap();
+        let params = params.try_as_association().unwrap();
+        assert_eq!(
+            params
+                .iter()
+                .find(|e| e.key == Expr::from("message"))
+                .map(|e| e.value.clone()),
+            Some(Expr::from("boom"))
+        );
         assert_eq!(find("SourceLocation"), Some(Expr::from("src/x.rs:1")));
         // The backtrace Expr is carried through verbatim — no serialization detour.
         assert_eq!(find("Backtrace"), Some(backtrace));
@@ -160,7 +180,7 @@ mod tests {
         let backtrace = Expr::string("bt");
         let variants = [
             LibraryError::RustPanic {
-                message_template: "m".into(),
+                message: "m".into(),
                 source_location: "l".into(),
                 backtrace,
             },

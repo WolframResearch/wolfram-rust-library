@@ -40,7 +40,7 @@ pub struct CaughtPanic {
 impl CaughtPanic {
     /// The caught panic as a typed [`LibraryError::RustPanic`], carrying the
     /// backtrace as a renderable [`Expr`].
-    pub fn to_library_error(&self) -> crate::errors::LibraryError {
+    pub(crate) fn to_library_error(&self) -> crate::errors::LibraryError {
         let CaughtPanic {
             message,
             location,
@@ -52,23 +52,42 @@ impl CaughtPanic {
         let message = message.unwrap_or("Rust panic (no message)".into());
         let location = location.unwrap_or("Unknown".into());
 
-        #[cfg(feature = "panic-failure-backtraces")]
-        let backtrace = display_backtrace(backtrace);
-
-        #[cfg(not(feature = "panic-failure-backtraces"))]
-        let backtrace = crate::expr::expr!(Missing["NotEnabled"]);
+        // Only resolve a backtrace when the feature is on *and* the user opted in
+        // via the env var — resolving is slow and noisy otherwise. Matches the
+        // upstream gating so behavior is unchanged.
+        let backtrace = {
+            #[cfg(feature = "panic-failure-backtraces")]
+            {
+                if should_show_backtrace() {
+                    display_backtrace(backtrace)
+                } else {
+                    crate::expr::expr!(Missing["NotEnabled"])
+                }
+            }
+            #[cfg(not(feature = "panic-failure-backtraces"))]
+            {
+                crate::expr::expr!(Missing["NotEnabled"])
+            }
+        };
 
         crate::errors::LibraryError::RustPanic {
-            message_template: message,
+            message,
             source_location: location,
             backtrace,
         }
     }
 
     /// The caught panic rendered as a `Failure["RustPanic", <|…|>]` [`Expr`].
-    pub fn to_pretty_expr(&self) -> Expr {
+    pub(crate) fn to_pretty_expr(&self) -> Expr {
         self.to_library_error().to_expr()
     }
+}
+
+/// Whether to resolve and show a backtrace, gated on the `LIBRARY_LINK_RUST_BACKTRACE`
+/// env var (matches upstream; resolving symbols can take 100s of ms).
+#[cfg(feature = "panic-failure-backtraces")]
+fn should_show_backtrace() -> bool {
+    std::env::var(crate::BACKTRACE_ENV_VAR).is_ok()
 }
 
 #[cfg(feature = "panic-failure-backtraces")]
