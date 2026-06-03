@@ -14,9 +14,7 @@ use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::NativeFunction;
 
 /// Returned when [`wolfram_library_link::initialize`] fails on entry.
-const FAILED_TO_INIT: c_int = 1001;
 /// Returned when the wrapped Rust code panicked.
-const FAILED_WITH_PANIC: c_int = 1002;
 
 /// Bridge a native `#[export]`-marked function across the LibraryLink C ABI.
 ///
@@ -32,12 +30,14 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
     func: F,
 ) -> c_int {
     if wolfram_library_link::initialize(lib_data).is_err() {
-        return FAILED_TO_INIT;
+        return wolfram_library_link::FAILED_TO_INIT;
     }
 
     let argc = match usize::try_from(argc) {
         Ok(argc) => argc,
-        Err(_) => return sys::LIBRARY_FUNCTION_ERROR as c_int,
+        Err(_) => {
+            return wolfram_library_link::LibraryError::InvalidArgCount.return_code()
+        },
     };
 
     // FIXME: This isn't safe! 'a could be 'static, and then the user could store the
@@ -46,7 +46,7 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
     let args: &[MArgument] = std::slice::from_raw_parts(args, argc);
 
     if call_and_catch_as_expr(AssertUnwindSafe(move || func.call(args, res))).is_err() {
-        return FAILED_WITH_PANIC;
+        return wolfram_library_link::FAILED_WITH_PANIC;
     }
 
     sys::LIBRARY_NO_ERROR as c_int
@@ -59,11 +59,11 @@ pub unsafe fn init_with_user_function(
     user_init_func: fn(),
 ) -> c_int {
     if wolfram_library_link::initialize(lib).is_err() {
-        return FAILED_TO_INIT;
+        return wolfram_library_link::FAILED_TO_INIT;
     }
 
     if call_and_catch_as_expr(user_init_func).is_err() {
-        FAILED_WITH_PANIC
+        wolfram_library_link::FAILED_WITH_PANIC
     } else {
         sys::LIBRARY_NO_ERROR as c_int
     }

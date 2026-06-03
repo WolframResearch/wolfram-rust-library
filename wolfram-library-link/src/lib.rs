@@ -262,7 +262,7 @@ pub use self::{
     args::{FromArg, IntoArg, NativeFunction},
     async_tasks::AsyncTaskObject,
     data_store::{DataStore, DataStoreNode, DataStoreNodeValue, Nodes},
-    errors::LibraryError,
+    errors::{LibraryError, FAILED_TO_INIT, FAILED_WITH_PANIC},
     image::{ColorSpace, Image, ImageData, ImageType, Pixel, UninitImage},
     library_data::{get_library_data, initialize, WolframLibraryData},
     numeric_array::{

@@ -5,37 +5,13 @@ use wstp::{self, Link};
 
 use crate::{
     catch_panic::call_and_catch_panic,
+    errors::LibraryError,
     expr::Expr,
     sys::{self, MArgument},
     NativeFunction,
 };
 #[cfg(feature = "wstp")]
 use crate::{catch_panic::CaughtPanic, sys::LIBRARY_NO_ERROR, WstpFunction};
-
-/// Error codes returned by macro-generated wrapper code.
-///
-/// If no error occured, [`sys::LIBRARY_NO_ERROR`] is returned.
-///
-/// Using separate error codes for macro-generated code makes the source of the error
-/// clearer when something goes wrong in wrapper code.
-//
-// TODO: Make this module public somewhere and document these error code in #[export(..)]
-//       and Overview.md.
-mod error_code {
-    use std::os::raw::c_int;
-
-    // Chosen arbitrarily. Avoids clashing with `LIBRARY_FUNCTION_ERROR` and related
-    // error codes.
-    const OFFSET: c_int = 1000;
-
-    /// A call to [initialize()][crate::initialize] failed.
-    pub const FAILED_TO_INIT: c_int = OFFSET + 1;
-
-    /// The library code panicked.
-    //
-    // TODO: Wherever this code is set, also set a $LastError-like variable.
-    pub const FAILED_WITH_PANIC: c_int = OFFSET + 2;
-}
 
 //==================
 // Shared panic helper
@@ -67,7 +43,7 @@ unsafe fn call_wstp_link_wolfram_library_function<
 ) -> c_int {
     // Initialize the library.
     if crate::initialize(libdata).is_err() {
-        return error_code::FAILED_TO_INIT;
+        return LibraryError::NotInitialized.return_code();
     }
 
     let link = Link::unchecked_ref_cast_mut(&mut unsafe_link);
@@ -79,68 +55,39 @@ unsafe fn call_wstp_link_wolfram_library_function<
 
     match result {
         Ok(()) => LIBRARY_NO_ERROR as c_int,
-        // Try to fail gracefully by writing the panic message as a Failure[..] object to
-        // be returned, but if that fails, just return LIBRARY_FUNCTION_ERROR.
-        Err(panic) => match write_panic_failure_to_link(link, panic) {
-            Ok(()) => LIBRARY_NO_ERROR as c_int,
-            Err(_wstp_err) => {
-                // println!("PANIC ERROR: {}", _wstp_err);
-                error_code::FAILED_WITH_PANIC
-            },
+        // Try to fail gracefully by writing the panic as a Failure[..] to the link;
+        // if even that fails, surrender to the FAILED_WITH_PANIC return code.
+        Err(panic) => {
+            let err = panic.to_library_error();
+            match write_failure_to_link(link, &err.to_expr()) {
+                Ok(()) => LIBRARY_NO_ERROR as c_int,
+                Err(_wstp_err) => err.return_code(),
+            }
         },
     }
 }
 
+/// Write a `Failure[..]` expression to the link, recovering from any error state
+/// the link may have been left in (a panic is often triggered by a failed
+/// `link.read(...).unwrap()`, which poisons the link).
 #[cfg(feature = "wstp")]
-fn write_panic_failure_to_link(
+pub(crate) fn write_failure_to_link(
     link: &mut Link,
-    caught_panic: CaughtPanic,
+    failure: &Expr,
 ) -> Result<(), wstp::Error> {
-    // Clear the last error on the link, if any.
-    //
-    // This is necessary because the panic we caught might have been caused by
-    // code like:
-    //
-    //     link.do_something(...).unwrap()
-    //
-    // where `do_something()` fails, which will have "poisoned" the link, and would cause
-    // our attempt to write the panic message to the link to fail if we didn't clear the
-    // error.
-    //
-    // If there is no error condition set on the link, this is a no-op.
-    //
-    // TODO: If an error *is* set, mention that in the Failure message? That might help
-    //       users debug link issues more quickly.
+    // Clear any poisoned error state so our own `put_expr` can proceed.
     link.clear_error();
 
-    // Skip whatever data is still stored in the link, if any.
+    // Skip whatever (possibly partial) data is still on the link.
     if link.is_ready() {
         link.raw_get_next()?;
-
-        // Skip to the next packet on the link.
-        //
-        // If there is (possibly partial) data that is unread, this will
-        // skip to the end and return Ok. If there is partially complete data
-        // being *written*, this will still skip to the end, but will return
-        // an Err(..).
-        //
-        // Incomplete data being read typically happens if an unwrap()
-        // fails when expecting to read an argument of a specific type.
-        //
-        // Incomplete data being written typically happens if a panic occurs
-        // within the logic that puts the function return value. E.g.:
-        //
-        //     link.put_function("List", 3)?; // Start writing a function of 3 elems
-        //     todo!() // <-- leave the List[... incomplete.
-
         let result: Result<(), _> = link.new_packet();
-
         if result.is_err() {
             link.clear_error();
         }
     }
 
-    link.put_expr(&caught_panic.to_pretty_expr())
+    link.put_expr(failure)
 }
 
 //======================================
@@ -158,12 +105,12 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
 
     // Initialize the library.
     if crate::initialize(lib_data).is_err() {
-        return error_code::FAILED_TO_INIT;
+        return LibraryError::NotInitialized.return_code();
     }
 
     let argc = match usize::try_from(argc) {
         Ok(argc) => argc,
-        Err(_) => return sys::LIBRARY_FUNCTION_ERROR as c_int,
+        Err(_) => return LibraryError::InvalidArgCount.return_code(),
     };
 
     // FIXME: This isn't safe! 'a could be 'static, and then the user could store the
@@ -174,7 +121,7 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
     if call_and_catch_panic(AssertUnwindSafe(move || func.call(args, res))).is_err() {
         // TODO: Store the panic into a "LAST_ERROR" static, and provide an accessor to
         //       get it from WL? E.g. RustLink`GetLastError[<optional func name>].
-        return error_code::FAILED_WITH_PANIC;
+        return crate::errors::FAILED_WITH_PANIC;
     };
 
     sys::LIBRARY_NO_ERROR as c_int
@@ -218,22 +165,54 @@ pub unsafe fn load_library_functions_impl(
     lib_data: sys::WolframLibraryData,
     raw_link: wstp::sys::WSLINK,
 ) -> c_int {
+    let loader_failure = |link: &mut Link, message: &str, expected: &str, got: Expr| {
+        let f = LibraryError::Loader {
+            message: message.to_string(),
+            expected: expected.to_string(),
+            got,
+        };
+        let _ = write_failure_to_link(link, &f.to_expr());
+    };
+
     call_wstp_link_wolfram_library_function(lib_data, raw_link, |link: &mut Link| {
-        let arg_count: usize =
-            link.test_head("List").expect("expected 'List' expression");
+        let arg_count = match link.test_head("List") {
+            Ok(n) => n,
+            Err(e) => {
+                loader_failure(
+                    link,
+                    "loader call must be List[path]",
+                    "List",
+                    Expr::string(e.to_string()),
+                );
+                return;
+            },
+        };
 
         if arg_count != 1 {
-            panic!(
-                "expected 1 argument: the name of or file path to the dynamic library"
+            loader_failure(
+                link,
+                "loader takes exactly one argument: the dynamic library path",
+                "1 argument",
+                Expr::from(arg_count as i64),
             );
+            return;
         }
 
-        let path = {
-            let path = match link.get_string_ref() {
-                Ok(value) => value,
-                Err(err) => panic!("expected String argument (error: {})", err),
-            };
-            std::path::PathBuf::from(path.as_str())
+        let path = match link
+            .get_string_ref()
+            .map(|s| std::path::PathBuf::from(s.as_str()))
+            .map_err(|e| e.to_string())
+        {
+            Ok(p) => p,
+            Err(msg) => {
+                loader_failure(
+                    link,
+                    "loader argument must be a String path",
+                    "String",
+                    Expr::string(msg),
+                );
+                return;
+            },
         };
 
         let expr = exported_library_functions_association(Some(path));
@@ -447,11 +426,11 @@ pub unsafe fn init_with_user_function(
     user_init_func: fn(),
 ) -> c_int {
     if let Err(()) = crate::initialize(lib) {
-        return error_code::FAILED_TO_INIT as c_int;
+        return LibraryError::NotInitialized.return_code() as c_int;
     }
 
     if let Err(_) = call_and_catch_panic(user_init_func) {
-        error_code::FAILED_WITH_PANIC as c_int
+        crate::errors::FAILED_WITH_PANIC as c_int
     } else {
         sys::LIBRARY_NO_ERROR as c_int
     }

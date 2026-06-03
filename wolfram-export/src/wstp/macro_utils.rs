@@ -15,9 +15,6 @@ use wolfram_library_link::sys::{self, LIBRARY_NO_ERROR};
 use wolfram_library_link::WstpFunction;
 use wstp::Link;
 
-const FAILED_TO_INIT: c_int = 1001;
-const FAILED_WITH_PANIC: c_int = 1002;
-
 /// Shared inner helper: initialize, run `function(link)` under a panic guard,
 /// and on panic write the resulting `Failure[..]` expression to the link.
 unsafe fn call_wstp_link_wolfram_library_function<
@@ -28,7 +25,7 @@ unsafe fn call_wstp_link_wolfram_library_function<
     function: F,
 ) -> c_int {
     if wolfram_library_link::initialize(libdata).is_err() {
-        return FAILED_TO_INIT;
+        return wolfram_library_link::FAILED_TO_INIT;
     }
 
     let link = Link::unchecked_ref_cast_mut(&mut unsafe_link);
@@ -40,10 +37,10 @@ unsafe fn call_wstp_link_wolfram_library_function<
     match result {
         Ok(()) => LIBRARY_NO_ERROR as c_int,
         // Try to fail gracefully by writing the panic-as-Failure[..] to the
-        // link; if that itself fails we surrender to FAILED_WITH_PANIC.
+        // link; if that itself fails we surrender to the FAILED_WITH_PANIC code.
         Err(failure_expr) => match write_failure_to_link(link, failure_expr) {
             Ok(()) => LIBRARY_NO_ERROR as c_int,
-            Err(_wstp_err) => FAILED_WITH_PANIC,
+            Err(_wstp_err) => wolfram_library_link::FAILED_WITH_PANIC,
         },
     }
 }

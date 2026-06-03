@@ -20,9 +20,6 @@ use wolfram_wxf::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
 // Re-exported so the `#[export(wxf)]` proc-macro can name them by path.
 pub use wolfram_wxf::{FromWXF, ToWXF};
 
-const FAILED_TO_INIT: c_int = 1001;
-const FAILED_WITH_PANIC: c_int = 1002;
-
 /// (arg types, return type) signature for every `#[export(wxf)]` function:
 /// one ByteArray in, one ByteArray out.
 pub fn wxf_signature() -> Result<(Vec<Expr>, Expr), String> {
@@ -108,18 +105,20 @@ pub unsafe fn call_wxf_wolfram_library_function<'a, F: NativeFunction<'a>>(
     func: F,
 ) -> c_int {
     if wolfram_library_link::initialize(lib_data).is_err() {
-        return FAILED_TO_INIT;
+        return wolfram_library_link::FAILED_TO_INIT;
     }
 
     let argc = match usize::try_from(argc) {
         Ok(argc) => argc,
-        Err(_) => return sys::LIBRARY_FUNCTION_ERROR as c_int,
+        Err(_) => {
+            return wolfram_library_link::LibraryError::InvalidArgCount.return_code()
+        },
     };
 
     let args: &[MArgument] = std::slice::from_raw_parts(args, argc);
 
     if call_and_catch_as_expr(AssertUnwindSafe(move || func.call(args, res))).is_err() {
-        return FAILED_WITH_PANIC;
+        return wolfram_library_link::FAILED_WITH_PANIC;
     }
 
     sys::LIBRARY_NO_ERROR as c_int

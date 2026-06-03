@@ -867,17 +867,13 @@ mod wstp_impls {
         unsafe fn call(&self, link: &mut Link) {
             let args: Vec<Expr> = match get_args_list(link) {
                 Ok(args) => args,
-                Err(message) => panic!("WstpFunction: {}", message),
+                Err(message) => return write_arg_failure(link, ArgFail::Read(message)),
             };
 
             let result: Expr = self(args);
 
-            match link.put_expr(&result) {
-                Ok(()) => (),
-                Err(err) => panic!(
-                    "WstpFunction: WSTP error writing return expression to link: {}",
-                    err
-                ),
+            if let Err(err) = link.put_expr(&result) {
+                write_arg_failure(link, ArgFail::Write(err.to_string()));
             }
         }
     }
@@ -886,19 +882,31 @@ mod wstp_impls {
         unsafe fn call(&self, link: &mut Link) {
             let args: Vec<Expr> = match get_args_list(link) {
                 Ok(args) => args,
-                Err(message) => panic!("WstpFunction: {}", message),
+                Err(message) => return write_arg_failure(link, ArgFail::Read(message)),
             };
 
             let _null: () = self(args);
 
-            match link.put_symbol("System`Null") {
-                Ok(()) => (),
-                Err(err) => panic!(
-                    "WstpFunction: WSTP error writing return Null expression to link: {}",
-                    err
-                ),
+            if let Err(err) = link.put_symbol("System`Null") {
+                write_arg_failure(link, ArgFail::Write(err.to_string()));
             }
         }
+    }
+
+    /// Which side of the WSTP `Vec<Expr>` exchange failed.
+    enum ArgFail {
+        Read(String),
+        Write(String),
+    }
+
+    /// Write a structured `Failure[...]` to the link for an argument read /
+    /// result write failure, instead of panicking into a generic RustPanic.
+    fn write_arg_failure(link: &mut Link, fail: ArgFail) {
+        let err = match fail {
+            ArgFail::Read(message) => crate::LibraryError::ArgumentRead { message },
+            ArgFail::Write(message) => crate::LibraryError::ResultWrite { message },
+        };
+        let _ = crate::macro_utils::write_failure_to_link(link, &err.to_expr());
     }
 
     //----------------------------
