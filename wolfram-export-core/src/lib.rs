@@ -218,16 +218,21 @@ impl ExportEntry {
                 let name = *name;
                 let load_call =
                     expr!(LibraryFunctionLoad[library, name, "LinkObject", "LinkObject"]);
-                let var = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
-                let ctx = Expr::from(Symbol::new("System`$Context"));
+                let var  = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
+                let ctx  = Expr::from(Symbol::new("System`$Context"));
                 let ctx_path = Expr::from(Symbol::new("System`$ContextPath"));
-                let set_ctx = expr!(Set[ctx, "RustLinkWSTPPrivateContext`"]);
-                let set_ctx_path = expr!(Set[ctx_path, List[]]);
                 let var2 = var.clone();
-                let set_var = expr!(Set[var2, load_call]);
-                let slot_seq = expr!(SlotSequence[1]);
-                let body = Expr::normal(var, vec![slot_seq]);
-                expr!(With[List[set_var], Function[Block[List[set_ctx, set_ctx_path], body]]])
+                let body = Expr::normal(var, vec![expr!(SlotSequence[1])]);
+                expr!(With[
+                    List[Set[var2, load_call]],
+                    Function[Block[
+                        List[
+                            Set[ctx, "RustLinkWSTPPrivateContext`"],
+                            Set[ctx_path, List[]]
+                        ],
+                        body
+                    ]]
+                ])
             },
             // Wxf-mode: wire shape is always {ByteArray} -> ByteArray.
             ExportEntry::Wxf { name, .. } => {
