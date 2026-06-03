@@ -15,6 +15,7 @@
 
 #![warn(missing_docs)]
 
+pub mod complex;
 pub mod constants;
 pub mod from_wxf;
 pub mod numeric_in;
@@ -23,6 +24,8 @@ pub mod strategy;
 pub mod to_wxf;
 pub mod writer;
 pub mod wxf;
+
+pub use crate::complex::{Complex, Complex32, Complex64};
 
 pub use crate::constants::{
     ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum,

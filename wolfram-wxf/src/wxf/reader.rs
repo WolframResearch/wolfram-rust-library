@@ -109,21 +109,6 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
         Ok(f64::from_le_bytes(b.try_into().unwrap()))
     }
 
-    /// Read an integer body for one of the four integer tokens (tag already
-    /// consumed), widening to `i64`. Errors for any non-integer token.
-    pub fn read_integer_body(&mut self, tok: ExpressionEnum) -> Result<i64, Error> {
-        match tok {
-            ExpressionEnum::Integer8 => Ok(i64::from(self.read_i8()?)),
-            ExpressionEnum::Integer16 => Ok(i64::from(self.read_i16()?)),
-            ExpressionEnum::Integer32 => Ok(i64::from(self.read_i32()?)),
-            ExpressionEnum::Integer64 => self.read_i64(),
-            other => Err(Error::InvalidWxf(format!(
-                "expected Integer, got {}",
-                other.name()
-            ))),
-        }
-    }
-
     //---- length-prefixed payloads (tag already consumed) ----------------
 
     /// Read a `String`/`Symbol`-shaped payload: varint length + UTF-8 bytes.

@@ -14,8 +14,8 @@ use wolfram_wxf::{
 };
 
 use crate::{
-    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray,
-    PackedArray, RuleEntry, Symbol,
+    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray, PackedArray,
+    RuleEntry, Symbol,
 };
 
 //==============================================================================
@@ -249,10 +249,10 @@ impl<'de> FromWXF<'de> for Expr {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         match tok {
-            ExpressionEnum::Integer8
-            | ExpressionEnum::Integer16
-            | ExpressionEnum::Integer32
-            | ExpressionEnum::Integer64 => Ok(Expr::from(r.read_integer_body(tok)?)),
+            ExpressionEnum::Integer8 => Ok(Expr::from(i64::from(r.read_i8()?))),
+            ExpressionEnum::Integer16 => Ok(Expr::from(i64::from(r.read_i16()?))),
+            ExpressionEnum::Integer32 => Ok(Expr::from(i64::from(r.read_i32()?))),
+            ExpressionEnum::Integer64 => Ok(Expr::from(r.read_i64()?)),
             ExpressionEnum::Real64 => {
                 let f = r.read_f64()?;
                 if f.is_nan() {

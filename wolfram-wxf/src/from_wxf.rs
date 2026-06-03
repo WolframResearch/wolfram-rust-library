@@ -93,63 +93,53 @@ impl<'de> FromWXF<'de> for &'de [u8] {
 // Primitive scalars (owned — generic over 'de)
 //==============================================================================
 
-macro_rules! impl_int_from_wxf {
-    ($($t:ty),+) => {
-        $(
-            impl<'de> FromWXF<'de> for $t {
-                fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
-                    let n = r.read_integer_body(tok)?;
-                    <$t>::try_from(n).map_err(|_| Error::Deserialize {
+// One macro for all numeric scalars. Each call site lists *exactly* the wire
+// tokens that fit in the target type without any runtime range check or silent
+// truncation. Tokens are matched directly to their read method via a helper.
+//
+// Helper: map a wire-token identifier to its WxfReader read call.
+macro_rules! read_wire {
+    (Integer8,  $r:expr) => { $r.read_i8()?  as _ };
+    (Integer16, $r:expr) => { $r.read_i16()? as _ };
+    (Integer32, $r:expr) => { $r.read_i32()? as _ };
+    (Integer64, $r:expr) => { $r.read_i64()? as _ };
+    (Real64,    $r:expr) => { $r.read_f64()? as _ };
+}
+
+macro_rules! impl_numeric_from_wxf {
+    ($t:ty, [$($tok:ident),+]) => {
+        impl<'de> FromWXF<'de> for $t {
+            fn from_wxf_with_tag<R: Reader<'de>>(
+                r: &mut WxfReader<R>,
+                tok: ExpressionEnum,
+            ) -> Result<Self, Error> {
+                match tok {
+                    $(ExpressionEnum::$tok => Ok(read_wire!($tok, r)),)+
+                    other => Err(Error::Deserialize {
                         path: String::new(),
-                        expected: concat!(stringify!($t), " (Integer in range)"),
-                        got: format!("Integer({})", n),
-                    })
+                        expected: stringify!($t),
+                        got: other.name().into(),
+                    }),
                 }
             }
-        )+
+        }
     };
 }
-impl_int_from_wxf!(i8, i16, i32, i64, u8, u16, u32, u64);
 
-impl<'de> FromWXF<'de> for f32 {
-    fn from_wxf_with_tag<R: Reader<'de>>(
-        r: &mut WxfReader<R>,
-        tok: ExpressionEnum,
-    ) -> Result<Self, Error> {
-        match tok {
-            ExpressionEnum::Real64 => Ok(r.read_f64()? as f32),
-            ExpressionEnum::Integer8
-            | ExpressionEnum::Integer16
-            | ExpressionEnum::Integer32
-            | ExpressionEnum::Integer64 => Ok(r.read_integer_body(tok)? as f32),
-            other => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "f32",
-                got: other.name().into(),
-            }),
-        }
-    }
-}
+// Signed integers: accept only wire tokens whose values always fit (same or
+// smaller width). No runtime range check — the type of the wire read guarantees it.
+impl_numeric_from_wxf!(i8,  [Integer8]);
+impl_numeric_from_wxf!(i16, [Integer8, Integer16]);
+impl_numeric_from_wxf!(i32, [Integer8, Integer16, Integer32]);
+impl_numeric_from_wxf!(i64, [Integer8, Integer16, Integer32, Integer64]);
 
-impl<'de> FromWXF<'de> for f64 {
-    fn from_wxf_with_tag<R: Reader<'de>>(
-        r: &mut WxfReader<R>,
-        tok: ExpressionEnum,
-    ) -> Result<Self, Error> {
-        match tok {
-            ExpressionEnum::Real64 => r.read_f64(),
-            ExpressionEnum::Integer8
-            | ExpressionEnum::Integer16
-            | ExpressionEnum::Integer32
-            | ExpressionEnum::Integer64 => Ok(r.read_integer_body(tok)? as f64),
-            other => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "f64",
-                got: other.name().into(),
-            }),
-        }
-    }
-}
+// Floats: accept integer wire tokens whose bit width fits in the mantissa, plus
+// Real64 (the only real wire type — f32 narrows it, unavoidably).
+// f32 mantissa = 23 bits: i8 (7-bit) and i16 (15-bit) fit; i32 (31-bit) does not.
+// f64 mantissa = 52 bits: i8, i16, i32 (31-bit) fit; i64 (63-bit) does not.
+impl_numeric_from_wxf!(f32, [Integer8, Integer16]);
+impl_numeric_from_wxf!(f64, [Integer8, Integer16, Integer32, Real64]);
+
 
 impl<'de> FromWXF<'de> for bool {
     fn from_wxf_with_tag<R: Reader<'de>>(

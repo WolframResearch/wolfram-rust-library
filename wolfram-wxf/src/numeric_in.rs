@@ -10,9 +10,11 @@
 //! `ByteArray` on the wire is treated as a 1-D `NumericArray<Integer8>` before
 //! the widening rules apply.
 
+use std::convert::TryInto;
+
+use crate::complex::{Complex32, Complex64};
 use crate::constants::ExpressionEnum;
 use crate::constants::NumericArrayEnum as DT;
-
 use crate::reader::Reader;
 use crate::wxf::reader::WxfReader;
 use crate::Error;
@@ -162,7 +164,7 @@ fn reject(src: DT, target: DT) -> String {
 /// native little-endian layout (which is true for all WXF numeric payloads
 /// on x86-64 / arm64 macOS).
 #[inline]
-unsafe fn identity_cast<T: Copy>(bytes: &[u8]) -> Vec<T> {
+pub unsafe fn identity_cast<T: Copy>(bytes: &[u8]) -> Vec<T> {
     let elem_size = std::mem::size_of::<T>();
     let n = bytes.len() / elem_size;
     let mut out: Vec<T> = Vec::with_capacity(n);
@@ -176,7 +178,7 @@ unsafe fn identity_cast<T: Copy>(bytes: &[u8]) -> Vec<T> {
 }
 
 macro_rules! impl_target {
-    ($t:ty, $target:ident, { $($src:ident => $reader:ident),+ $(,)? }) => {
+    ($t:ty, $target:ident, { $($src:ident => $reader:ident),* $(,)? }) => {
         impl NumericTarget for $t {
             const TARGET: DT = DT::$target;
             fn widen_from(src: DT, bytes: &[u8]) -> Result<Vec<Self>, String> {
@@ -187,8 +189,8 @@ macro_rules! impl_target {
                 }
                 match src {
                     $(
-                        DT::$src => Ok($reader(bytes).map(|v| v as $t).collect()),
-                    )+
+                        DT::$src => Ok($reader(bytes).map(<$t>::from).collect()),
+                    )*
                     other => Err(reject(other, DT::$target)),
                 }
             }
@@ -255,4 +257,23 @@ impl_target!(f64, Real64, {
     UnsignedInteger32 => read_u32,
     Real32 => read_f32,
     Real64 => read_f64,
+});
+
+// Complex — same impl_target! macro as primitives.
+// From<Complex32> for Complex64 widens each component (f32 → f64, always exact).
+//
+// Widening matrix:
+//   Complex32 ← ComplexReal32            (identity only)
+//   Complex64 ← ComplexReal32            (via From<Complex32>)
+//             ← ComplexReal64            (identity)
+#[inline]
+fn read_complex32(b: &[u8]) -> impl Iterator<Item = Complex32> + '_ {
+    b.chunks_exact(8).map(|c| Complex32 {
+        re: f32::from_le_bytes(c[..4].try_into().unwrap()),
+        im: f32::from_le_bytes(c[4..].try_into().unwrap()),
+    })
+}
+impl_target!(Complex32, ComplexReal32, {});
+impl_target!(Complex64, ComplexReal64, {
+    ComplexReal32 => read_complex32,
 });

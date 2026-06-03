@@ -21,7 +21,7 @@ struct Frame {
     payload: Vec<u8>,
     samples: Vec<i32>,
     name: String,
-    tag: Option<u32>,
+    tag: Option<i32>,
 }
 
 #[derive(Debug, PartialEq, ToWXF, FromWXF)]
