@@ -62,7 +62,7 @@ fn parse_symbol_like(input: &str) -> Option<SymbolLike> {
     let components: Vec<&str> = input.split("`").collect();
 
     let like = match components.as_slice() {
-        [only] if is_symbol_component(*only) => SymbolLike::SymbolName,
+        [only] if is_symbol_component(only) => SymbolLike::SymbolName,
         // "`...`"
         ["", inner @ .., ""] if inner.iter().copied().all(is_symbol_component) => {
             SymbolLike::RelativeContext
@@ -105,7 +105,7 @@ fn is_symbol_component(str: &str) -> bool {
         match char {
             '_' | '-' => return false,
             _ if char.is_alphabetic() => (),
-            _ if char.is_digit(10) => (),
+            _ if char.is_ascii_digit() => (),
             '$' => (),
             _ => return false,
         }

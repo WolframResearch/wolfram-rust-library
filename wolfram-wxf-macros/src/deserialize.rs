@@ -177,17 +177,17 @@ fn expand_struct(
                 quote_spanned! { span => let #id = #extract; }
             });
 
-            let common_numeric_ty: Option<&syn::Type> = fields.first().and_then(|first| {
-                let first_name = numeric_primitive_name(&first.ty)?;
-                if fields
-                    .iter()
-                    .all(|f| numeric_primitive_name(&f.ty).as_deref() == Some(&first_name))
-                {
-                    Some(&first.ty)
-                } else {
-                    None
-                }
-            });
+            let common_numeric_ty: Option<&syn::Type> =
+                fields.first().and_then(|first| {
+                    let first_name = numeric_primitive_name(&first.ty)?;
+                    if fields.iter().all(|f| {
+                        numeric_primitive_name(&f.ty).as_deref() == Some(&first_name)
+                    }) {
+                        Some(&first.ty)
+                    } else {
+                        None
+                    }
+                });
             let numeric_branch = if let Some(t) = common_numeric_ty {
                 let assigns = field_idents.iter().enumerate().map(|(i, id)| {
                     quote! { let #id: #t = __slice[#i]; }
@@ -509,7 +509,11 @@ fn build_tuple_ctor_from_slice(ty: &syn::Type, idx: &mut usize) -> TokenStream {
 // Enums
 //==============================================================================
 
-fn expand_enum(name: &syn::Ident, name_str: &str, data: &DataEnum) -> Result<TokenStream> {
+fn expand_enum(
+    name: &syn::Ident,
+    name_str: &str,
+    data: &DataEnum,
+) -> Result<TokenStream> {
     let mut variant_arms = Vec::with_capacity(data.variants.len());
 
     for v in &data.variants {

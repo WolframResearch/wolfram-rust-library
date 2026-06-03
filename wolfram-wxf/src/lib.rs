@@ -24,7 +24,9 @@ pub mod to_wxf;
 pub mod writer;
 pub mod wxf;
 
-pub use crate::constants::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
+pub use crate::constants::{
+    ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum,
+};
 pub use crate::from_wxf::FromWXF;
 pub use crate::reader::{Reader, SliceReader};
 pub use crate::to_wxf::{ToWXF, WxfStruct};
@@ -85,7 +87,11 @@ impl std::fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::InvalidWxf(msg) => write!(f, "invalid WXF: {}", msg),
-            Error::Deserialize { path, expected, got } => {
+            Error::Deserialize {
+                path,
+                expected,
+                got,
+            } => {
                 if path.is_empty() {
                     write!(f, "expected {}, got {}", expected, got)
                 } else {
@@ -149,7 +155,8 @@ pub fn to_wxf<T: ToWXF + ?Sized>(
             use flate2::Compression;
 
             let out = vec![ver, HeaderEnum::Compress as u8, sep];
-            let encoder = ZlibEncoder::new(out, Compression::new(u32::from(level.to_u8())));
+            let encoder =
+                ZlibEncoder::new(out, Compression::new(u32::from(level.to_u8())));
             let mut w = WxfWriter::new(encoder);
             value.to_wxf(&mut w)?;
             Ok(w.into_inner().finish()?)
@@ -165,12 +172,15 @@ fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
     use crate::constants::HeaderEnum;
 
     if bytes.len() < 2 {
-        return Err(Error::InvalidWxf("byte stream too short for WXF header".into()));
+        return Err(Error::InvalidWxf(
+            "byte stream too short for WXF header".into(),
+        ));
     }
     if bytes[0] != HeaderEnum::Version as u8 {
         return Err(Error::InvalidWxf(format!(
             "WXF header version mismatch: expected {:?}, got {:?}",
-            HeaderEnum::Version as u8 as char, bytes[0] as char
+            HeaderEnum::Version as u8 as char,
+            bytes[0] as char
         )));
     }
     if bytes[1] == HeaderEnum::Compress as u8 {

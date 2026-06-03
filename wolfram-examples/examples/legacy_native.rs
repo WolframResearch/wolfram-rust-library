@@ -24,7 +24,11 @@ fn total_i64(list: &NumericArray<i64>) -> i64 {
 
 #[wll::export]
 fn dot_f64(a: &NumericArray<f64>, b: &NumericArray<f64>) -> f64 {
-    a.as_slice().iter().zip(b.as_slice()).map(|(x, y)| x * y).sum()
+    a.as_slice()
+        .iter()
+        .zip(b.as_slice())
+        .map(|(x, y)| x * y)
+        .sum()
 }
 
 #[wll::export]

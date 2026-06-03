@@ -3,8 +3,8 @@
 //! coverage matrix lives in `tests/derive.rs` once the deserialize side
 //! also lands.
 
-use wolfram_expr::{Association, Expr};
 use wolfram_expr::{from_wxf, to_wxf, FromWXF, ToWXF};
+use wolfram_expr::{Association, Expr};
 
 /// Linear-scan helper for tests. `Association` itself exposes no lookup —
 /// tests iterate to find an entry.
@@ -82,10 +82,7 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     let na = find(assoc, "samples")
         .try_as_numeric_array()
         .expect("samples should be NumericArray");
-    assert_eq!(
-        na.data_type(),
-        wolfram_expr::NumericArrayEnum::Integer32
-    );
+    assert_eq!(na.data_type(), wolfram_expr::NumericArrayEnum::Integer32);
     assert_eq!(na.dimensions(), &[3]);
 
     // tag → Option is an enum: Some(7) ⇒ <|"Enum" -> "Some", "Data" -> {7}|>
@@ -306,8 +303,7 @@ fn optional_field_missing_key_yields_none() {
         // No `c` entry — that key is absent on the wire.
     ];
 
-    let parsed: TwoOrThree =
-        from_wxf(bytes).expect("deserialize should succeed");
+    let parsed: TwoOrThree = from_wxf(bytes).expect("deserialize should succeed");
     assert_eq!(
         parsed,
         TwoOrThree {
@@ -328,8 +324,8 @@ fn optional_field_missing_key_yields_none() {
             0x53, 0x01, 0x61,
             0x43, 0x01,
     ];
-    let err = from_wxf::<TwoOrThree>(missing_required)
-        .expect_err("missing `b` should error");
+    let err =
+        from_wxf::<TwoOrThree>(missing_required).expect_err("missing `b` should error");
     let msg = format!("{}", err);
     assert!(
         msg.contains("\"b\""),

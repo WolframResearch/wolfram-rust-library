@@ -19,15 +19,18 @@
 
 use crate::constants::ExpressionEnum;
 use crate::reader::Reader;
+use crate::writer::Writer;
 use crate::wxf::reader::WxfReader;
 use crate::wxf::writer::WxfWriter;
-use crate::writer::Writer;
 use crate::Error;
 
 //---- write ------------------------------------------------------------------
 
 /// Write a unit variant: `<|"Enum" -> name|>`.
-pub fn write_unit_variant<W: Writer>(w: &mut WxfWriter<W>, name: &str) -> Result<(), Error> {
+pub fn write_unit_variant<W: Writer>(
+    w: &mut WxfWriter<W>,
+    name: &str,
+) -> Result<(), Error> {
     w.write_association(1)?;
     w.write_rule(false)?;
     w.write_string("Enum")?;
@@ -68,12 +71,17 @@ pub fn read_enum_header<'de, R: Reader<'de>>(
     }
     let n = r.read_varint()?;
     if n == 0 {
-        return Err(Error::InvalidWxf("enum Association has no \"Enum\" entry".into()));
+        return Err(Error::InvalidWxf(
+            "enum Association has no \"Enum\" entry".into(),
+        ));
     }
     r.read_rule()?;
     let key = r.read_string()?;
     if key != "Enum" {
-        return Err(Error::InvalidWxf(format!("expected first key \"Enum\", got {:?}", key)));
+        return Err(Error::InvalidWxf(format!(
+            "expected first key \"Enum\", got {:?}",
+            key
+        )));
     }
     let variant = r.read_string()?;
     Ok((n, variant))
@@ -82,11 +90,17 @@ pub fn read_enum_header<'de, R: Reader<'de>>(
 /// After [`read_enum_header`] yields a data variant, read the `"Data"` entry: the
 /// `Data` key + a `List` header, validating its arity equals `n_data`. The caller
 /// then reads the `n_data` payload values.
-pub fn read_data_header<'de, R: Reader<'de>>(r: &mut WxfReader<R>, n_data: usize) -> Result<(), Error> {
+pub fn read_data_header<'de, R: Reader<'de>>(
+    r: &mut WxfReader<R>,
+    n_data: usize,
+) -> Result<(), Error> {
     r.read_rule()?;
     let key = r.read_string()?;
     if key != "Data" {
-        return Err(Error::InvalidWxf(format!("expected key \"Data\", got {:?}", key)));
+        return Err(Error::InvalidWxf(format!(
+            "expected key \"Data\", got {:?}",
+            key
+        )));
     }
     if r.read_expr_token()? != ExpressionEnum::Function {
         return Err(Error::InvalidWxf("expected List for enum \"Data\"".into()));

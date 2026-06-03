@@ -26,10 +26,7 @@ const FAILED_WITH_PANIC: c_int = 1002;
 /// (arg types, return type) signature for every `#[export(wxf)]` function:
 /// one ByteArray in, one ByteArray out.
 pub fn wxf_signature() -> Result<(Vec<Expr>, Expr), String> {
-    Ok((
-        vec![Expr::string("ByteArray")],
-        Expr::string("ByteArray"),
-    ))
+    Ok((vec![Expr::string("ByteArray")], Expr::string("ByteArray")))
 }
 
 /// Deserialize WXF bytes from `input` into a typed value of type `A`.
@@ -72,18 +69,23 @@ where
 
 /// Build a `Failure["WxfDeserialize", <|"MessageTemplate" -> msg|>]` Expr.
 pub fn deserialize_failure_expr(msg: &str) -> wolfram_expr::Expr {
-    let assoc: Association =
-        vec![RuleEntry::rule(Expr::string("MessageTemplate"), Expr::string(msg))];
+    let assoc: Association = vec![RuleEntry::rule(
+        Expr::string("MessageTemplate"),
+        Expr::string(msg),
+    )];
     Expr::normal(
         Symbol::new("System`Failure"),
-        vec![Expr::string("WxfDeserialize"), Expr::new(ExprKind::Association(assoc))],
+        vec![
+            Expr::string("WxfDeserialize"),
+            Expr::new(ExprKind::Association(assoc)),
+        ],
     )
 }
 
 /// Serialize `value` to WXF bytes and wrap them in a UInt8 NumericArray.
 pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
-    let bytes: Vec<u8> = to_wxf(value, None)
-        .unwrap_or_else(|e| panic!("WXF serialize failed: {}", e));
+    let bytes: Vec<u8> =
+        to_wxf(value, None).unwrap_or_else(|e| panic!("WXF serialize failed: {}", e));
     NumericArray::<u8>::from_slice(&bytes)
 }
 

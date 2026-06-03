@@ -7,7 +7,9 @@
 
 #![allow(missing_docs)]
 
-pub use wolfram_wxf::constants::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
+pub use wolfram_wxf::constants::{
+    ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum,
+};
 
 use crate::array_buf::ArrayElement;
 use crate::complex::{Complex32, Complex64};

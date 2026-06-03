@@ -28,7 +28,10 @@ mod tests {
         assert_eq!(arr.data_type(), PackedArrayEnum::Real64);
         assert_eq!(arr.dimensions(), &[2, 2]);
         assert_eq!(arr.element_count(), 4);
-        assert_eq!(arr.try_as_slice::<f64>(), Some([1.0, 2.0, 3.0, 4.0].as_slice()));
+        assert_eq!(
+            arr.try_as_slice::<f64>(),
+            Some([1.0, 2.0, 3.0, 4.0].as_slice())
+        );
         assert_eq!(arr.try_as_slice::<i32>(), None);
     }
 
@@ -37,6 +40,9 @@ mod tests {
         let arr = PackedArray::from_slice::<i32>(vec![3], &[10, 20, 30]);
         assert_eq!(NumericArrayRead::rank(&arr), 1);
         assert_eq!(NumericArrayRead::byte_count(&arr), 12);
-        assert_eq!(NumericArrayRead::data_type(&arr), NumericArrayEnum::Integer32);
+        assert_eq!(
+            NumericArrayRead::data_type(&arr),
+            NumericArrayEnum::Integer32
+        );
     }
 }

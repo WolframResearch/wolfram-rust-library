@@ -143,13 +143,21 @@ pub trait NumericArrayRead {
     fn as_bytes(&self) -> &[u8];
 
     /// Number of dimensions.
-    fn rank(&self) -> usize { self.dimensions().len() }
+    fn rank(&self) -> usize {
+        self.dimensions().len()
+    }
     /// Total element count = product of dimensions.
-    fn element_count(&self) -> usize { self.dimensions().iter().product() }
+    fn element_count(&self) -> usize {
+        self.dimensions().iter().product()
+    }
     /// Total byte length of the buffer.
-    fn byte_count(&self) -> usize { self.as_bytes().len() }
+    fn byte_count(&self) -> usize {
+        self.as_bytes().len()
+    }
     /// Bytes per element.
-    fn element_size(&self) -> usize { self.data_type().size_in_bytes() }
+    fn element_size(&self) -> usize {
+        self.data_type().size_in_bytes()
+    }
 
     /// View the buffer as `&[T]` if `T`'s element type matches; else `None`.
     fn try_as_slice<T: ArrayElement<NumericArrayEnum>>(&self) -> Option<&[T]> {
@@ -161,13 +169,22 @@ pub trait NumericArrayRead {
         debug_assert_eq!(bytes.len() % elem_size, 0);
         // SAFETY: tag matches, alignment guaranteed by construction.
         Some(unsafe {
-            std::slice::from_raw_parts(bytes.as_ptr() as *const T, bytes.len() / elem_size)
+            std::slice::from_raw_parts(
+                bytes.as_ptr() as *const T,
+                bytes.len() / elem_size,
+            )
         })
     }
 }
 
 impl<Tag: Into<NumericArrayEnum> + Copy + PartialEq> NumericArrayRead for ArrayBuf<Tag> {
-    fn data_type(&self) -> NumericArrayEnum { self.data_type.into() }
-    fn dimensions(&self) -> &[usize]        { &self.dimensions }
-    fn as_bytes(&self) -> &[u8]             { &self.bytes }
+    fn data_type(&self) -> NumericArrayEnum {
+        self.data_type.into()
+    }
+    fn dimensions(&self) -> &[usize] {
+        &self.dimensions
+    }
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
 }

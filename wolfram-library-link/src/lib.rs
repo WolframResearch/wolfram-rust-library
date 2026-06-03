@@ -277,8 +277,8 @@ pub use self::args::WstpFunction;
 // them from this crate's namespace without an extra `use wolfram_expr` line.
 pub use wolfram_expr::NumericArray as OwnedNumericArray;
 pub use wolfram_expr::{
-    NumericArrayEnum, Association, ByteArray, NumericArrayRead,
-    PackedArray, PackedArrayEnum,
+    Association, ByteArray, NumericArrayEnum, NumericArrayRead, PackedArray,
+    PackedArrayEnum,
 };
 pub use wolfram_expr::{BigInteger, BigReal};
 

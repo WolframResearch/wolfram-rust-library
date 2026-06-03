@@ -65,9 +65,9 @@ impl<'de> Reader<'de> for SliceReader<'de> {
         // Copy out the `&'de [u8]` reference first so the returned slice is tied
         // to the buffer lifetime `'de`, not to this `&mut self` borrow.
         let buf: &'de [u8] = self.bytes;
-        let slice = buf
-            .get(self.pos..end)
-            .ok_or_else(|| Error::InvalidWxf(format!("unexpected EOF reading {} bytes", n)))?;
+        let slice = buf.get(self.pos..end).ok_or_else(|| {
+            Error::InvalidWxf(format!("unexpected EOF reading {} bytes", n))
+        })?;
         self.pos = end;
         Ok(slice)
     }

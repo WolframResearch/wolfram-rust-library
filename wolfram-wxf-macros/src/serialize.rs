@@ -144,7 +144,8 @@ fn emit_write_field(accessor: &TokenStream, ty: &syn::Type, span: Span) -> Token
             tuple_paths,
             original_ty,
         } => {
-            let dims_lits: Vec<TokenStream> = dims.iter().map(|d| quote! { #d }).collect();
+            let dims_lits: Vec<TokenStream> =
+                dims.iter().map(|d| quote! { #d }).collect();
             let total_leaves: usize = dims.iter().product();
             let rank = dims.len();
             if let Some(paths) = tuple_paths {
@@ -239,12 +240,12 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
             },
             Fields::Unnamed(unnamed) => {
                 let arity = unnamed.unnamed.len();
-                let bindings: Vec<syn::Ident> = (0..arity)
-                    .map(|i| format_ident!("__bind_{}", i))
-                    .collect();
-                let elem_writes = unnamed.unnamed.iter().zip(&bindings).map(|(f, b)| {
-                    emit_write_field(&quote! { #b }, &f.ty, f.ty.span())
-                });
+                let bindings: Vec<syn::Ident> =
+                    (0..arity).map(|i| format_ident!("__bind_{}", i)).collect();
+                let elem_writes =
+                    unnamed.unnamed.iter().zip(&bindings).map(|(f, b)| {
+                        emit_write_field(&quote! { #b }, &f.ty, f.ty.span())
+                    });
                 arms.push(quote! {
                     #name :: #v_name ( #(#bindings),* ) => {
                         ::wolfram_wxf::strategy::begin_data_variant(__w, #v_str, #arity)?;

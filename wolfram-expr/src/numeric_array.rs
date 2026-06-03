@@ -45,7 +45,10 @@ mod tests {
         assert_eq!(arr.dimensions(), &[2, 3]);
         assert_eq!(arr.element_count(), 6);
         assert_eq!(arr.byte_count(), 24);
-        assert_eq!(arr.try_as_slice::<i32>(), Some([1, 2, 3, 4, 5, 6].as_slice()));
+        assert_eq!(
+            arr.try_as_slice::<i32>(),
+            Some([1, 2, 3, 4, 5, 6].as_slice())
+        );
         assert_eq!(arr.try_as_slice::<i64>(), None);
     }
 }

@@ -1,6 +1,6 @@
 use wolfram_library_link::{
     self as wll,
-    expr::{NumericArrayEnum, ByteArray, Expr, ExprKind, Number, NumericArray, Symbol},
+    expr::{ByteArray, Expr, ExprKind, Number, NumericArray, NumericArrayEnum, Symbol},
     wstp::Link,
 };
 
@@ -88,7 +88,12 @@ fn probe_raw_type(link: &mut Link) {
     let raw = link.get_raw_type().unwrap();
     // Drain remaining args so the link is clean — we don't need to read them.
     link.new_packet().unwrap();
-    link.put_str(&format!("raw={} ('{}')", raw, char::from_u32(raw as u32).unwrap_or('?'))).unwrap();
+    link.put_str(&format!(
+        "raw={} ('{}')",
+        raw,
+        char::from_u32(raw as u32).unwrap_or('?')
+    ))
+    .unwrap();
 }
 
 // Probe the raw token sequence for the single argument. Recursively walks

@@ -3,8 +3,8 @@
 //! intermediate `Vec`, no `&dyn` dispatch — fully monomorphized.
 
 use crate::constants::NumericArrayEnum;
-use crate::wxf::writer::WxfWriter;
 use crate::writer::Writer;
+use crate::wxf::writer::WxfWriter;
 use crate::Error;
 
 /// Types that know how to serialize themselves into a WXF stream.

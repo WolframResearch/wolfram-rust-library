@@ -12,8 +12,8 @@
 //! runtime `wolframscript` invocation. Re-run the generator script if
 //! you add a test case or want to refresh against a newer kernel.
 
-use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
 use wolfram_expr::from_wxf;
+use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;
@@ -88,17 +88,19 @@ fn function_user_context() {
 
 #[test]
 fn association_plain() {
-    let mut a = Association::new();
-    a.push(RuleEntry::rule(Expr::from("a"), Expr::from(1)));
-    a.push(RuleEntry::rule(Expr::from("b"), Expr::from(2)));
+    let a: Association = vec![
+        RuleEntry::rule(Expr::from("a"), Expr::from(1)),
+        RuleEntry::rule(Expr::from("b"), Expr::from(2)),
+    ];
     assert_parses_to(fix::ASSOCIATION_PLAIN, Expr::from(a));
 }
 
 #[test]
 fn association_with_delayed_rule() {
-    let mut a = Association::new();
-    a.push(RuleEntry::rule(Expr::from("a"), Expr::from(1)));
-    a.push(RuleEntry::rule_delayed(Expr::from("b"), Expr::from(2)));
+    let a: Association = vec![
+        RuleEntry::rule(Expr::from("a"), Expr::from(1)),
+        RuleEntry::rule_delayed(Expr::from("b"), Expr::from(2)),
+    ];
     assert_parses_to(fix::ASSOCIATION_DELAYED, Expr::from(a));
 }
 
@@ -119,8 +121,8 @@ fn compressed_range_100() {
     // Kernel size-optimizes Range[100] into PackedArray[..., "Integer8"]
     // wrapped in an `8C:` zlib-compressed payload — exercises both the
     // compression handling and packed-array decoding.
-    let parsed: Expr = from_wxf(fix::COMPRESSED_RANGE_100)
-        .expect("deserialize compressed kernel WXF");
+    let parsed: Expr =
+        from_wxf(fix::COMPRESSED_RANGE_100).expect("deserialize compressed kernel WXF");
     let arr = parsed
         .try_as_packed_array()
         .expect("Range[100] should land as a PackedArray");

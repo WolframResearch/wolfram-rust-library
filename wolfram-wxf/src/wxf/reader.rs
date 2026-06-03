@@ -65,15 +65,17 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
     /// Consume a NumericArray element-type byte.
     pub fn read_numeric_type(&mut self) -> Result<NumericArrayEnum, Error> {
         let b = self.inner.read_byte()?;
-        NumericArrayEnum::try_from(b)
-            .map_err(|_| Error::InvalidWxf(format!("unknown NumericArray element type 0x{:02X}", b)))
+        NumericArrayEnum::try_from(b).map_err(|_| {
+            Error::InvalidWxf(format!("unknown NumericArray element type 0x{:02X}", b))
+        })
     }
 
     /// Consume a PackedArray element-type byte (numeric subset).
     pub fn read_packed_type(&mut self) -> Result<PackedArrayEnum, Error> {
         let b = self.inner.read_byte()?;
-        PackedArrayEnum::try_from(b)
-            .map_err(|_| Error::InvalidWxf(format!("unknown PackedArray element type 0x{:02X}", b)))
+        PackedArrayEnum::try_from(b).map_err(|_| {
+            Error::InvalidWxf(format!("unknown PackedArray element type 0x{:02X}", b))
+        })
     }
 
     //---- fixed-width integer / real payloads (tag already consumed) -----
@@ -115,7 +117,10 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
             ExpressionEnum::Integer16 => Ok(i64::from(self.read_i16()?)),
             ExpressionEnum::Integer32 => Ok(i64::from(self.read_i32()?)),
             ExpressionEnum::Integer64 => self.read_i64(),
-            other => Err(Error::InvalidWxf(format!("expected Integer, got {}", other.name()))),
+            other => Err(Error::InvalidWxf(format!(
+                "expected Integer, got {}",
+                other.name()
+            ))),
         }
     }
 
@@ -127,7 +132,8 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
     pub fn read_str(&mut self) -> Result<&'de str, Error> {
         let len = self.read_varint()? as usize;
         let bytes = self.inner.read_bytes(len)?;
-        std::str::from_utf8(bytes).map_err(|_| Error::InvalidWxf("payload not valid UTF-8".into()))
+        std::str::from_utf8(bytes)
+            .map_err(|_| Error::InvalidWxf("payload not valid UTF-8".into()))
     }
 
     /// Read a complete `String` value (token + payload) into an owned `String`.
@@ -135,7 +141,10 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
     pub fn read_string(&mut self) -> Result<String, Error> {
         match self.read_expr_token()? {
             ExpressionEnum::String => Ok(self.read_str()?.to_owned()),
-            other => Err(Error::InvalidWxf(format!("expected String, got {}", other.name()))),
+            other => Err(Error::InvalidWxf(format!(
+                "expected String, got {}",
+                other.name()
+            ))),
         }
     }
 
@@ -169,7 +178,10 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
 
     /// Shared array tail: rank varint, `rank` dim varints, then the flat
     /// little-endian byte buffer (`prod(dims) * elem_size` bytes).
-    pub fn read_array_body(&mut self, elem_size: usize) -> Result<(Vec<usize>, Vec<u8>), Error> {
+    pub fn read_array_body(
+        &mut self,
+        elem_size: usize,
+    ) -> Result<(Vec<usize>, Vec<u8>), Error> {
         let rank = self.read_varint()? as usize;
         let mut dims = Vec::with_capacity(rank);
         for _ in 0..rank {

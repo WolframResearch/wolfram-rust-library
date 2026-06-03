@@ -989,9 +989,13 @@ impl Link {
                 self.put_symbol("System`ByteArray")?;
                 self.put_u8_array(bytes, &[bytes.len()])?;
             },
-            ExprKind::BigInteger(_) | ExprKind::BigReal(_) | ExprKind::PackedArray(_) | ExprKind::NumericArray(_) => {
-                let wxf = wolfram_wxf::to_wxf(expr, None)
-                    .map_err(|e| Error::custom(format!("put_expr: WXF serialization failed: {e}")))?;
+            ExprKind::BigInteger(_)
+            | ExprKind::BigReal(_)
+            | ExprKind::PackedArray(_)
+            | ExprKind::NumericArray(_) => {
+                let wxf = wolfram_wxf::to_wxf(expr, None).map_err(|e| {
+                    Error::custom(format!("put_expr: WXF serialization failed: {e}"))
+                })?;
                 self.put_raw_type(i32::from(sys::WSTKFUNC))?;
                 self.put_arg_count(1)?;
                 self.put_symbol("System`BinaryDeserialize")?;

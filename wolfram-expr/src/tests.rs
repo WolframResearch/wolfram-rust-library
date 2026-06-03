@@ -1,7 +1,7 @@
 use crate::symbol::{ContextRef, RelativeContext, SymbolNameRef, SymbolRef};
 use crate::{
-    NumericArrayEnum, Association, ByteArray, Expr, ExprKind, NumericArray,
-    PackedArray, PackedArrayEnum, Symbol,
+    Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayEnum, PackedArray,
+    PackedArrayEnum, Symbol,
 };
 
 /// `(input, is Symbol, is SymbolName, is Context, is RelativeContext)`
@@ -73,9 +73,10 @@ fn byte_array_variant_roundtrip() {
 #[test]
 fn association_variant_roundtrip() {
     use crate::RuleEntry;
-    let mut a = Association::new();
-    a.push(RuleEntry::rule(Expr::from("k1"), Expr::from(1)));
-    a.push(RuleEntry::rule_delayed(Expr::from("k2"), Expr::from(2)));
+    let a: Association = vec![
+        RuleEntry::rule(Expr::from("k1"), Expr::from(1)),
+        RuleEntry::rule_delayed(Expr::from("k2"), Expr::from(2)),
+    ];
     let expr = Expr::from(a.clone());
     assert!(matches!(expr.kind(), ExprKind::Association(_)));
     assert_eq!(expr.try_as_association(), Some(&a));
@@ -145,8 +146,7 @@ fn display_of_new_variants_is_non_empty() {
     let ba = Expr::from(ByteArray::from(vec![0xab]));
     let assoc = {
         use crate::RuleEntry;
-        let mut a = Association::new();
-        a.push(RuleEntry::rule(Expr::from("k"), Expr::from(1)));
+        let a: Association = vec![RuleEntry::rule(Expr::from("k"), Expr::from(1))];
         Expr::from(a)
     };
     let na = Expr::from(NumericArray::from_slice::<u8>(vec![1], &[42]));

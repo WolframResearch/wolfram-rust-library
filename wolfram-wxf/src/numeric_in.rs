@@ -59,14 +59,20 @@ pub fn read_vec_with_tag<'de, T: NumericTarget, R: Reader<'de>>(
                 count *= r.read_varint()? as usize;
             }
             let bytes = r.read_bytes(count * dt.size_in_bytes())?;
-            T::widen_from(dt, bytes).map_err(|m| err(path, "compatible numeric source", m))
+            T::widen_from(dt, bytes)
+                .map_err(|m| err(path, "compatible numeric source", m))
         },
         ExpressionEnum::ByteArray => {
             let len = r.read_varint()? as usize;
             let bytes = r.read_bytes(len)?;
-            T::widen_from(DT::Integer8, bytes).map_err(|m| err(path, "compatible numeric source", m))
+            T::widen_from(DT::Integer8, bytes)
+                .map_err(|m| err(path, "compatible numeric source", m))
         },
-        other => Err(err(path, "NumericArray, PackedArray, or ByteArray", other.name().to_string())),
+        other => Err(err(
+            path,
+            "NumericArray, PackedArray, or ByteArray",
+            other.name().to_string(),
+        )),
     }
 }
 

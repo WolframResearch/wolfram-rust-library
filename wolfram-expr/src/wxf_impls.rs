@@ -7,15 +7,15 @@
 
 use std::convert::TryFrom;
 
-use wolfram_wxf::{
-    ExpressionEnum, FromWXF, NumericArrayEnum, PackedArrayEnum, Reader, ToWXF, WxfReader,
-    WxfWriter, Writer,
-};
 use wolfram_wxf::Error;
+use wolfram_wxf::{
+    ExpressionEnum, FromWXF, NumericArrayEnum, PackedArrayEnum, Reader, ToWXF, Writer,
+    WxfReader, WxfWriter,
+};
 
 use crate::{
-    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray, PackedArray,
-    RuleEntry, Symbol,
+    ArrayBuf, Association, BigInteger, BigReal, Expr, ExprKind, NumericArray,
+    PackedArray, RuleEntry, Symbol,
 };
 
 //==============================================================================
@@ -131,24 +131,41 @@ fn packed_array_from_parts(
     bytes: Vec<u8>,
 ) -> Result<PackedArray, Error> {
     let pdt = PackedArrayEnum::try_from(dt).map_err(|_| {
-        Error::InvalidWxf(format!("PackedArray does not support element type {}", dt.name()))
+        Error::InvalidWxf(format!(
+            "PackedArray does not support element type {}",
+            dt.name()
+        ))
     })?;
     Ok(PackedArray::new(pdt, dims, bytes))
 }
 
 impl<'de> FromWXF<'de> for Symbol {
-    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(
+        r: &mut WxfReader<R>,
+        tok: ExpressionEnum,
+    ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
-            return Err(Error::Deserialize { path: String::new(), expected: "Symbol", got: tok.name().into() });
+            return Err(Error::Deserialize {
+                path: String::new(),
+                expected: "Symbol",
+                got: tok.name().into(),
+            });
         }
         symbol_from_name(r.read_symbol_name()?)
     }
 }
 
 impl<'de> FromWXF<'de> for NumericArray {
-    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(
+        r: &mut WxfReader<R>,
+        tok: ExpressionEnum,
+    ) -> Result<Self, Error> {
         if tok != ExpressionEnum::NumericArray {
-            return Err(Error::Deserialize { path: String::new(), expected: "NumericArray", got: tok.name().into() });
+            return Err(Error::Deserialize {
+                path: String::new(),
+                expected: "NumericArray",
+                got: tok.name().into(),
+            });
         }
         let (dt, dims, bytes) = r.read_numeric_array_parts()?;
         Ok(numeric_array_from_parts(dt, dims, bytes))
@@ -156,9 +173,16 @@ impl<'de> FromWXF<'de> for NumericArray {
 }
 
 impl<'de> FromWXF<'de> for PackedArray {
-    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(
+        r: &mut WxfReader<R>,
+        tok: ExpressionEnum,
+    ) -> Result<Self, Error> {
         if tok != ExpressionEnum::PackedArray {
-            return Err(Error::Deserialize { path: String::new(), expected: "PackedArray", got: tok.name().into() });
+            return Err(Error::Deserialize {
+                path: String::new(),
+                expected: "PackedArray",
+                got: tok.name().into(),
+            });
         }
         let (dt, dims, bytes) = r.read_numeric_array_parts()?;
         packed_array_from_parts(dt, dims, bytes)
@@ -169,38 +193,61 @@ impl<'de> FromWXF<'de> for PackedArray {
 // (orphan rule); use [`read_association`] directly, or deserialize as `Expr`.
 
 impl<'de> FromWXF<'de> for BigInteger {
-    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(
+        r: &mut WxfReader<R>,
+        tok: ExpressionEnum,
+    ) -> Result<Self, Error> {
         if tok != ExpressionEnum::BigInteger {
-            return Err(Error::Deserialize { path: String::new(), expected: "BigInteger", got: tok.name().into() });
+            return Err(Error::Deserialize {
+                path: String::new(),
+                expected: "BigInteger",
+                got: tok.name().into(),
+            });
         }
         Ok(BigInteger::new(r.read_symbol_name()?))
     }
 }
 
 impl<'de> FromWXF<'de> for BigReal {
-    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(
+        r: &mut WxfReader<R>,
+        tok: ExpressionEnum,
+    ) -> Result<Self, Error> {
         if tok != ExpressionEnum::BigReal {
-            return Err(Error::Deserialize { path: String::new(), expected: "BigReal", got: tok.name().into() });
+            return Err(Error::Deserialize {
+                path: String::new(),
+                expected: "BigReal",
+                got: tok.name().into(),
+            });
         }
         Ok(BigReal::new(r.read_symbol_name()?))
     }
 }
 
 /// Read an Association body (token already consumed): `count` × (rule, key, value).
-fn read_association<'de, R: Reader<'de>>(r: &mut WxfReader<R>) -> Result<Association, Error> {
+fn read_association<'de, R: Reader<'de>>(
+    r: &mut WxfReader<R>,
+) -> Result<Association, Error> {
     let n = r.read_varint()?;
     let mut a = Association::new();
     for _ in 0..n {
         let delayed = r.read_rule()?;
         let key = Expr::from_wxf(r)?;
         let value = Expr::from_wxf(r)?;
-        a.push(RuleEntry { key, value, delayed });
+        a.push(RuleEntry {
+            key,
+            value,
+            delayed,
+        });
     }
     Ok(a)
 }
 
 impl<'de> FromWXF<'de> for Expr {
-    fn from_wxf_with_tag<R: Reader<'de>>(r: &mut WxfReader<R>, tok: ExpressionEnum) -> Result<Self, Error> {
+    fn from_wxf_with_tag<R: Reader<'de>>(
+        r: &mut WxfReader<R>,
+        tok: ExpressionEnum,
+    ) -> Result<Self, Error> {
         match tok {
             ExpressionEnum::Integer8
             | ExpressionEnum::Integer16
@@ -214,10 +261,16 @@ impl<'de> FromWXF<'de> for Expr {
                 Ok(Expr::real(f))
             },
             ExpressionEnum::String => Ok(Expr::string(r.read_str()?.to_owned())),
-            ExpressionEnum::Symbol => Ok(Expr::symbol(symbol_from_name(r.read_symbol_name()?)?)),
+            ExpressionEnum::Symbol => {
+                Ok(Expr::symbol(symbol_from_name(r.read_symbol_name()?)?))
+            },
             ExpressionEnum::ByteArray => Ok(Expr::from(r.read_byte_array()?.to_vec())),
-            ExpressionEnum::BigInteger => Ok(Expr::from(BigInteger::new(r.read_symbol_name()?))),
-            ExpressionEnum::BigReal => Ok(Expr::from(BigReal::new(r.read_symbol_name()?))),
+            ExpressionEnum::BigInteger => {
+                Ok(Expr::from(BigInteger::new(r.read_symbol_name()?)))
+            },
+            ExpressionEnum::BigReal => {
+                Ok(Expr::from(BigReal::new(r.read_symbol_name()?)))
+            },
             ExpressionEnum::NumericArray => {
                 let (dt, dims, bytes) = r.read_numeric_array_parts()?;
                 Ok(Expr::from(numeric_array_from_parts(dt, dims, bytes)))
@@ -236,9 +289,12 @@ impl<'de> FromWXF<'de> for Expr {
                 Ok(Expr::normal(head, args))
             },
             ExpressionEnum::Association => Ok(Expr::from(read_association(r)?)),
-            other @ (ExpressionEnum::Rule | ExpressionEnum::RuleDelayed) => Err(
-                Error::InvalidWxf(format!("unexpected {} outside Association", other.name())),
-            ),
+            other @ (ExpressionEnum::Rule | ExpressionEnum::RuleDelayed) => {
+                Err(Error::InvalidWxf(format!(
+                    "unexpected {} outside Association",
+                    other.name()
+                )))
+            },
         }
     }
 }

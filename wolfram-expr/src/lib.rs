@@ -20,10 +20,10 @@ pub mod symbol;
 #[cfg(test)]
 mod tests;
 
-#[doc(hidden)]
 mod test_readme {
-    // Ensure that doc tests in the README.md file get run.
-    #![doc = include_str ! ("../README.md")]
+    //! Ensure that doc tests in the README.md file get run.
+    #![doc(hidden)]
+    #![doc = include_str!("../README.md")]
 }
 
 use std::fmt;
@@ -38,9 +38,9 @@ pub use self::association::{Association, RuleEntry};
 pub use self::bignum::{BigInteger, BigReal};
 pub use self::byte_array::ByteArray;
 pub use self::complex::{Complex32, Complex64};
-pub use self::wxf::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 pub use self::numeric_array::NumericArray;
 pub use self::packed_array::PackedArray;
+pub use self::wxf::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 
 // WXF serialization — the traits, derives, and entry points live in the
 // dependency-free `wolfram-wxf` crate; re-exported here for ergonomics.
@@ -112,7 +112,7 @@ impl Expr {
 
     /// Get the [`ExprKind`] representing this expression.
     pub fn kind(&self) -> &ExprKind {
-        &*self.inner
+        &self.inner
     }
 
     /// Get mutable access to the [`ExprKind`] that represents this expression.

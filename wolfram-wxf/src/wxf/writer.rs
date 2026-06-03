@@ -152,7 +152,11 @@ impl<W: Writer> WxfWriter<W> {
 
     //---- internal -------------------------------------------------------
 
-    fn write_length_prefixed(&mut self, token: ExpressionEnum, bytes: &[u8]) -> Result<(), Error> {
+    fn write_length_prefixed(
+        &mut self,
+        token: ExpressionEnum,
+        bytes: &[u8],
+    ) -> Result<(), Error> {
         self.write_expr_token(token)?;
         self.write_varint(bytes.len() as u64)?;
         self.inner.write_bytes(bytes)
