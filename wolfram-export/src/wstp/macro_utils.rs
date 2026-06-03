@@ -94,40 +94,42 @@ pub unsafe fn load_library_functions_impl(
     lib_data: sys::WolframLibraryData,
     raw_link: wstp::sys::WSLINK,
 ) -> c_int {
-    use wolfram_library_link::expr::{expr, Expr};
+    use wolfram_library_link::expr::Expr;
+    use wolfram_library_link::LibraryError;
 
-    // Write a structured `Failure["LoaderError", <|…|>]` to the link instead of
-    // panicking, so a bad call to the generated loader surfaces a proper Failure
-    // (with the data behind it) rather than an opaque RustPanic.
-    fn loader_failure(message: &str, expected: &str, got: Expr) -> Expr {
-        expr!(Failure["LoaderError", {
-            "Message"  -> message,
-            "Expected" -> expected,
-            "Got"      -> got
-        }])
-    }
+    // A bad call to the generated loader surfaces a structured
+    // `Failure["LoaderError", <|…|>]` (with the data behind it) instead of an
+    // opaque RustPanic.
+    let loader_failure = |link: &mut Link, message: &str, expected: &str, got: Expr| {
+        let f = LibraryError::Loader {
+            message: message.to_string(),
+            expected: expected.to_string(),
+            got,
+        };
+        let _ = write_failure_to_link(link, f.to_expr());
+    };
 
     call_wstp_link_wolfram_library_function(lib_data, raw_link, |link: &mut Link| {
         let arg_count = match link.test_head("List") {
             Ok(n) => n,
             Err(e) => {
-                let f = loader_failure(
+                loader_failure(
+                    link,
                     "loader call must be List[path]",
                     "List",
                     Expr::string(e.to_string()),
                 );
-                let _ = write_failure_to_link(link, f);
                 return;
             },
         };
 
         if arg_count != 1 {
-            let f = loader_failure(
+            loader_failure(
+                link,
                 "loader takes exactly one argument: the dynamic library path",
                 "1 argument",
                 Expr::from(arg_count as i64),
             );
-            let _ = write_failure_to_link(link, f);
             return;
         }
 
@@ -140,12 +142,12 @@ pub unsafe fn load_library_functions_impl(
         {
             Ok(p) => p,
             Err(msg) => {
-                let f = loader_failure(
+                loader_failure(
+                    link,
                     "loader argument must be a String path",
                     "String",
                     Expr::string(msg),
                 );
-                let _ = write_failure_to_link(link, f);
                 return;
             },
         };

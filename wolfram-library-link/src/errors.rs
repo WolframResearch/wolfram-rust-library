@@ -1,45 +1,66 @@
 //! Typed errors surfaced across the LibraryLink boundary.
 //!
-//! [`LibraryError`] derives [`WxfError`][wolfram_wxf::WxfError], so each variant
-//! serializes to a structured `Failure["Variant", <|…|>]` with `CamelCase` keys
-//! — the same shape the kernel already expects, now produced from a typed enum
-//! rather than a hand-built expression.
+//! [`LibraryError`] enumerates every failure we communicate *back to the kernel*
+//! as an expression (panics, loader contract violations). Each variant renders to
+//! a structured `Failure["Variant", <|…|>]` via [`LibraryError::to_expr`], built
+//! directly — link communication trades in [`Expr`], so there's no detour through
+//! WXF bytes.
 //!
-//! The [`RustPanic`][LibraryError::RustPanic] variant carries its `backtrace`
-//! as a full [`Expr`] (a clickable `Column` of stack frames when the
-//! `panic-failure-backtraces` feature is on), so the traceback survives intact.
+//! Failures that *can't* be expressions — a library that failed to initialize, or
+//! a panic whose Failure couldn't even be written to the link — surface as C-ABI
+//! return codes instead (see `macro_utils::error_code`), not as `LibraryError`.
 
-use wolfram_wxf::{from_wxf, to_wxf, WxfError};
+use crate::expr::{expr, Expr};
 
-use crate::expr::Expr;
-
-/// An error raised at the LibraryLink boundary, serialized to a WL `Failure[…]`.
-#[derive(Debug, WxfError)]
+/// An error raised at the LibraryLink boundary, rendered to a WL `Failure[…]`.
+#[derive(Debug, Clone)]
 pub enum LibraryError {
-    /// A Rust panic caught while running an exported function. Field names map
-    /// to the conventional WL `Failure` keys via `CamelCase`:
-    /// `message_template` → `MessageTemplate`, etc.
+    /// A Rust panic caught while running an exported function. The `backtrace`
+    /// is a renderable [`Expr`] (a clickable `Column` of frames when the
+    /// `panic-failure-backtraces` feature is on, else `Missing[…]`).
     RustPanic {
         /// Human-readable panic message (the WL `MessageTemplate`).
         message_template: String,
         /// `file:line` where the panic originated.
         source_location: String,
-        /// The backtrace as a renderable [`Expr`] (clickable frames when the
-        /// `panic-failure-backtraces` feature is enabled, else `Missing[…]`).
+        /// The backtrace as a renderable expression.
         backtrace: Expr,
+    },
+    /// The generated `generate_loader!` entry point was called incorrectly
+    /// (wrong head / argument count / argument type).
+    Loader {
+        /// What went wrong.
+        message: String,
+        /// What the loader expected (e.g. `"List"`, `"String"`, `"1 argument"`).
+        expected: String,
+        /// What it got — an arbitrary [`Expr`] (an error message, a count, …).
+        got: Expr,
     },
 }
 
 impl LibraryError {
-    /// Render this error as the `Failure[…]` [`Expr`] sent over a WSTP link.
-    ///
-    /// Goes through the WXF representation so there's a single source of truth
-    /// (the derived `ToWXF`); the round-trip is cheap and only runs on the error
-    /// path.
+    /// Render this error as its `Failure["Variant", <|…|>]` [`Expr`].
     pub fn to_expr(&self) -> Expr {
-        to_wxf(self, None)
-            .and_then(|bytes| from_wxf::<Expr>(&bytes))
-            .unwrap_or_else(|_| Expr::string("LibraryError: failed to serialize"))
+        match self.clone() {
+            LibraryError::RustPanic {
+                message_template,
+                source_location,
+                backtrace,
+            } => expr!(Failure["RustPanic", {
+                "MessageTemplate" -> message_template,
+                "SourceLocation"  -> source_location,
+                "Backtrace"       -> backtrace
+            }]),
+            LibraryError::Loader {
+                message,
+                expected,
+                got,
+            } => expr!(Failure["LoaderError", {
+                "Message"  -> message,
+                "Expected" -> expected,
+                "Got"      -> got
+            }]),
+        }
     }
 }
 
@@ -75,7 +96,7 @@ mod tests {
         };
         assert_eq!(find("MessageTemplate"), Some(Expr::from("boom")));
         assert_eq!(find("SourceLocation"), Some(Expr::from("src/x.rs:1")));
-        // The backtrace Expr survives the round-trip intact.
+        // The backtrace Expr is carried through verbatim — no serialization detour.
         assert_eq!(find("Backtrace"), Some(backtrace));
     }
 }
