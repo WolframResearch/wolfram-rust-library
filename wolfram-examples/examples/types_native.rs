@@ -1,5 +1,5 @@
 use wolfram_export::export;
-use wolfram_export::NumericArray;
+use wolfram_library_link::NumericArray;
 
 // ── Tier 1: scalars ──────────────────────────────────────────────────────────
 

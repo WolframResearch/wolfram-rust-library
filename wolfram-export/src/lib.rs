@@ -63,9 +63,9 @@ pub use wolfram_export_macros::{export, export_native, export_wstp, export_wxf, 
 //==============================================================================
 // Macro-emission surface.
 //
-// The proc-macro emits code that names `wolfram_export::sys::*`,
-// `wolfram_export::macro_utils::*`, `wolfram_export::NumericArray`, etc. These
-// resolve via the mode submodules below, gated on the matching feature.
+// The proc-macro emits code that names `wolfram_export::sys::*` and
+// `wolfram_export::macro_utils::*`. These resolve via the mode submodules
+// below, gated on the matching feature.
 //==============================================================================
 
 #[cfg(any(feature = "native", feature = "wxf"))]
@@ -78,9 +78,6 @@ pub mod sys {
 
 #[cfg(feature = "native")]
 pub use ::wolfram_library_link::NativeFunction;
-
-#[cfg(any(feature = "native", feature = "wxf"))]
-pub use ::wolfram_library_link::NumericArray;
 
 /// Macro-runtime helpers. Re-exports of the per-mode `macro_utils` modules
 /// behind a single `wolfram_export::macro_utils::*` namespace so the
@@ -97,6 +94,14 @@ pub mod macro_utils {
 
     #[cfg(feature = "wxf")]
     pub use crate::wxf::macro_utils::*;
+
+    // The `#[export(wxf)]` bridge names `NumericArray<u8>` (the input ByteArray
+    // buffer). It's `wolfram-library-link`'s runtime type — re-exported here for
+    // macro codegen only (hidden), not as part of `wolfram-export`'s public API.
+    // Users name value types via `wolfram_library_link` directly.
+    #[cfg(feature = "wxf")]
+    #[doc(hidden)]
+    pub use ::wolfram_library_link::NumericArray;
 
     /// `LibraryLinkFunction` is a type alias for [`ExportEntry`][crate::ExportEntry].
     /// Lives at this path because the proc-macro emits

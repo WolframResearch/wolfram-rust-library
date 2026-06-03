@@ -335,7 +335,7 @@ fn export_wxf_function(
             // we take a reference. Panics (including deserialization failures
             // not caught explicitly) are converted to WXF-encoded Failure[]
             // expressions by `call_and_encode_panic`.
-            fn __wxf_bridge(__input: &#p::NumericArray<u8>) -> #p::NumericArray<u8> {
+            fn __wxf_bridge(__input: &#p::macro_utils::NumericArray<u8>) -> #p::macro_utils::NumericArray<u8> {
                 #p::macro_utils::call_and_encode_panic(|| {
                     let __decoded = #p::macro_utils::decode_args(__input, #n_u64, |__c| {
                         ::core::result::Result::Ok(#tuple_read)
