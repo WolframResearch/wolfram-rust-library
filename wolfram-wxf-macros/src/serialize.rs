@@ -263,12 +263,8 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                 let entry_writes = emit_named_entries(&fields, &|id| quote! { #id })?;
                 arms.push(quote! {
                     #name :: #v_name { #(#bindings),* } => {
-                        __w.write_association(2)?;
-                        __w.write_rule(false)?;
-                        __w.write_string("Enum")?;
-                        __w.write_string(#v_str)?;
-                        __w.write_rule(false)?;
-                        __w.write_string("Data")?;
+                        // {"VariantName", <|field -> val, ...|>}
+                        ::wolfram_wxf::strategy::begin_data_variant(__w, #v_str, 1)?;
                         __w.write_association(#arity)?;
                         #(#entry_writes)*
                     }

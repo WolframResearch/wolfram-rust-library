@@ -523,26 +523,18 @@ fn expand_enum(
         let v_path = format!("{}::{}", name_str, v_name);
         match &v.fields {
             Fields::Unit => {
+                // Unit variant: {"VariantName"} — __n == 1, no payload.
                 variant_arms.push(quote! {
                     #v_str => {
-                        if __n != 1 {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(
-                                    #v_path,
-                                    "Association with 1 entry (unit variant)",
-                                    format!("Association with {} entries", __n),
-                                ),
-                            );
-                        }
                         return ::core::result::Result::Ok(#name :: #v_name);
                     }
                 });
             },
             Fields::Unnamed(unnamed) => {
+                // Tuple variant: {"VariantName", f0, f1, ...} — payload follows inline.
                 let fields: Vec<&syn::Field> = unnamed.unnamed.iter().collect();
-                let arity = fields.len();
-                let mut bindings = Vec::with_capacity(arity);
-                let mut extracts = Vec::with_capacity(arity);
+                let mut bindings = Vec::with_capacity(fields.len());
+                let mut extracts = Vec::with_capacity(fields.len());
                 for (i, f) in fields.iter().enumerate() {
                     let bind = format_ident!("__a{}", i);
                     let path = format!("{}.{}", v_path, i);
@@ -553,23 +545,13 @@ fn expand_enum(
                 }
                 variant_arms.push(quote! {
                     #v_str => {
-                        if __n != 2 {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(
-                                    #v_path,
-                                    "Association with 2 entries (tuple variant)",
-                                    format!("Association with {} entries", __n),
-                                ),
-                            );
-                        }
-                        // Reads `"Data" -> List[…]` header, validating arity.
-                        ::wolfram_wxf::strategy::read_data_header(__c, #arity)?;
                         #(#extracts)*
                         return ::core::result::Result::Ok(#name :: #v_name ( #(#bindings),* ));
                     }
                 });
             },
             Fields::Named(named) => {
+                // Struct variant: {"VariantName", <|fields...|>} — one Association payload.
                 let fields: Vec<&syn::Field> = named.named.iter().collect();
                 let NamedFieldsAssoc {
                     slot_decls,
@@ -579,26 +561,6 @@ fn expand_enum(
                 } = build_named_assoc(&fields, &v_path)?;
                 variant_arms.push(quote! {
                     #v_str => {
-                        if __n != 2 {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(
-                                    #v_path,
-                                    "Association with 2 entries (struct variant)",
-                                    format!("Association with {} entries", __n),
-                                ),
-                            );
-                        }
-                        let _delayed = __c.read_rule()?;
-                        let __data_key = __c.read_string()?;
-                        if __data_key.as_str() != "Data" {
-                            return ::core::result::Result::Err(
-                                ::wolfram_wxf::from_wxf::err_at(
-                                    #v_path,
-                                    "Association entry with key \"Data\"",
-                                    format!("got key {:?}", __data_key),
-                                ),
-                            );
-                        }
                         if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Association {
                             return ::core::result::Result::Err(
                                 ::wolfram_wxf::from_wxf::err_at(#v_path, "Association", "other".to_string()),

@@ -85,11 +85,12 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     assert_eq!(na.data_type(), wolfram_expr::NumericArrayEnum::Integer32);
     assert_eq!(na.dimensions(), &[3]);
 
-    // tag → Option is an enum: Some(7) ⇒ <|"Enum" -> "Some", "Data" -> {7}|>
+    // tag → Option is an enum: Some(7) ⇒ {"Some", 7} (List head, variant first)
     let tag = find(assoc, "tag")
-        .try_as_association()
-        .expect("tag (Some) should be an enum Association");
-    assert_eq!(find(tag, "Enum"), &Expr::from("Some"));
+        .try_as_normal()
+        .expect("tag (Some) should be a List function");
+    assert_eq!(tag.head().try_as_symbol().unwrap().as_str(), "System`List");
+    assert_eq!(tag.elements()[0].try_as_str().unwrap(), "Some");
 
     // typed round-trip
     let back: Frame = from_wxf(&bytes).unwrap();
@@ -231,50 +232,38 @@ fn enum_roundtrips_all_variant_shapes() {
 
 #[test]
 fn enum_variants_emit_proper_shapes() {
-    // Helper: assert the parsed Expr is an Association whose `"Enum"` entry
-    // equals `expected_variant`, and return the value of the `"Data"` entry
-    // (or `System\`Null` if absent).
-    fn assert_enum_key(expr: &Expr, expected_variant: &str) -> Expr {
-        let assoc = expr.try_as_association().expect("Association");
-        let s = find(assoc, "Enum")
-            .try_as_str()
-            .expect("Enum value is String");
-        assert_eq!(s, expected_variant);
-        assoc
-            .iter()
-            .find(|e| e.key == Expr::from("Data"))
-            .map(|e| e.value.clone())
-            .unwrap_or_else(|| Expr::symbol(wolfram_expr::Symbol::new("System`Null")))
+    // Helper: assert the parsed Expr is a List{"VariantName", ...} and return
+    // the elements after the variant name.
+    fn assert_enum_list<'a>(expr: &'a Expr, expected_variant: &str) -> &'a [Expr] {
+        let list = expr.try_as_normal().expect("List function");
+        assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
+        assert_eq!(list.elements()[0].try_as_str().unwrap(), expected_variant);
+        &list.elements()[1..]
     }
 
-    // Unit variant: 1-entry Association with only "Enum".
+    // Unit variant: {"Origin"} — 1 element, just the name.
     let bytes = to_wxf(&Shape::Origin, None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
-    let assoc = s.try_as_association().expect("Association");
-    assert_eq!(assoc.len(), 1);
-    assert_eq!(find(assoc, "Enum").try_as_str().unwrap(), "Origin");
+    let tail = assert_enum_list(&s, "Origin");
+    assert_eq!(tail.len(), 0);
 
-    // Tuple variant (1 arg): "Data" → List of args.
+    // Tuple variant (1 arg): {"Square", 2.0}
     let bytes = to_wxf(&Shape::Square(2.0), None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
-    let data = assert_enum_key(&s, "Square");
-    let list = data.try_as_normal().expect("Data is a List Function");
-    assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
-    assert_eq!(list.elements().len(), 1);
+    let tail = assert_enum_list(&s, "Square");
+    assert_eq!(tail.len(), 1);
 
-    // Tuple variant (2 args): "Data" → List of 2 args.
+    // Tuple variant (2 args): {"Rect", 1.0, 2.0}
     let bytes = to_wxf(&Shape::Rect(1.0, 2.0), None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
-    let data = assert_enum_key(&s, "Rect");
-    let list = data.try_as_normal().unwrap();
-    assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
-    assert_eq!(list.elements().len(), 2);
+    let tail = assert_enum_list(&s, "Rect");
+    assert_eq!(tail.len(), 2);
 
-    // Struct variant: "Data" → inner Association of named fields.
+    // Struct variant: {"Circle", <|"radius" -> 3.0|>}
     let bytes = to_wxf(&Shape::Circle { radius: 3.0 }, None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
-    let data = assert_enum_key(&s, "Circle");
-    let inner = data.try_as_association().expect("Data is an Association");
+    let tail = assert_enum_list(&s, "Circle");
+    let inner = tail[0].try_as_association().expect("inner Association");
     assert!(inner.iter().any(|e| e.key == Expr::from("radius")));
 }
 

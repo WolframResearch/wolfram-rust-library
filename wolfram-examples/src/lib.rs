@@ -70,3 +70,27 @@ pub fn summarize(ds: DatasetRef<'_>) -> String {
 pub fn force_panic(n: f64) -> f64 {
     panic!("force_panic called with {n}")
 }
+
+/// Returns the value inside `Some`, or 0 for `None`.
+pub fn resolve_number(v: Option<i64>) -> i64 {
+    v.unwrap_or(0)
+}
+
+/// Returns the value inside `Ok`, or 0 for `Err`.
+pub fn resolve_number_error(v: Result<i64, String>) -> i64 {
+    v.unwrap_or(0)
+}
+
+/// Returns `Some(n as u8)` if `n` is an integer in 0–255, `None` otherwise.
+pub fn trim_number(n: f64) -> Option<u8> {
+    if n >= 0.0 && n <= 255.0 && n.fract() == 0.0 {
+        Some(n as u8)
+    } else {
+        None
+    }
+}
+
+/// Returns `Ok(n as u8)` if `n` is an integer in 0–255, `Err` otherwise.
+pub fn force_trim_number(n: f64) -> Result<u8, String> {
+    trim_number(n).ok_or_else(|| format!("{n} is not an integer in 0–255"))
+}

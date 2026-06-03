@@ -6,16 +6,14 @@
 //!
 //! ## Enum representation
 //!
-//! A Rust enum is encoded as an Association keyed by `"Enum"` (the variant name)
-//! and, for variants carrying data, `"Data"`:
+//! A Rust enum is encoded as a `List` where the first element is the variant
+//! name (a string) and the remaining elements are the payload:
 //!
 //! ```text
-//! None            <|"Enum" -> "None"|>
-//! Some(v)         <|"Enum" -> "Some", "Data" -> {v}|>
-//! Rect(w, h)      <|"Enum" -> "Rect", "Data" -> {w, h}|>
+//! None            {"None"}
+//! Some(v)         {"Some", v}
+//! Rect(w, h)      {"Rect", w, h}
 //! ```
-//!
-//! `"Enum"` is always the first entry.
 
 use crate::constants::ExpressionEnum;
 use crate::reader::Reader;
@@ -26,92 +24,66 @@ use crate::Error;
 
 //---- write ------------------------------------------------------------------
 
-/// Write a unit variant: `<|"Enum" -> name|>`.
+/// Write a unit variant: `{"VariantName"}`.
 pub fn write_unit_variant<W: Writer>(
     w: &mut WxfWriter<W>,
     name: &str,
 ) -> Result<(), Error> {
-    w.write_association(1)?;
-    w.write_rule(false)?;
-    w.write_string("Enum")?;
+    w.write_function(1)?;
+    w.write_symbol("System`List")?;
     w.write_string(name)
 }
 
-/// Begin a data-carrying variant: `<|"Enum" -> name, "Data" -> List[<n items>]|>`.
-/// The caller writes the `n_data` payload values next.
+/// Begin a data-carrying variant: `{"VariantName", data...}`.
+/// The caller writes the `n_data` payload values immediately after.
 pub fn begin_data_variant<W: Writer>(
     w: &mut WxfWriter<W>,
     name: &str,
     n_data: usize,
 ) -> Result<(), Error> {
-    w.write_association(2)?;
-    w.write_rule(false)?;
-    w.write_string("Enum")?;
-    w.write_string(name)?;
-    w.write_rule(false)?;
-    w.write_string("Data")?;
-    w.write_function(n_data)?;
-    w.write_symbol("System`List")
+    w.write_function(1 + n_data)?;
+    w.write_symbol("System`List")?;
+    w.write_string(name)
 }
 
 //---- read -------------------------------------------------------------------
 
-/// Read an enum-association header (token already consumed): validates the first
-/// entry is `"Enum" -> <variant name>` and returns `(entry_count, variant_name)`.
-/// The caller dispatches on the name; data variants then call [`read_data_header`].
+/// Read an enum list header (token already consumed): skips the head, reads the
+/// variant name string, and returns `(total_arity, variant_name)`. The caller
+/// reads the remaining `total_arity - 1` payload values.
 pub fn read_enum_header<'de, R: Reader<'de>>(
     r: &mut WxfReader<R>,
     tok: ExpressionEnum,
 ) -> Result<(u64, String), Error> {
-    if tok != ExpressionEnum::Association {
-        return Err(Error::InvalidWxf(format!(
-            "expected Association (enum), got {}",
-            tok.name()
-        )));
+    match tok {
+        // Full form: {"VariantName", data...}
+        ExpressionEnum::Function => {
+            let n = r.read_varint()?;
+            if n == 0 {
+                return Err(Error::InvalidWxf("enum List is empty".into()));
+            }
+            r.skip()?; // discard head
+            let variant = r.read_string()?;
+            Ok((n, variant))
+        },
+        // Shorthand: "VariantName" — unit variant with no data.
+        ExpressionEnum::String => {
+            let variant = r.read_str()?.to_owned();
+            Ok((1, variant))
+        },
+        other => Err(Error::InvalidWxf(format!(
+            "expected List or String (enum), got {}",
+            other.name()
+        ))),
     }
-    let n = r.read_varint()?;
-    if n == 0 {
-        return Err(Error::InvalidWxf(
-            "enum Association has no \"Enum\" entry".into(),
-        ));
-    }
-    r.read_rule()?;
-    let key = r.read_string()?;
-    if key != "Enum" {
-        return Err(Error::InvalidWxf(format!(
-            "expected first key \"Enum\", got {:?}",
-            key
-        )));
-    }
-    let variant = r.read_string()?;
-    Ok((n, variant))
 }
 
-/// After [`read_enum_header`] yields a data variant, read the `"Data"` entry: the
-/// `Data` key + a `List` header, validating its arity equals `n_data`. The caller
-/// then reads the `n_data` payload values.
+/// No-op: the old strategy needed a separate `"Data"` key + List header;
+/// the new format inlines data directly after the variant name, so there
+/// is nothing extra to read. Kept for API compatibility with derived code.
 pub fn read_data_header<'de, R: Reader<'de>>(
-    r: &mut WxfReader<R>,
-    n_data: usize,
+    _r: &mut WxfReader<R>,
+    _n_data: usize,
 ) -> Result<(), Error> {
-    r.read_rule()?;
-    let key = r.read_string()?;
-    if key != "Data" {
-        return Err(Error::InvalidWxf(format!(
-            "expected key \"Data\", got {:?}",
-            key
-        )));
-    }
-    if r.read_expr_token()? != ExpressionEnum::Function {
-        return Err(Error::InvalidWxf("expected List for enum \"Data\"".into()));
-    }
-    let arity = r.read_varint()?;
-    r.skip()?; // discard head
-    if arity != n_data as u64 {
-        return Err(Error::InvalidWxf(format!(
-            "enum data: expected {} elements, got {}",
-            n_data, arity
-        )));
-    }
     Ok(())
 }
