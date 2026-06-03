@@ -1,4 +1,4 @@
-use wolfram_examples::{Dataset, Point};
+use wolfram_examples::{Dataset, DatasetRef, Point};
 use wolfram_export::export;
 use wolfram_expr::Expr;
 
@@ -46,12 +46,10 @@ fn force_panic(n: f64) -> f64 {
 
 // ── Tier 4: borrowed (zero-copy) struct arg ───────────────────────────────────
 
-#[derive(wolfram_expr::ToWXF, wolfram_expr::FromWXF)]
-struct Greeting<'a> {
-    name: &'a str,
-}
-
+// `DatasetRef` borrows `name` as `&str` straight out of the WXF input buffer
+// (no allocation); `values` is still copied. Wire-compatible with `Dataset`, so
+// the kernel passes the same `<|"name" -> …, "values" -> …|>` association.
 #[export(wxf)]
-fn greet(g: Greeting<'_>) -> String {
-    format!("Hello, {}", g.name)
+fn summarize(ds: DatasetRef<'_>) -> String {
+    wolfram_examples::summarize(ds)
 }

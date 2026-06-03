@@ -104,10 +104,6 @@ impl ToWXF for Expr {
             ),
             ExprKind::BigInteger(n) => w.write_big_integer(n.as_str()),
             ExprKind::BigReal(r) => w.write_big_real(r.as_str()),
-            other => Err(Error::InvalidWxf(format!(
-                "ToWXF for Expr: unhandled ExprKind variant: {:?}",
-                other
-            ))),
         }
     }
 }

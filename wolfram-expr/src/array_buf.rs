@@ -135,15 +135,23 @@ impl<Tag: Copy + PartialEq> ArrayBuf<Tag> {
 /// [`crate::PackedArray`] and the runtime-handle `NumericArray<T>` in
 /// `wolfram-library-link`.
 pub trait NumericArrayRead {
+    /// The element-type tag.
     fn data_type(&self) -> NumericArrayEnum;
+    /// The multi-dimensional shape (row-major).
     fn dimensions(&self) -> &[usize];
+    /// The flat little-endian byte buffer.
     fn as_bytes(&self) -> &[u8];
 
+    /// Number of dimensions.
     fn rank(&self) -> usize { self.dimensions().len() }
+    /// Total element count = product of dimensions.
     fn element_count(&self) -> usize { self.dimensions().iter().product() }
+    /// Total byte length of the buffer.
     fn byte_count(&self) -> usize { self.as_bytes().len() }
+    /// Bytes per element.
     fn element_size(&self) -> usize { self.data_type().size_in_bytes() }
 
+    /// View the buffer as `&[T]` if `T`'s element type matches; else `None`.
     fn try_as_slice<T: ArrayElement<NumericArrayEnum>>(&self) -> Option<&[T]> {
         if self.data_type() != T::TAG {
             return None;

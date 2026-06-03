@@ -34,11 +34,37 @@ pub fn echo_point(p: Point) -> Point {
 #[derive(Debug, Clone, FromWXF, ToWXF)]
 pub struct Dataset {
     pub name: String,
+    pub blob: Vec<u8>,
     pub values: Vec<f64>,
 }
 
 pub fn echo_dataset(ds: Dataset) -> Dataset {
     ds
+}
+
+/// Borrowed view of a [`Dataset`]: `name` (`&str`) and `blob` (`&[u8]`) are read
+/// **zero-copy** straight out of the WXF input buffer — no allocation. `values`
+/// is still owned: numeric arrays can't be borrowed zero-copy (alignment), but
+/// that copy is cheap.
+///
+/// Wire-compatible with [`Dataset`]: both are
+/// `<|"name" -> "…", "blob" -> ByteArray[…], "values" -> …|>`.
+#[derive(Debug, FromWXF)]
+pub struct DatasetRef<'a> {
+    pub name: &'a str,
+    pub blob: &'a [u8],
+    pub values: Vec<f64>,
+}
+
+/// Summarize a borrowed dataset without copying its `name` or `blob`.
+pub fn summarize(ds: DatasetRef<'_>) -> String {
+    format!(
+        "{}: {} bytes, {} values, sum = {}",
+        ds.name,
+        ds.blob.len(),
+        ds.values.len(),
+        ds.values.iter().sum::<f64>(),
+    )
 }
 
 pub fn force_panic(n: f64) -> f64 {

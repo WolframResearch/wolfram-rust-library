@@ -16,7 +16,11 @@
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use inventory;
 
-use wolfram_expr::{Association, Expr, ExprKind, RuleEntry, Symbol};
+use wolfram_expr::{Expr, Symbol};
+// Only the `exported_library_functions_association` manifest builder (gated on
+// this feature) constructs an Association.
+#[cfg(feature = "automate-function-loading-boilerplate")]
+use wolfram_expr::{Association, ExprKind, RuleEntry};
 use wolfram_wxf::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib

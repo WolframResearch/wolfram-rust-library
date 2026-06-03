@@ -3,7 +3,7 @@
 //! [ref/PackedArray]: https://reference.wolfram.com/language/ref/Developer/PackedArrayQ.html
 
 use crate::array_buf::{ArrayBuf, ArrayElement};
-use crate::wxf::{NumericArrayEnum, PackedArrayEnum};
+use crate::wxf::PackedArrayEnum;
 
 /// Owned [`PackedArray`][ref/PackedArray]<sub>WL</sub> value.
 ///
@@ -19,6 +19,7 @@ impl<T: ArrayElement<PackedArrayEnum>> From<(Vec<usize>, &[T])> for PackedArray 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::wxf::NumericArrayEnum;
     use crate::NumericArrayRead;
 
     #[test]
