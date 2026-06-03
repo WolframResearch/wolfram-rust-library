@@ -316,9 +316,11 @@ fn optional_field_missing_key_yields_none() {
     let err =
         from_wxf::<TwoOrThree>(missing_required).expect_err("missing `b` should error");
     let msg = format!("{}", err);
+    // The WxfError-derived Display delegates to Debug; assert it names the path
+    // of the missing key (`TwoOrThree.b`).
     assert!(
-        msg.contains("\"b\""),
-        "error should mention the missing key: {}",
+        msg.contains("TwoOrThree.b"),
+        "error should mention the missing key path: {}",
         msg
     );
 }

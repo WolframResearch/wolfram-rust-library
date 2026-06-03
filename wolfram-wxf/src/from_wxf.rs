@@ -44,8 +44,8 @@ pub trait FromWXF<'de>: Sized {
 pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> Error {
     Error::Deserialize {
         path: path.into(),
-        expected,
-        got,
+        expected: expected,
+        got: got,
     }
 }
 

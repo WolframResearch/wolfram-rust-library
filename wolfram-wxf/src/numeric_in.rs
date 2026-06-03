@@ -109,8 +109,8 @@ pub fn read_fixed_with_tag<'de, T: NumericTarget, R: Reader<'de>>(
 fn err(path: &str, expected: &'static str, got: String) -> Error {
     Error::Deserialize {
         path: path.to_string(),
-        expected,
-        got,
+        expected: expected,
+        got: got,
     }
 }
 

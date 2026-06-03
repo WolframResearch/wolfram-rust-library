@@ -42,14 +42,14 @@ pub fn decode_args<R, F>(
     input: &NumericArray<u8>,
     n_expected: u64,
     read: F,
-) -> Result<R, String>
+) -> Result<R, wolfram_wxf::Error>
 where
     F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_wxf::Error>,
 {
     wolfram_wxf::read_wxf(input.as_slice(), |r| {
         let tok = r.read_expr_token()?;
         if tok != ExpressionEnum::Function {
-            return Err(wolfram_wxf::Error::InvalidWxf(format!(
+            return Err(wolfram_wxf::Error::invalid_wxf(format!(
                 "expected Function, got {}",
                 tok.name()
             )));
@@ -57,19 +57,13 @@ where
         let n = r.read_varint()?;
         r.skip()?; // discard head — any shape ok
         if n != n_expected {
-            return Err(wolfram_wxf::Error::InvalidWxf(format!(
+            return Err(wolfram_wxf::Error::invalid_wxf(format!(
                 "expected {} args, got {}",
                 n_expected, n
             )));
         }
         read(r)
     })
-    .map_err(|e| e.to_string())
-}
-
-/// Build a `Failure["WxfDeserialize", <|"MessageTemplate" -> msg|>]` Expr.
-pub fn deserialize_failure_expr(msg: &str) -> wolfram_expr::Expr {
-    wolfram_expr::expr!(Failure["WxfDeserialize", {"MessageTemplate" -> msg}])
 }
 
 /// Serialize `value` to WXF bytes and wrap them in a UInt8 NumericArray.

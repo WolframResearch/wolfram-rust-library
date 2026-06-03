@@ -1,5 +1,5 @@
 use wolfram_expr::Expr;
-use wolfram_wxf_macros::{FromWXF, ToWXF};
+use wolfram_wxf_macros::{FromWXF, ToWXF, WxfError};
 
 // ── Shared computation helpers ────────────────────────────────────────────────
 
@@ -82,8 +82,9 @@ pub fn resolve_number_error(v: Result<i64, String>) -> i64 {
 }
 
 /// Structured error type that serializes as WL `Failure[...]` expressions.
-#[derive(Debug, ToWXF, FromWXF)]
-#[wolfram(enum_head = "System`Failure")]
+/// `WxfError` gives it the `Failure` head, `snake_to_camelcase` keys
+/// (`value` → `Value`), plus `Display` + `Error` — all from one derive.
+#[derive(Debug, WxfError)]
 pub enum ValidationError {
     OutOfRange { value: f64, min: f64, max: f64 },
     NotAnInteger { value: f64 },
@@ -95,7 +96,11 @@ pub fn strict_trim_number(n: f64) -> Result<i64, ValidationError> {
         return Err(ValidationError::NotAnInteger { value: n });
     }
     if n < 0.0 || n > 255.0 {
-        return Err(ValidationError::OutOfRange { value: n, min: 0.0, max: 255.0 });
+        return Err(ValidationError::OutOfRange {
+            value: n,
+            min: 0.0,
+            max: 255.0,
+        });
     }
     Ok(n as i64)
 }

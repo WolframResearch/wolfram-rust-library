@@ -12,17 +12,28 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::shared::{parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs};
+use crate::shared::{
+    parse_container_attrs, parse_field_attrs, process_key, qualify_symbol, ContainerAttrs,
+};
 use crate::ty_classify::{classify, FieldKind};
 
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
+    let container_attrs = parse_container_attrs(&input.attrs)?;
+    expand_with_attrs(input, &container_attrs)
+}
+
+/// `ToWXF` expansion with caller-supplied container attrs. Lets the `WxfError`
+/// derive force `enum_head = "System`Failure"` while reusing all the codegen.
+pub(crate) fn expand_with_attrs(
+    input: &DeriveInput,
+    container_attrs: &ContainerAttrs,
+) -> Result<TokenStream> {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let container_attrs = parse_container_attrs(&input.attrs)?;
 
     let body = match &input.data {
-        Data::Struct(s) => expand_struct(name, &container_attrs, s)?,
-        Data::Enum(e) => expand_enum(name, &container_attrs, e)?,
+        Data::Struct(s) => expand_struct(name, container_attrs, s)?,
+        Data::Enum(e) => expand_enum(name, container_attrs, e)?,
         Data::Union(_) => {
             return Err(syn::Error::new_spanned(
                 input,
@@ -61,7 +72,11 @@ fn expand_struct(
         Fields::Named(named) => {
             let fields: Vec<&syn::Field> = named.named.iter().collect();
             let arity = fields.len();
-            let writes = emit_named_entries(&fields, &|id| quote! { self.#id })?;
+            let writes = emit_named_entries(
+                &fields,
+                &|id| quote! { self.#id },
+                attrs.key_processor.as_deref(),
+            )?;
             Ok(quote! {
                 __w.write_association(#arity)?;
                 #(#writes)*
@@ -95,12 +110,17 @@ fn expand_struct(
 fn emit_named_entries(
     fields: &[&syn::Field],
     accessor: &dyn Fn(&syn::Ident) -> TokenStream,
+    key_processor: Option<&str>,
 ) -> Result<Vec<TokenStream>> {
     let mut out = Vec::with_capacity(fields.len());
     for f in fields {
         let f_attrs = parse_field_attrs(&f.attrs)?;
         let ident = f.ident.as_ref().expect("named field");
-        let key = f_attrs.rename.clone().unwrap_or_else(|| ident.to_string());
+        // Explicit per-field `rename` wins; otherwise apply the container's key_processor.
+        let key = f_attrs
+            .rename
+            .clone()
+            .unwrap_or_else(|| process_key(&ident.to_string(), key_processor));
         let span = f.ty.span();
         let write_val = emit_write_field(&accessor(ident), &f.ty, span);
         out.push(quote_spanned! { span =>
@@ -222,7 +242,11 @@ fn parse_dotted_index_path(p: &str, span: Span) -> TokenStream {
 // Each variant becomes an Association keyed by `"Enum"` (variant name) and
 // optionally `"Data"` (a List for tuple variants, an Association for struct
 // variants). `"Enum"` is always written first.
-fn expand_enum(name: &syn::Ident, attrs: &ContainerAttrs, data: &DataEnum) -> Result<TokenStream> {
+fn expand_enum(
+    name: &syn::Ident,
+    attrs: &ContainerAttrs,
+    data: &DataEnum,
+) -> Result<TokenStream> {
     let head = attrs.enum_head.as_deref().unwrap_or("System`List");
     let mut arms = Vec::with_capacity(data.variants.len());
     for v in &data.variants {
@@ -259,7 +283,11 @@ fn expand_enum(name: &syn::Ident, attrs: &ContainerAttrs, data: &DataEnum) -> Re
                     .iter()
                     .map(|f| f.ident.as_ref().expect("named field"))
                     .collect();
-                let entry_writes = emit_named_entries(&fields, &|id| quote! { #id })?;
+                let entry_writes = emit_named_entries(
+                    &fields,
+                    &|id| quote! { #id },
+                    attrs.key_processor.as_deref(),
+                )?;
                 arms.push(quote! {
                     #name :: #v_name { #(#bindings),* } => {
                         ::wolfram_wxf::strategy::begin_data_variant(__w, #head, #v_str, 1)?;

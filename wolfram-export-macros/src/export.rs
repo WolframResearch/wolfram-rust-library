@@ -351,10 +351,10 @@ fn export_wxf_function(
                         ::core::result::Result::Ok(__bytes) => {
                             #p::macro_utils::NumericArray::<u8>::from_slice(&__bytes)
                         }
-                        ::core::result::Result::Err(__msg) => {
-                            #p::macro_utils::encode(
-                                &#p::macro_utils::deserialize_failure_expr(&__msg),
-                            )
+                        // The error is a `wolfram_wxf::Error`, which serializes to a
+                        // structured `Failure["Deserialize"/"InvalidWXF", <|…|>]`.
+                        ::core::result::Result::Err(__err) => {
+                            #p::macro_utils::encode(&__err)
                         }
                     }
                 })

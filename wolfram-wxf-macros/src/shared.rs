@@ -18,6 +18,33 @@ pub(crate) struct ContainerAttrs {
     /// Defaults to `"System`List"`. Use `#[wolfram(enum_head = "System`Failure")]`
     /// to emit `Failure["VariantName", <|fields|>]` instead of `{"VariantName", ...}`.
     pub enum_head: Option<String>,
+    /// Transform applied to every Association key that lacks an explicit
+    /// `#[wolfram(rename = "...")]`. `None` (default) leaves keys verbatim;
+    /// `"snake_to_camelcase"` upper-camel-cases them (`out_of_range` → `OutOfRange`).
+    /// `WxfError` defaults this to `"snake_to_camelcase"` so failures get
+    /// Wolfram-style keys.
+    pub key_processor: Option<String>,
+}
+
+/// Apply a `key_processor` policy to one Association key. `None` (or an unknown
+/// policy) leaves the key untouched; `"snake_to_camelcase"` upper-camel-cases each
+/// `_`-separated segment (`message_template` → `MessageTemplate`).
+pub(crate) fn process_key(key: &str, processor: Option<&str>) -> String {
+    match processor {
+        Some("snake_to_camelcase") => key
+            .split('_')
+            .map(|seg| {
+                let mut chars = seg.chars();
+                match chars.next() {
+                    Some(first) => {
+                        first.to_uppercase().collect::<String>() + chars.as_str()
+                    },
+                    None => String::new(),
+                }
+            })
+            .collect(),
+        _ => key.to_string(),
+    }
 }
 
 /// Field-level attributes parsed from `#[wolfram(...)]`.
@@ -44,13 +71,20 @@ pub(crate) fn parse_container_attrs(attrs: &[Attribute]) -> Result<ContainerAttr
                 NestedMeta::Meta(Meta::NameValue(nv)) if nv.path.is_ident("symbol") => {
                     out.symbol = Some(string_lit(&nv.lit)?);
                 },
-                NestedMeta::Meta(Meta::NameValue(nv)) if nv.path.is_ident("enum_head") => {
+                NestedMeta::Meta(Meta::NameValue(nv))
+                    if nv.path.is_ident("enum_head") =>
+                {
                     out.enum_head = Some(string_lit(&nv.lit)?);
+                },
+                NestedMeta::Meta(Meta::NameValue(nv))
+                    if nv.path.is_ident("key_processor") =>
+                {
+                    out.key_processor = Some(string_lit(&nv.lit)?);
                 },
                 other => {
                     return Err(Error::new_spanned(
                         other,
-                        "unknown `#[wolfram(...)]` option; expected `symbol = \"...\"` or `enum_head = \"...\"`",
+                        "unknown `#[wolfram(...)]` option; expected `symbol`, `enum_head`, or `key_processor`",
                     ));
                 },
             }

@@ -14,7 +14,7 @@ use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
 use crate::shared::{
-    parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs,
+    parse_container_attrs, parse_field_attrs, process_key, qualify_symbol, ContainerAttrs,
 };
 use crate::ty_classify::{classify, is_option_type, numeric_primitive_name, FieldKind};
 
@@ -26,7 +26,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 
     let body = match &input.data {
         Data::Struct(s) => expand_struct(name, &name_str, &container_attrs, s)?,
-        Data::Enum(e) => expand_enum(name, &name_str, e)?,
+        Data::Enum(e) => expand_enum(name, &name_str, &container_attrs, e)?,
         Data::Union(_) => {
             return Err(syn::Error::new_spanned(
                 input,
@@ -86,13 +86,19 @@ struct NamedFieldsAssoc<'a> {
 fn build_named_assoc<'a>(
     fields: &'a [&'a syn::Field],
     err_path_prefix: &str,
+    key_processor: Option<&str>,
 ) -> Result<NamedFieldsAssoc<'a>> {
     let mut field_keys: Vec<String> = Vec::with_capacity(fields.len());
     let mut field_idents: Vec<&syn::Ident> = Vec::with_capacity(fields.len());
     for f in fields {
         let attrs = parse_field_attrs(&f.attrs)?;
         let id = f.ident.as_ref().expect("named field");
-        field_keys.push(attrs.rename.unwrap_or_else(|| id.to_string()));
+        // Must match the write side: explicit `rename` wins, else key_processor.
+        field_keys.push(
+            attrs
+                .rename
+                .unwrap_or_else(|| process_key(&id.to_string(), key_processor)),
+        );
         field_idents.push(id);
     }
     let slot_decls = fields
@@ -168,7 +174,7 @@ fn expand_struct(
                 key_arms,
                 unwraps,
                 field_idents,
-            } = build_named_assoc(&fields, name_str)?;
+            } = build_named_assoc(&fields, name_str, attrs.key_processor.as_deref())?;
 
             let pos_extracts = fields.iter().zip(&field_idents).map(|(f, id)| {
                 let path = format!("{}.{}", name_str, id);
@@ -512,6 +518,7 @@ fn build_tuple_ctor_from_slice(ty: &syn::Type, idx: &mut usize) -> TokenStream {
 fn expand_enum(
     name: &syn::Ident,
     name_str: &str,
+    attrs: &ContainerAttrs,
     data: &DataEnum,
 ) -> Result<TokenStream> {
     let mut variant_arms = Vec::with_capacity(data.variants.len());
@@ -558,7 +565,7 @@ fn expand_enum(
                     key_arms,
                     unwraps,
                     field_idents,
-                } = build_named_assoc(&fields, &v_path)?;
+                } = build_named_assoc(&fields, &v_path, attrs.key_processor.as_deref())?;
                 variant_arms.push(quote! {
                     #v_str => {
                         if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::Association {

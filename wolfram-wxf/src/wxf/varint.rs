@@ -28,7 +28,7 @@ pub fn read_varint<R: Read>(r: &mut R) -> Result<u64, Error> {
     loop {
         let mut buf = [0u8; 1];
         r.read_exact(&mut buf)
-            .map_err(|_| Error::InvalidWxf("truncated varint".into()))?;
+            .map_err(|_| Error::invalid_wxf("truncated varint".into()))?;
         let byte = buf[0];
         result |= ((byte & 0x7F) as u64) << shift;
         if byte & 0x80 == 0 {
@@ -36,7 +36,7 @@ pub fn read_varint<R: Read>(r: &mut R) -> Result<u64, Error> {
         }
         shift += 7;
         if shift >= 64 {
-            return Err(Error::InvalidWxf("varint too long (>9 bytes)".into()));
+            return Err(Error::invalid_wxf("varint too long (>9 bytes)".into()));
         }
     }
 }

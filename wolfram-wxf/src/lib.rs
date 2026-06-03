@@ -15,8 +15,13 @@
 
 #![warn(missing_docs)]
 
+// Lets the derive macros' absolute `::wolfram_wxf::…` paths resolve while
+// compiling this crate itself — so `#[derive(WxfError)]` works on our own `Error`.
+extern crate self as wolfram_wxf;
+
 pub mod complex;
 pub mod constants;
+pub mod errors;
 pub mod from_wxf;
 pub mod numeric_in;
 pub mod reader;
@@ -24,6 +29,8 @@ pub mod strategy;
 pub mod to_wxf;
 pub mod writer;
 pub mod wxf;
+
+pub use crate::errors::Error;
 
 pub use crate::complex::{Complex, Complex32, Complex64};
 
@@ -38,7 +45,7 @@ pub use crate::wxf::reader::WxfReader;
 pub use crate::wxf::writer::WxfWriter;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
-pub use wolfram_wxf_macros::{FromWXF, ToWXF};
+pub use wolfram_wxf_macros::{FromWXF, ToWXF, WxfError};
 
 /// zlib compression level passed to [`to_wxf`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -61,62 +68,6 @@ impl CompressionLevel {
             CompressionLevel::Best => 9,
             CompressionLevel::Level(n) => n.min(9),
         }
-    }
-}
-
-/// Errors returned by [`to_wxf`] / [`from_wxf`].
-#[derive(Debug)]
-pub enum Error {
-    /// Wraps an underlying [`std::io::Error`] from a writer.
-    Io(std::io::Error),
-    /// WXF byte stream is malformed (header mismatch, unexpected token,
-    /// truncation, …) or an unhandled internal serialize/deserialize state.
-    InvalidWxf(String),
-    /// Type mismatch during typed deserialization via [`FromWXF`].
-    /// `path` is a dotted accessor (e.g. `"Frame.payload"`); `expected` and
-    /// `got` describe the wire shape the deserializer wanted vs. what it found.
-    Deserialize {
-        /// Field path threaded by the derived `FromWXF` impl.
-        path: String,
-        /// Human-readable description of the expected wire shape.
-        expected: &'static str,
-        /// Human-readable description of the actual wire shape encountered.
-        got: String,
-    },
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Io(e) => write!(f, "I/O error: {}", e),
-            Error::InvalidWxf(msg) => write!(f, "invalid WXF: {}", msg),
-            Error::Deserialize {
-                path,
-                expected,
-                got,
-            } => {
-                if path.is_empty() {
-                    write!(f, "expected {}, got {}", expected, got)
-                } else {
-                    write!(f, "at {}: expected {}, got {}", path, expected, got)
-                }
-            },
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::Io(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::Io(e)
     }
 }
 
@@ -175,12 +126,12 @@ fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
     use crate::constants::HeaderEnum;
 
     if bytes.len() < 2 {
-        return Err(Error::InvalidWxf(
+        return Err(Error::invalid_wxf(
             "byte stream too short for WXF header".into(),
         ));
     }
     if bytes[0] != HeaderEnum::Version as u8 {
-        return Err(Error::InvalidWxf(format!(
+        return Err(Error::invalid_wxf(format!(
             "WXF header version mismatch: expected {:?}, got {:?}",
             HeaderEnum::Version as u8 as char,
             bytes[0] as char
@@ -188,17 +139,17 @@ fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
     }
     if bytes[1] == HeaderEnum::Compress as u8 {
         if bytes.len() < 3 || bytes[2] != HeaderEnum::Separator as u8 {
-            return Err(Error::InvalidWxf("WXF compressed header truncated".into()));
+            return Err(Error::invalid_wxf("WXF compressed header truncated".into()));
         }
         let mut decoded = Vec::new();
         flate2::read::ZlibDecoder::new(&bytes[3..])
             .read_to_end(&mut decoded)
-            .map_err(|e| Error::InvalidWxf(format!("zlib decompress failed: {}", e)))?;
+            .map_err(|e| Error::invalid_wxf(format!("zlib decompress failed: {}", e)))?;
         Ok(std::borrow::Cow::Owned(decoded))
     } else if bytes[1] == HeaderEnum::Separator as u8 {
         Ok(std::borrow::Cow::Borrowed(&bytes[2..]))
     } else {
-        Err(Error::InvalidWxf(format!(
+        Err(Error::invalid_wxf(format!(
             "WXF header separator mismatch: expected ':' or 'C', got {:?}",
             bytes[1] as char
         )))
@@ -235,17 +186,17 @@ pub fn from_wxf_ref<'de, T: FromWXF<'de>>(bytes: &'de [u8]) -> Result<T, Error> 
     use crate::constants::HeaderEnum;
 
     if bytes.len() < 2 || bytes[0] != HeaderEnum::Version as u8 {
-        return Err(Error::InvalidWxf("not a WXF stream".into()));
+        return Err(Error::invalid_wxf("not a WXF stream".into()));
     }
     if bytes[1] == HeaderEnum::Compress as u8 {
-        return Err(Error::InvalidWxf(
+        return Err(Error::invalid_wxf(
             "from_wxf_ref requires uncompressed (8:) WXF — borrowed views can't \
              point into a decompressed buffer"
                 .into(),
         ));
     }
     if bytes[1] != HeaderEnum::Separator as u8 {
-        return Err(Error::InvalidWxf("malformed WXF header".into()));
+        return Err(Error::invalid_wxf("malformed WXF header".into()));
     }
     let payload: &'de [u8] = &bytes[2..];
     let mut r = WxfReader::new(SliceReader::new(payload));

@@ -56,12 +56,12 @@ impl<'de> Reader<'de> for SliceReader<'de> {
         let end = self
             .pos
             .checked_add(n)
-            .ok_or_else(|| Error::InvalidWxf("byte count overflow".into()))?;
+            .ok_or_else(|| Error::invalid_wxf("byte count overflow".into()))?;
         // Copy out the `&'de [u8]` reference first so the returned slice is tied
         // to the buffer lifetime `'de`, not to this `&mut self` borrow.
         let buf: &'de [u8] = self.bytes;
         let slice = buf.get(self.pos..end).ok_or_else(|| {
-            Error::InvalidWxf(format!("unexpected EOF reading {} bytes", n))
+            Error::invalid_wxf(format!("unexpected EOF reading {} bytes", n))
         })?;
         self.pos = end;
         Ok(slice)
