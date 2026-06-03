@@ -82,7 +82,7 @@ pub fn resolve_number_error(v: Result<i64, String>) -> i64 {
 }
 
 /// Structured error type that serializes as WL `Failure[...]` expressions.
-/// `WxfError` gives it the `Failure` head, `snake_to_camelcase` keys
+/// `WxfError` gives it the `Failure` head, `CamelCase` keys
 /// (`value` → `Value`), plus `Display` + `Error` — all from one derive.
 #[derive(Debug, WxfError)]
 pub enum ValidationError {

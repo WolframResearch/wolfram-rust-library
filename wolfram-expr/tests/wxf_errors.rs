@@ -41,7 +41,7 @@ fn assert_failure(err: &Error, tag: &str, fields: &[(&str, Expr)]) {
     assert_eq!(assoc.iter().count(), fields.len(), "exact field set");
 }
 
-// Keys are upper-camel-cased by WxfError's default `snake_to_camelcase`
+// Keys are upper-camel-cased by WxfError's default `CamelCase`
 // key_processor: `message` → `Message`, `path` → `Path`, etc.
 
 #[test]

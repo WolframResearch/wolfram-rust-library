@@ -24,7 +24,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    // Errors default to System`Failure head + snake_to_camelcase keys, so a bare
+    // Errors default to System`Failure head + CamelCase keys, so a bare
     // `#[derive(WxfError)]` already produces `Failure["V", <|UpperCamel -> …|>]`.
     // Both are overridable via explicit `#[wolfram(...)]`.
     let mut attrs = parse_container_attrs(&input.attrs)?;
@@ -32,7 +32,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
         attrs.enum_head = Some("System`Failure".to_string());
     }
     if attrs.key_processor.is_none() {
-        attrs.key_processor = Some("snake_to_camelcase".to_string());
+        attrs.key_processor = Some("CamelCase".to_string());
     }
 
     let to_wxf = crate::serialize::expand_with_attrs(input, &attrs)?;

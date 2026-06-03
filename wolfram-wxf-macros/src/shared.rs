@@ -20,18 +20,22 @@ pub(crate) struct ContainerAttrs {
     pub enum_head: Option<String>,
     /// Transform applied to every Association key that lacks an explicit
     /// `#[wolfram(rename = "...")]`. `None` (default) leaves keys verbatim;
-    /// `"snake_to_camelcase"` upper-camel-cases them (`out_of_range` → `OutOfRange`).
-    /// `WxfError` defaults this to `"snake_to_camelcase"` so failures get
-    /// Wolfram-style keys.
+    /// `"CamelCase"` upper-camel-cases them (`out_of_range` → `OutOfRange`).
+    /// `WxfError` defaults this to `"CamelCase"` so failures get Wolfram-style keys.
+    ///
+    /// Must be a compile-time-known name, not a function path: keys are baked into
+    /// the generated code as string literals, and the deserialize side matches them
+    /// in `match key { ... }` arms (patterns must be constants), so a runtime
+    /// `fn(&str) -> String` can't be used.
     pub key_processor: Option<String>,
 }
 
 /// Apply a `key_processor` policy to one Association key. `None` (or an unknown
-/// policy) leaves the key untouched; `"snake_to_camelcase"` upper-camel-cases each
+/// policy) leaves the key untouched; `"CamelCase"` upper-camel-cases each
 /// `_`-separated segment (`message_template` → `MessageTemplate`).
 pub(crate) fn process_key(key: &str, processor: Option<&str>) -> String {
     match processor {
-        Some("snake_to_camelcase") => key
+        Some("CamelCase") => key
             .split('_')
             .map(|seg| {
                 let mut chars = seg.chars();
