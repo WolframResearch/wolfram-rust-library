@@ -54,56 +54,20 @@ impl CaughtPanic {
         let backtrace = display_backtrace(backtrace);
 
         #[cfg(not(feature = "panic-failure-backtraces"))]
-        let backtrace = Expr::normal(
-            Symbol::new("System`Missing"),
-            vec![Expr::string("NotEnabled")],
-        );
+        let backtrace = crate::expr::expr!(Missing["NotEnabled"]);
 
         // Failure["RustPanic", <|
-        //     "MessageTemplate" -> "Rust LibraryLink function panic: `message`",
-        //     "MessageParameters" -> <| "message" -> "..." |>,
+        //     "MessageTemplate" -> "`message`",
+        //     "MessageParameters" -> <|"message" -> "..."|>,
         //     "SourceLocation" -> "...",
-        //     "Backtrace" -> "..."
+        //     "Backtrace" -> ...
         // |>]
-        Expr::normal(
-            Symbol::new("System`Failure"),
-            vec![
-                Expr::string("RustPanic"),
-                Expr::normal(
-                    Symbol::new("System`Association"),
-                    vec![
-                        Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![
-                                Expr::string("MessageTemplate"),
-                                Expr::string("`message`"),
-                            ],
-                        ),
-                        Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![
-                                Expr::string("MessageParameters"),
-                                Expr::normal(
-                                    Symbol::new("System`Association"),
-                                    vec![Expr::normal(
-                                        Symbol::new("System`Rule"),
-                                        vec![Expr::string("message"), message],
-                                    )],
-                                ),
-                            ],
-                        ),
-                        Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![Expr::string("SourceLocation"), location],
-                        ),
-                        Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![Expr::string("Backtrace"), backtrace],
-                        ),
-                    ],
-                ),
-            ],
-        )
+        crate::expr::expr!(Failure["RustPanic", {
+            "MessageTemplate"  -> "`message`",
+            "MessageParameters" -> {"message" -> message},
+            "SourceLocation"   -> location,
+            "Backtrace"        -> backtrace
+        }])
     }
 }
 
@@ -148,93 +112,32 @@ fn display_backtrace(bt: Option<Backtrace>) -> Expr {
             // Only make a clickable link if the file actually exists on disk.
             // This naturally excludes /rustc/... and other phantom paths baked
             // in by the compiler that are not present on the user's machine.
+            let courier = crate::expr::expr!({"FontFamily" -> "Courier"});
             let location = if file_exists {
-                Expr::normal(
-                    Symbol::new("System`Button"),
-                    vec![
-                        Expr::normal(
-                            Symbol::new("System`Style"),
-                            vec![
-                                Expr::string(label),
-                                Expr::normal(
-                                    Symbol::new("System`RGBColor"),
-                                    vec![
-                                        Expr::real(0.25),
-                                        Expr::real(0.48),
-                                        Expr::real(1.0),
-                                    ],
-                                ),
-                                Expr::symbol(Symbol::new("System`Small")),
-                                Expr::normal(
-                                    Symbol::new("System`Rule"),
-                                    vec![
-                                        Expr::symbol(Symbol::new("System`FontFamily")),
-                                        Expr::string("Courier"),
-                                    ],
-                                ),
-                            ],
-                        ),
-                        Expr::normal(
-                            Symbol::new("System`SystemOpen"),
-                            vec![Expr::string(path_str.clone())],
-                        ),
-                        Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![
-                                Expr::symbol(Symbol::new("System`Appearance")),
-                                Expr::string("Frameless"),
-                            ],
-                        ),
-                    ],
-                )
+                let rgb = crate::expr::expr!(RGBColor[0.25f64, 0.48f64, 1.0f64]);
+                let style = crate::expr::expr!(Style[label, rgb, "Small", courier]);
+                let path_clone = path_str.clone();
+                let open = crate::expr::expr!(SystemOpen[path_clone]);
+                crate::expr::expr!(Button[style, open, {"Appearance" -> "Frameless"}])
             } else {
-                Expr::normal(
-                    Symbol::new("System`Style"),
-                    vec![
-                        Expr::string(label),
-                        Expr::symbol(Symbol::new("System`Small")),
-                        Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![
-                                Expr::symbol(Symbol::new("System`FontFamily")),
-                                Expr::string("Courier"),
-                            ],
-                        ),
-                    ],
-                )
+                crate::expr::expr!(Style[label, "Small", courier])
             };
 
             let row = if path_str.is_empty() {
                 Expr::string(name.clone())
             } else {
-                Expr::normal(
-                    Symbol::new("System`Row"),
-                    vec![Expr::normal(
-                        Symbol::new("System`List"),
-                        vec![location, Expr::string(" in "), Expr::string(name)],
-                    )],
-                )
+                let name_expr = name.clone();
+                let items = crate::expr::expr!(List[location, " in ", name_expr]);
+                crate::expr::expr!(Row[items])
             };
 
             frames.push(row);
         }
 
-        Expr::normal(
-            Symbol::new("System`Style"),
-            vec![
-                Expr::normal(
-                    Symbol::new("System`Column"),
-                    vec![Expr::normal(Symbol::new("System`List"), frames)],
-                ),
-                Expr::normal(
-                    Symbol::new("System`Rule"),
-                    vec![
-                        Expr::symbol(Symbol::new("System`FontFamily")),
-                        Expr::string("Courier"),
-                    ],
-                ),
-            ],
-        )
+        let frames_list = Expr::list(frames);
+        let courier = crate::expr::expr!({"FontFamily" -> "Courier"});
+        let col = crate::expr::expr!(Column[frames_list]);
+        crate::expr::expr!(Style[col, courier])
     } else {
         Expr::string("<unable to capture backtrace>")
     };

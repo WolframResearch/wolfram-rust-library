@@ -158,19 +158,9 @@ pub extern "C" fn wstp_expr_function(
                 return LIBRARY_FUNCTION_ERROR;
             }
 
-            let err = Expr::string(err.to_string());
-            let err = Expr::normal(
-                Symbol::new("System`Failure"),
-                vec![
-                    Expr::string("WSTP Error"),
-                    Expr::normal(
-                        Symbol::new("System`Association"),
-                        vec![Expr::normal(
-                            Symbol::new("System`Rule"),
-                            vec![Expr::string("Message"), err],
-                        )],
-                    ),
-                ],
+            let msg = err.to_string();
+            let err = wolfram_library_link::expr::expr!(
+                Failure["WSTP Error", {"Message" -> msg}]
             );
             match link.put_expr(&err) {
                 Ok(()) => return LIBRARY_NO_ERROR,

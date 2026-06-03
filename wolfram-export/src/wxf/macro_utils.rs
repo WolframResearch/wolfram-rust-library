@@ -69,17 +69,7 @@ where
 
 /// Build a `Failure["WxfDeserialize", <|"MessageTemplate" -> msg|>]` Expr.
 pub fn deserialize_failure_expr(msg: &str) -> wolfram_expr::Expr {
-    let assoc: Association = vec![RuleEntry::rule(
-        Expr::string("MessageTemplate"),
-        Expr::string(msg),
-    )];
-    Expr::normal(
-        Symbol::new("System`Failure"),
-        vec![
-            Expr::string("WxfDeserialize"),
-            Expr::new(ExprKind::Association(assoc)),
-        ],
-    )
+    wolfram_expr::expr!(Failure["WxfDeserialize", {"MessageTemplate" -> msg}])
 }
 
 /// Serialize `value` to WXF bytes and wrap them in a UInt8 NumericArray.
