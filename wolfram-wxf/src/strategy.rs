@@ -24,25 +24,31 @@ use crate::Error;
 
 //---- write ------------------------------------------------------------------
 
-/// Write a unit variant: `{"VariantName"}`.
+/// Default head for enum variants on the wire: `{"VariantName", data...}`.
+pub const DEFAULT_ENUM_HEAD: &str = "System`List";
+
+/// Write a unit variant: `head["VariantName"]`.
+/// Use [`DEFAULT_ENUM_HEAD`] for the standard `{"VariantName"}` form.
 pub fn write_unit_variant<W: Writer>(
     w: &mut WxfWriter<W>,
+    head: &str,
     name: &str,
 ) -> Result<(), Error> {
     w.write_function(1)?;
-    w.write_symbol("System`List")?;
+    w.write_symbol(head)?;
     w.write_string(name)
 }
 
-/// Begin a data-carrying variant: `{"VariantName", data...}`.
+/// Begin a data-carrying variant: `head["VariantName", data...]`.
 /// The caller writes the `n_data` payload values immediately after.
 pub fn begin_data_variant<W: Writer>(
     w: &mut WxfWriter<W>,
+    head: &str,
     name: &str,
     n_data: usize,
 ) -> Result<(), Error> {
     w.write_function(1 + n_data)?;
-    w.write_symbol("System`List")?;
+    w.write_symbol(head)?;
     w.write_string(name)
 }
 

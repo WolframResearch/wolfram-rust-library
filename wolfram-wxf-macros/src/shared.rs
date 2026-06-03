@@ -14,6 +14,10 @@ pub(crate) struct ContainerAttrs {
     /// the wire (e.g. `"MyPkg`Foo"`). When `None`, the macro qualifies the
     /// Rust ident with `Global`` automatically.
     pub symbol: Option<String>,
+    /// Override for the List head used to wrap enum variants on the wire.
+    /// Defaults to `"System`List"`. Use `#[wolfram(enum_head = "System`Failure")]`
+    /// to emit `Failure["VariantName", <|fields|>]` instead of `{"VariantName", ...}`.
+    pub enum_head: Option<String>,
 }
 
 /// Field-level attributes parsed from `#[wolfram(...)]`.
@@ -40,10 +44,13 @@ pub(crate) fn parse_container_attrs(attrs: &[Attribute]) -> Result<ContainerAttr
                 NestedMeta::Meta(Meta::NameValue(nv)) if nv.path.is_ident("symbol") => {
                     out.symbol = Some(string_lit(&nv.lit)?);
                 },
+                NestedMeta::Meta(Meta::NameValue(nv)) if nv.path.is_ident("enum_head") => {
+                    out.enum_head = Some(string_lit(&nv.lit)?);
+                },
                 other => {
                     return Err(Error::new_spanned(
                         other,
-                        "unknown `#[wolfram(...)]` option here; expected `symbol = \"...\"`",
+                        "unknown `#[wolfram(...)]` option; expected `symbol = \"...\"` or `enum_head = \"...\"`",
                     ));
                 },
             }

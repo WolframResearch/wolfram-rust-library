@@ -12,9 +12,7 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::shared::{
-    parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs,
-};
+use crate::shared::{parse_container_attrs, parse_field_attrs, qualify_symbol, ContainerAttrs};
 use crate::ty_classify::{classify, FieldKind};
 
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
@@ -24,7 +22,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 
     let body = match &input.data {
         Data::Struct(s) => expand_struct(name, &container_attrs, s)?,
-        Data::Enum(e) => expand_enum(name, e)?,
+        Data::Enum(e) => expand_enum(name, &container_attrs, e)?,
         Data::Union(_) => {
             return Err(syn::Error::new_spanned(
                 input,
@@ -224,7 +222,8 @@ fn parse_dotted_index_path(p: &str, span: Span) -> TokenStream {
 // Each variant becomes an Association keyed by `"Enum"` (variant name) and
 // optionally `"Data"` (a List for tuple variants, an Association for struct
 // variants). `"Enum"` is always written first.
-fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
+fn expand_enum(name: &syn::Ident, attrs: &ContainerAttrs, data: &DataEnum) -> Result<TokenStream> {
+    let head = attrs.enum_head.as_deref().unwrap_or("System`List");
     let mut arms = Vec::with_capacity(data.variants.len());
     for v in &data.variants {
         let _v_attrs = parse_container_attrs(&v.attrs)?;
@@ -234,7 +233,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
             Fields::Unit => {
                 arms.push(quote! {
                     #name :: #v_name => {
-                        ::wolfram_wxf::strategy::write_unit_variant(__w, #v_str)?;
+                        ::wolfram_wxf::strategy::write_unit_variant(__w, #head, #v_str)?;
                     }
                 });
             },
@@ -248,7 +247,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                     });
                 arms.push(quote! {
                     #name :: #v_name ( #(#bindings),* ) => {
-                        ::wolfram_wxf::strategy::begin_data_variant(__w, #v_str, #arity)?;
+                        ::wolfram_wxf::strategy::begin_data_variant(__w, #head, #v_str, #arity)?;
                         #(#elem_writes)*
                     }
                 });
@@ -263,8 +262,7 @@ fn expand_enum(name: &syn::Ident, data: &DataEnum) -> Result<TokenStream> {
                 let entry_writes = emit_named_entries(&fields, &|id| quote! { #id })?;
                 arms.push(quote! {
                     #name :: #v_name { #(#bindings),* } => {
-                        // {"VariantName", <|field -> val, ...|>}
-                        ::wolfram_wxf::strategy::begin_data_variant(__w, #v_str, 1)?;
+                        ::wolfram_wxf::strategy::begin_data_variant(__w, #head, #v_str, 1)?;
                         __w.write_association(#arity)?;
                         #(#entry_writes)*
                     }

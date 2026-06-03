@@ -81,6 +81,25 @@ pub fn resolve_number_error(v: Result<i64, String>) -> i64 {
     v.unwrap_or(0)
 }
 
+/// Structured error type that serializes as WL `Failure[...]` expressions.
+#[derive(Debug, ToWXF, FromWXF)]
+#[wolfram(enum_head = "System`Failure")]
+pub enum ValidationError {
+    OutOfRange { value: f64, min: f64, max: f64 },
+    NotAnInteger { value: f64 },
+}
+
+/// Returns `Ok(n as u8)` or a structured `ValidationError`.
+pub fn strict_trim_number(n: f64) -> Result<i64, ValidationError> {
+    if n.fract() != 0.0 {
+        return Err(ValidationError::NotAnInteger { value: n });
+    }
+    if n < 0.0 || n > 255.0 {
+        return Err(ValidationError::OutOfRange { value: n, min: 0.0, max: 255.0 });
+    }
+    Ok(n as i64)
+}
+
 /// Returns `Some(n as u8)` if `n` is an integer in 0–255, `None` otherwise.
 pub fn trim_number(n: f64) -> Option<u8> {
     if n >= 0.0 && n <= 255.0 && n.fract() == 0.0 {

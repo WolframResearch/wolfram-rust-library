@@ -170,9 +170,9 @@ impl ToWXF for () {
 impl<T: ToWXF> ToWXF for Option<T> {
     fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
         match self {
-            None => crate::strategy::write_unit_variant(w, "None"),
+            None => crate::strategy::write_unit_variant(w, crate::strategy::DEFAULT_ENUM_HEAD, "None"),
             Some(v) => {
-                crate::strategy::begin_data_variant(w, "Some", 1)?;
+                crate::strategy::begin_data_variant(w, crate::strategy::DEFAULT_ENUM_HEAD, "Some", 1)?;
                 v.to_wxf(w)
             },
         }
@@ -183,11 +183,11 @@ impl<T: ToWXF, E: ToWXF> ToWXF for Result<T, E> {
     fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
         match self {
             Ok(v) => {
-                crate::strategy::begin_data_variant(w, "Ok", 1)?;
+                crate::strategy::begin_data_variant(w, crate::strategy::DEFAULT_ENUM_HEAD, "Ok", 1)?;
                 v.to_wxf(w)
             },
             Err(e) => {
-                crate::strategy::begin_data_variant(w, "Err", 1)?;
+                crate::strategy::begin_data_variant(w, crate::strategy::DEFAULT_ENUM_HEAD, "Err", 1)?;
                 e.to_wxf(w)
             },
         }

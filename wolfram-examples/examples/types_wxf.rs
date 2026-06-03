@@ -1,4 +1,4 @@
-use wolfram_examples::{Dataset, DatasetRef, Point};
+use wolfram_examples::{Dataset, DatasetRef, Point, ValidationError};
 use wolfram_export::export;
 use wolfram_expr::Expr;
 
@@ -57,6 +57,12 @@ fn trim_number(n: f64) -> Option<u8> {
 #[export(wxf)]
 fn force_trim_number(n: f64) -> Result<u8, String> {
     wolfram_examples::force_trim_number(n)
+}
+
+// Returns Ok(n) or a Failure[...] expression as the error.
+#[export(wxf)]
+fn strict_trim_number(n: f64) -> Result<i64, ValidationError> {
+    wolfram_examples::strict_trim_number(n)
 }
 
 // Round-trip testers: accept the enum value back in and pass it through.
