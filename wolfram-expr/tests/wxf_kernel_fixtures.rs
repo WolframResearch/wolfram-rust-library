@@ -12,18 +12,24 @@
 //! runtime `wolframscript` invocation. Re-run the generator script if
 //! you add a test case or want to refresh against a newer kernel.
 
-use wolfram_expr::from_wxf;
-use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
+use wolfram_expr::{expr, from_wxf, to_wxf};
+use wolfram_expr::{Association, ByteArray, Expr, ExprKind, NumericArray, RuleEntry, Symbol};
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;
 
-/// Helper: deserialize a kernel-produced WXF byte sequence and assert it parses to
-/// `expected`.
+/// Deserialize kernel WXF bytes and assert they match `expected`.
 #[track_caller]
 fn assert_parses_to(bytes: &[u8], expected: Expr) {
     let parsed: Expr = from_wxf(bytes).expect("deserialize kernel WXF");
     assert_eq!(parsed, expected);
+}
+
+/// Serialize `expr` and assert the bytes are identical to the kernel fixture.
+#[track_caller]
+fn assert_serializes_to(expr: Expr, fixture: &[u8]) {
+    let bytes = to_wxf(&expr, None).expect("serialize WXF");
+    assert_eq!(bytes.as_slice(), fixture, "serialized bytes don't match kernel fixture");
 }
 
 #[test]
@@ -114,6 +120,47 @@ fn byte_array() {
 fn numeric_array_int32() {
     let arr = Expr::from(NumericArray::from_slice::<i32>(vec![3], &[10, 20, 30]));
     assert_parses_to(fix::NUMERIC_ARRAY_INT32, arr);
+}
+
+//==============================================================================
+// expr! macro — build the same expressions with the macro and verify our
+// serializer produces bytes identical to the kernel fixtures.
+//==============================================================================
+
+#[test]
+fn expr_macro_integers() {
+    assert_serializes_to(expr!(42),            fix::INTEGER_42);
+    assert_serializes_to(expr!(-1_234_567_890i64), fix::INTEGER_NEG_LARGE);
+}
+
+#[test]
+fn expr_macro_real() {
+    assert_serializes_to(expr!(3.5f64), fix::REAL_3_5);
+}
+
+#[test]
+fn expr_macro_string() {
+    assert_serializes_to(expr!("hello"), fix::STRING_HELLO);
+}
+
+#[test]
+fn expr_macro_association() {
+    assert_serializes_to(
+        expr!({ "a" -> 1, "b" -> 2 }),
+        fix::ASSOCIATION_PLAIN,
+    );
+}
+
+#[test]
+fn expr_macro_byte_array() {
+    let ba = ByteArray::from(vec![0u8, 1, 2, 0xff, 0x80]);
+    assert_serializes_to(expr!(ba), fix::BYTE_ARRAY);
+}
+
+#[test]
+fn expr_macro_numeric_array() {
+    let arr = NumericArray::from_slice::<i32>(vec![3], &[10, 20, 30]);
+    assert_serializes_to(expr!(arr), fix::NUMERIC_ARRAY_INT32);
 }
 
 #[test]

@@ -182,6 +182,12 @@ impl From<i64> for Expr {
     }
 }
 
+impl From<f64> for Expr {
+    fn from(f: f64) -> Expr {
+        Expr::real(f)
+    }
+}
+
 // impl From<Normal> for ExprKind {
 //     fn from(normal: Normal) -> ExprKind {
 //         ExprKind::Normal(Box::new(normal))

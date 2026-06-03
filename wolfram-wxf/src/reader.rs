@@ -50,10 +50,6 @@ impl<'a> SliceReader<'a> {
         SliceReader { bytes, pos: 0 }
     }
 
-    /// Number of unread bytes remaining.
-    pub fn remaining(&self) -> usize {
-        self.bytes.len() - self.pos
-    }
 }
 
 impl<'de> Reader<'de> for SliceReader<'de> {

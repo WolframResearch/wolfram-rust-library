@@ -9,6 +9,7 @@ mod bignum;
 mod byte_array;
 mod complex;
 mod conversion;
+mod macros;
 mod numeric_array;
 mod packed_array;
 mod ptr_cmp;
