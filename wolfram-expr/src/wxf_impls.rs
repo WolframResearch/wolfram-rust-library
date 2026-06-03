@@ -114,7 +114,7 @@ impl ToWXF for Expr {
 
 fn symbol_from_name(name: String) -> Result<Symbol, Error> {
     Symbol::try_from_wxf_name_owned(name)
-        .map_err(|n| Error::invalid_wxf(format!("invalid symbol name: {:?}", n)))
+        .map_err(|n| Error::InvalidSymbolName { name: n })
 }
 
 fn numeric_array_from_parts(
@@ -130,12 +130,10 @@ fn packed_array_from_parts(
     dims: Vec<usize>,
     bytes: Vec<u8>,
 ) -> Result<PackedArray, Error> {
-    let pdt = PackedArrayEnum::try_from(dt).map_err(|_| {
-        Error::invalid_wxf(format!(
-            "PackedArray does not support element type {}",
-            dt.name()
-        ))
-    })?;
+    let pdt =
+        PackedArrayEnum::try_from(dt).map_err(|_| Error::UnsupportedPackedType {
+            element_type: dt.name().to_string(),
+        })?;
     Ok(PackedArray::new(pdt, dims, bytes))
 }
 
@@ -145,11 +143,7 @@ impl<'de> FromWXF<'de> for Symbol {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "Symbol",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["Symbol"], tok));
         }
         symbol_from_name(r.read_symbol_name()?)
     }
@@ -161,11 +155,7 @@ impl<'de> FromWXF<'de> for NumericArray {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::NumericArray {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "NumericArray",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["NumericArray"], tok));
         }
         let (dt, dims, bytes) = r.read_numeric_array_parts()?;
         Ok(numeric_array_from_parts(dt, dims, bytes))
@@ -178,11 +168,7 @@ impl<'de> FromWXF<'de> for PackedArray {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::PackedArray {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "PackedArray",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["PackedArray"], tok));
         }
         let (dt, dims, bytes) = r.read_numeric_array_parts()?;
         packed_array_from_parts(dt, dims, bytes)
@@ -198,11 +184,7 @@ impl<'de> FromWXF<'de> for BigInteger {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::BigInteger {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "BigInteger",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["BigInteger"], tok));
         }
         Ok(BigInteger::new(r.read_symbol_name()?))
     }
@@ -214,11 +196,7 @@ impl<'de> FromWXF<'de> for BigReal {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::BigReal {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "BigReal",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["BigReal"], tok));
         }
         Ok(BigReal::new(r.read_symbol_name()?))
     }
@@ -256,7 +234,7 @@ impl<'de> FromWXF<'de> for Expr {
             ExpressionEnum::Real64 => {
                 let f = r.read_f64()?;
                 if f.is_nan() {
-                    return Err(Error::invalid_wxf("Real64 token contained NaN".into()));
+                    return Err(Error::RealNaN);
                 }
                 Ok(Expr::real(f))
             },
@@ -290,10 +268,7 @@ impl<'de> FromWXF<'de> for Expr {
             },
             ExpressionEnum::Association => Ok(Expr::from(read_association(r)?)),
             other @ (ExpressionEnum::Rule | ExpressionEnum::RuleDelayed) => {
-                Err(Error::invalid_wxf(format!(
-                    "unexpected {} outside Association",
-                    other.name()
-                )))
+                Err(Error::RuleOutsideAssociation { got: other.name() })
             },
         }
     }

@@ -94,22 +94,60 @@ pub unsafe fn load_library_functions_impl(
     lib_data: sys::WolframLibraryData,
     raw_link: wstp::sys::WSLINK,
 ) -> c_int {
+    use wolfram_library_link::expr::{expr, Expr};
+
+    // Write a structured `Failure["LoaderError", <|…|>]` to the link instead of
+    // panicking, so a bad call to the generated loader surfaces a proper Failure
+    // (with the data behind it) rather than an opaque RustPanic.
+    fn loader_failure(message: &str, expected: &str, got: Expr) -> Expr {
+        expr!(Failure["LoaderError", {
+            "Message"  -> message,
+            "Expected" -> expected,
+            "Got"      -> got
+        }])
+    }
+
     call_wstp_link_wolfram_library_function(lib_data, raw_link, |link: &mut Link| {
-        let arg_count: usize =
-            link.test_head("List").expect("expected 'List' expression");
+        let arg_count = match link.test_head("List") {
+            Ok(n) => n,
+            Err(e) => {
+                let f = loader_failure(
+                    "loader call must be List[path]",
+                    "List",
+                    Expr::string(e.to_string()),
+                );
+                let _ = write_failure_to_link(link, f);
+                return;
+            },
+        };
 
         if arg_count != 1 {
-            panic!(
-                "expected 1 argument: the name of or file path to the dynamic library"
+            let f = loader_failure(
+                "loader takes exactly one argument: the dynamic library path",
+                "1 argument",
+                Expr::from(arg_count as i64),
             );
+            let _ = write_failure_to_link(link, f);
+            return;
         }
 
-        let path = {
-            let path = match link.get_string_ref() {
-                Ok(value) => value,
-                Err(err) => panic!("expected String argument (error: {})", err),
-            };
-            std::path::PathBuf::from(path.as_str())
+        // Resolve to an owned value first so the `link` borrow from
+        // `get_string_ref` ends before we re-borrow `link` to write a failure.
+        let path = match link
+            .get_string_ref()
+            .map(|s| std::path::PathBuf::from(s.as_str()))
+            .map_err(|e| e.to_string())
+        {
+            Ok(p) => p,
+            Err(msg) => {
+                let f = loader_failure(
+                    "loader argument must be a String path",
+                    "String",
+                    Expr::string(msg),
+                );
+                let _ = write_failure_to_link(link, f);
+                return;
+            },
         };
 
         let expr =

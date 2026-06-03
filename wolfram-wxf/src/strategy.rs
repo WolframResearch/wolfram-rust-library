@@ -66,7 +66,7 @@ pub fn read_enum_header<'de, R: Reader<'de>>(
         ExpressionEnum::Function => {
             let n = r.read_varint()?;
             if n == 0 {
-                return Err(Error::invalid_wxf("enum List is empty".into()));
+                return Err(Error::EmptyEnum);
             }
             r.skip()?; // discard head
             let variant = r.read_string()?;
@@ -77,10 +77,7 @@ pub fn read_enum_header<'de, R: Reader<'de>>(
             let variant = r.read_str()?.to_owned();
             Ok((1, variant))
         },
-        other => Err(Error::invalid_wxf(format!(
-            "expected List or String (enum), got {}",
-            other.name()
-        ))),
+        other => Err(Error::unexpected_token(&["Function", "String"], other)),
     }
 }
 

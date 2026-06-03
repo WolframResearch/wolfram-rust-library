@@ -49,18 +49,15 @@ where
     wolfram_wxf::read_wxf(input.as_slice(), |r| {
         let tok = r.read_expr_token()?;
         if tok != ExpressionEnum::Function {
-            return Err(wolfram_wxf::Error::invalid_wxf(format!(
-                "expected Function, got {}",
-                tok.name()
-            )));
+            return Err(wolfram_wxf::Error::unexpected_token(&["Function"], tok));
         }
         let n = r.read_varint()?;
         r.skip()?; // discard head — any shape ok
         if n != n_expected {
-            return Err(wolfram_wxf::Error::invalid_wxf(format!(
-                "expected {} args, got {}",
-                n_expected, n
-            )));
+            return Err(wolfram_wxf::Error::ArgCountMismatch {
+                expected: n_expected,
+                got: n,
+            });
         }
         read(r)
     })

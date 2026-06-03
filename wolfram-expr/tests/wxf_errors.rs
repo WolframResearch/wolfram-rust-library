@@ -44,12 +44,46 @@ fn assert_failure(err: &Error, tag: &str, fields: &[(&str, Expr)]) {
 // Keys are upper-camel-cased by WxfError's default `CamelCase`
 // key_processor: `message` → `Message`, `path` → `Path`, etc.
 
+/// Helper: a WL `List["a", "b", ...]` Expr to compare against a `Vec`-valued field.
+fn list_of(items: &[&str]) -> Expr {
+    Expr::list(items.iter().map(|s| Expr::from(*s)).collect())
+}
+
 #[test]
-fn invalid_wxf_is_failure() {
+fn unexpected_token_carries_expected_and_got() {
+    // The user's canonical case: i32 accepts Integer8/16/32; got Real64.
+    let err = Error::unexpected_token(
+        &["Integer8", "Integer16", "Integer32"],
+        wolfram_wxf::ExpressionEnum::Real64,
+    );
     assert_failure(
-        &Error::invalid_wxf("bad token".into()),
-        "InvalidWXF",
-        &[("Message", Expr::from("bad token"))],
+        &err,
+        "UnexpectedToken",
+        &[
+            ("Expected", list_of(&["Integer8", "Integer16", "Integer32"])),
+            ("Got", Expr::from("Real64")),
+        ],
+    );
+}
+
+#[test]
+fn unknown_token_carries_byte() {
+    assert_failure(
+        &Error::UnknownToken { byte: 0x7f },
+        "UnknownToken",
+        &[("Byte", Expr::from(0x7fi64))],
+    );
+}
+
+#[test]
+fn arg_count_mismatch_carries_both() {
+    assert_failure(
+        &Error::ArgCountMismatch {
+            expected: 2,
+            got: 3,
+        },
+        "ArgCountMismatch",
+        &[("Expected", Expr::from(2i64)), ("Got", Expr::from(3i64))],
     );
 }
 
@@ -78,8 +112,13 @@ fn io_is_failure() {
 }
 
 #[test]
-fn malformed_bytes_produce_invalid_wxf() {
-    // A truncated header → InvalidWXF when deserializing.
+fn empty_enum_is_unit_failure() {
+    assert_failure(&Error::EmptyEnum, "EmptyEnum", &[]);
+}
+
+#[test]
+fn malformed_bytes_produce_structured_header_error() {
+    // A truncated header (1 byte) → HeaderTooShort{needed:2, got:1}.
     let err = from_wxf::<Expr>(b"8").unwrap_err();
     let bytes = to_wxf(&err, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
@@ -88,14 +127,14 @@ fn malformed_bytes_produce_invalid_wxf() {
         normal.head().try_as_symbol().unwrap().as_str(),
         "System`Failure"
     );
-    assert_eq!(normal.elements()[0].try_as_str().unwrap(), "InvalidWXF");
+    assert_eq!(normal.elements()[0].try_as_str().unwrap(), "HeaderTooShort");
 }
 
 #[test]
 fn display_delegates_to_debug() {
-    // The WxfError-derived Display is non-empty and mentions the variant.
-    let err = Error::invalid_wxf("oops".into());
+    // The WxfError-derived Display is non-empty and mentions the variant + data.
+    let err = Error::UnknownToken { byte: 0x42 };
     let shown = format!("{}", err);
-    assert!(shown.contains("InvalidWXF"), "Display: {}", shown);
-    assert!(shown.contains("oops"), "Display: {}", shown);
+    assert!(shown.contains("UnknownToken"), "Display: {}", shown);
+    assert!(shown.contains("66"), "Display: {}", shown); // 0x42 = 66
 }

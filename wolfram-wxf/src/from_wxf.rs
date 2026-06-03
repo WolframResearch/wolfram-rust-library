@@ -63,11 +63,7 @@ impl<'de> FromWXF<'de> for &'de str {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::String {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "String (&str)",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["String"], tok));
         }
         r.read_str()
     }
@@ -79,11 +75,7 @@ impl<'de> FromWXF<'de> for &'de [u8] {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::ByteArray {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "ByteArray (&[u8])",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["ByteArray"], tok));
         }
         r.read_byte_array()
     }
@@ -125,11 +117,10 @@ macro_rules! impl_numeric_from_wxf {
             ) -> Result<Self, Error> {
                 match tok {
                     $(ExpressionEnum::$tok => Ok(read_wire!($tok, r)),)+
-                    other => Err(Error::Deserialize {
-                        path: String::new(),
-                        expected: stringify!($t),
-                        got: other.name().into(),
-                    }),
+                    other => Err(Error::unexpected_token(
+                        &[$(stringify!($tok)),+],
+                        other,
+                    )),
                 }
             }
         }
@@ -156,19 +147,14 @@ impl<'de> FromWXF<'de> for bool {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "bool (System`True / System`False)",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["Symbol"], tok));
         }
         match r.read_str()? {
             "System`True" => Ok(true),
             "System`False" => Ok(false),
-            other => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "bool (System`True / System`False)",
-                got: format!("Symbol({:?})", other),
+            other => Err(Error::UnexpectedSymbol {
+                expected: vec!["System`True", "System`False"],
+                got: other.to_owned(),
             }),
         }
     }
@@ -194,18 +180,13 @@ impl<'de> FromWXF<'de> for () {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Symbol {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "() (Null symbol)",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["Symbol"], tok));
         }
         match r.read_str()? {
             "Null" | "System`Null" => Ok(()),
-            other => Err(Error::Deserialize {
-                path: String::new(),
-                expected: "() (Null symbol)",
-                got: format!("Symbol({:?})", other),
+            other => Err(Error::UnexpectedSymbol {
+                expected: vec!["Null", "System`Null"],
+                got: other.to_owned(),
             }),
         }
     }
@@ -226,11 +207,10 @@ impl<'de, T: FromWXF<'de>> FromWXF<'de> for Option<T> {
                 crate::strategy::read_data_header(r, 1)?;
                 Ok(Some(T::from_wxf(r)?))
             },
-            other => Err(err_at(
-                "Option",
-                "\"None\" or \"Some\"",
-                format!("{:?}", other),
-            )),
+            other => Err(Error::UnexpectedSymbol {
+                expected: vec!["None", "Some"],
+                got: other.to_owned(),
+            }),
         }
     }
 }
@@ -250,11 +230,10 @@ impl<'de, T: FromWXF<'de>, E: FromWXF<'de>> FromWXF<'de> for Result<T, E> {
                 crate::strategy::read_data_header(r, 1)?;
                 Ok(Err(E::from_wxf(r)?))
             },
-            other => Err(err_at(
-                "Result",
-                "\"Ok\" or \"Err\"",
-                format!("{:?}", other),
-            )),
+            other => Err(Error::UnexpectedSymbol {
+                expected: vec!["Ok", "Err"],
+                got: other.to_owned(),
+            }),
         }
     }
 }
@@ -269,11 +248,7 @@ where
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Association {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "Association",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["Association"], tok));
         }
         let n = r.read_varint()?;
         let mut out = HashMap::with_capacity(n as usize);
@@ -297,11 +272,7 @@ where
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Association {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "Association",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["Association"], tok));
         }
         let n = r.read_varint()?;
         let mut out = BTreeMap::new();
@@ -350,11 +321,7 @@ impl<'de, T: FromWXF<'de> + crate::to_wxf::WxfStruct> FromWXF<'de> for Vec<T> {
         tok: ExpressionEnum,
     ) -> Result<Self, Error> {
         if tok != ExpressionEnum::Function {
-            return Err(Error::Deserialize {
-                path: String::new(),
-                expected: "Function (List)",
-                got: tok.name().into(),
-            });
+            return Err(Error::unexpected_token(&["Function"], tok));
         }
         let n = r.read_varint()?;
         r.skip()?; // discard head (any head accepted)

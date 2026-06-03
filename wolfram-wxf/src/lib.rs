@@ -126,33 +126,34 @@ fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
     use crate::constants::HeaderEnum;
 
     if bytes.len() < 2 {
-        return Err(Error::invalid_wxf(
-            "byte stream too short for WXF header".into(),
-        ));
+        return Err(Error::HeaderTooShort {
+            needed: 2,
+            got: bytes.len() as u64,
+        });
     }
     if bytes[0] != HeaderEnum::Version as u8 {
-        return Err(Error::invalid_wxf(format!(
-            "WXF header version mismatch: expected {:?}, got {:?}",
-            HeaderEnum::Version as u8 as char,
-            bytes[0] as char
-        )));
+        return Err(Error::VersionMismatch {
+            expected: (HeaderEnum::Version as u8 as char).to_string(),
+            got: (bytes[0] as char).to_string(),
+        });
     }
     if bytes[1] == HeaderEnum::Compress as u8 {
         if bytes.len() < 3 || bytes[2] != HeaderEnum::Separator as u8 {
-            return Err(Error::invalid_wxf("WXF compressed header truncated".into()));
+            return Err(Error::CompressedHeaderTruncated);
         }
         let mut decoded = Vec::new();
         flate2::read::ZlibDecoder::new(&bytes[3..])
             .read_to_end(&mut decoded)
-            .map_err(|e| Error::invalid_wxf(format!("zlib decompress failed: {}", e)))?;
+            .map_err(|e| Error::ZlibDecompress {
+                message: e.to_string(),
+            })?;
         Ok(std::borrow::Cow::Owned(decoded))
     } else if bytes[1] == HeaderEnum::Separator as u8 {
         Ok(std::borrow::Cow::Borrowed(&bytes[2..]))
     } else {
-        Err(Error::invalid_wxf(format!(
-            "WXF header separator mismatch: expected ':' or 'C', got {:?}",
-            bytes[1] as char
-        )))
+        Err(Error::SeparatorMismatch {
+            got: (bytes[1] as char).to_string(),
+        })
     }
 }
 
@@ -186,17 +187,13 @@ pub fn from_wxf_ref<'de, T: FromWXF<'de>>(bytes: &'de [u8]) -> Result<T, Error> 
     use crate::constants::HeaderEnum;
 
     if bytes.len() < 2 || bytes[0] != HeaderEnum::Version as u8 {
-        return Err(Error::invalid_wxf("not a WXF stream".into()));
+        return Err(Error::NotWxf);
     }
     if bytes[1] == HeaderEnum::Compress as u8 {
-        return Err(Error::invalid_wxf(
-            "from_wxf_ref requires uncompressed (8:) WXF — borrowed views can't \
-             point into a decompressed buffer"
-                .into(),
-        ));
+        return Err(Error::RefRequiresUncompressed);
     }
     if bytes[1] != HeaderEnum::Separator as u8 {
-        return Err(Error::invalid_wxf("malformed WXF header".into()));
+        return Err(Error::MalformedHeader);
     }
     let payload: &'de [u8] = &bytes[2..];
     let mut r = WxfReader::new(SliceReader::new(payload));
