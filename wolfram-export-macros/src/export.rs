@@ -337,13 +337,19 @@ fn export_wxf_function(
             // expressions by `call_and_encode_panic`.
             fn __wxf_bridge(__input: &#p::macro_utils::NumericArray<u8>) -> #p::macro_utils::NumericArray<u8> {
                 #p::macro_utils::call_and_encode_panic(|| {
+                    // Read args, call the user fn, and serialize the result —
+                    // ALL inside the closure, where the borrows into the input
+                    // buffer are live. The closure returns owned `Vec<u8>`, which
+                    // does not borrow the buffer, so zero-copy `&str` / `&[u8]`
+                    // arguments are sound.
                     let __decoded = #p::macro_utils::decode_args(__input, #n_u64, |__c| {
-                        ::core::result::Result::Ok(#tuple_read)
+                        let #tuple_pat = #tuple_read;
+                        let __result = super::#name(#(#arg_idents),*);
+                        #p::macro_utils::to_wxf_bytes(&__result)
                     });
                     match __decoded {
-                        ::core::result::Result::Ok(#tuple_pat) => {
-                            let __result = super::#name(#(#arg_idents),*);
-                            #p::macro_utils::encode(&__result)
+                        ::core::result::Result::Ok(__bytes) => {
+                            #p::macro_utils::NumericArray::<u8>::from_slice(&__bytes)
                         }
                         ::core::result::Result::Err(__msg) => {
                             #p::macro_utils::encode(

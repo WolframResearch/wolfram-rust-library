@@ -25,6 +25,17 @@ pub trait Reader {
     fn read_bytes(&mut self, n: usize) -> Result<&[u8], Error>;
 }
 
+/// A [`Reader`] that can additionally lend **buffer-lifetime** views (`&'de`),
+/// which outlive the `&mut self` borrow. This is what enables zero-copy
+/// *borrowed* deserialization ([`FromWxfRef`][crate::FromWxfRef]): a `&'de str`
+/// or `&'de [u8]` field can point straight into the input buffer. Only
+/// slice-backed readers (the data is all present) can implement it.
+pub trait RefReader<'de>: Reader {
+    /// Consume `n` bytes, returning a view tied to the underlying buffer
+    /// (lifetime `'de`), not to `&mut self`.
+    fn read_bytes_ref(&mut self, n: usize) -> Result<&'de [u8], Error>;
+}
+
 /// Slice-backed [`Reader`]: holds `&[u8]` plus a position. Every read is a
 /// bounds-checked sub-slice — no allocation, no copy.
 pub struct SliceReader<'a> {
@@ -55,12 +66,22 @@ impl<'a> Reader for SliceReader<'a> {
     }
 
     fn read_bytes(&mut self, n: usize) -> Result<&[u8], Error> {
+        // Same advance as `read_bytes_ref`, but the returned lifetime is the
+        // shorter `&mut self` borrow (sufficient for the owned path).
+        self.read_bytes_ref(n)
+    }
+}
+
+impl<'de> RefReader<'de> for SliceReader<'de> {
+    fn read_bytes_ref(&mut self, n: usize) -> Result<&'de [u8], Error> {
         let end = self
             .pos
             .checked_add(n)
             .ok_or_else(|| Error::InvalidWxf("byte count overflow".into()))?;
-        let slice = self
-            .bytes
+        // Copy out the `&'de [u8]` reference first so the returned slice is tied
+        // to the buffer lifetime `'de`, not to this `&mut self` borrow.
+        let buf: &'de [u8] = self.bytes;
+        let slice = buf
             .get(self.pos..end)
             .ok_or_else(|| Error::InvalidWxf(format!("unexpected EOF reading {} bytes", n)))?;
         self.pos = end;

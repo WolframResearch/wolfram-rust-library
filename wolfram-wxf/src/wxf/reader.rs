@@ -9,7 +9,7 @@
 //! (`Symbol`, `NumericArray`, …) are assembled by the consumer (`wolfram-expr`).
 
 use crate::constants::{ExpressionEnum, NumericArrayEnum, PackedArrayEnum};
-use crate::reader::Reader;
+use crate::reader::{Reader, RefReader};
 use crate::Error;
 
 /// Typed WXF reader wrapping a raw byte [`Reader`].
@@ -259,5 +259,25 @@ impl<R: Reader> WxfReader<R> {
             },
         }
         Ok(())
+    }
+}
+
+/// Borrowed (zero-copy) payload reads — available when the underlying reader can
+/// lend buffer-lifetime views ([`RefReader`]). Used by `#[derive(FromWxfRef)]`.
+impl<'de, R: RefReader<'de>> WxfReader<R> {
+    /// Read a `String` payload as a `&'de str` borrowing the input buffer
+    /// (tag already consumed). Zero-copy — no allocation.
+    pub fn read_str_ref(&mut self) -> Result<&'de str, Error> {
+        let len = self.read_varint()? as usize;
+        let bytes = self.inner.read_bytes_ref(len)?;
+        std::str::from_utf8(bytes)
+            .map_err(|_| Error::InvalidWxf("String payload not valid UTF-8".into()))
+    }
+
+    /// Read a `ByteArray` payload as a `&'de [u8]` borrowing the input buffer
+    /// (tag already consumed). Zero-copy — no allocation.
+    pub fn read_byte_array_ref(&mut self) -> Result<&'de [u8], Error> {
+        let len = self.read_varint()? as usize;
+        self.inner.read_bytes_ref(len)
     }
 }

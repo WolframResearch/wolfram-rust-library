@@ -43,3 +43,15 @@ fn echo_dataset(ds: Dataset) -> Dataset {
 fn force_panic(n: f64) -> f64 {
     wolfram_examples::force_panic(n)
 }
+
+// ── Tier 4: borrowed (zero-copy) struct arg ───────────────────────────────────
+
+#[derive(wolfram_expr::ToWXF, wolfram_expr::FromWXF)]
+struct Greeting<'a> {
+    name: &'a str,
+}
+
+#[export(wxf)]
+fn greet(g: Greeting<'_>) -> String {
+    format!("Hello, {}", g.name)
+}

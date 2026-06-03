@@ -3,7 +3,7 @@
 
 use wolfram_expr::{from_wxf, to_wxf, Expr, FromWXF, ToWXF};
 
-fn roundtrip<T: ToWXF + FromWXF + PartialEq + std::fmt::Debug>(v: T) {
+fn roundtrip<T: ToWXF + for<'de> FromWXF<'de> + PartialEq + std::fmt::Debug>(v: T) {
     let bytes = to_wxf(&v, None).unwrap();
     let back: T = from_wxf(&bytes).unwrap();
     assert_eq!(back, v);

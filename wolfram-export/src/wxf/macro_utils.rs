@@ -33,7 +33,7 @@ pub fn wxf_signature() -> Result<(Vec<Expr>, Expr), String> {
 }
 
 /// Deserialize WXF bytes from `input` into a typed value of type `A`.
-pub fn decode<A: FromWXF>(input: &NumericArray<u8>) -> Result<A, String> {
+pub fn decode<A: for<'de> FromWXF<'de>>(input: &NumericArray<u8>) -> Result<A, String> {
     from_wxf::<A>(input.as_slice()).map_err(|e| e.to_string())
 }
 
@@ -87,6 +87,13 @@ pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
     NumericArray::<u8>::from_slice(&bytes)
 }
 
+/// Serialize a result to owned WXF bytes. The bridge calls this *inside* the
+/// arg-reading closure so the (owned) `Vec<u8>` can escape while borrowed
+/// arguments stay confined to the closure.
+pub fn to_wxf_bytes<R: ToWXF>(value: &R) -> Result<Vec<u8>, wolfram_wxf::Error> {
+    to_wxf(value, None)
+}
+
 /// Run `func` (the body of a WXF bridge), catch any panic, and return either
 /// the successful `NumericArray<u8>` result or a WXF-serialized
 /// `Failure["RustPanic", …]` expression.
@@ -103,7 +110,7 @@ where
 /// Marker trait used by the proc-macro to constrain the user function's
 /// argument and return types at expansion time.
 pub trait WxfFunction {}
-impl<A: FromWXF, R: ToWXF> WxfFunction for fn(A) -> R {}
+impl<A: for<'de> FromWXF<'de>, R: ToWXF> WxfFunction for fn(A) -> R {}
 
 /// Bridge a `#[export(wxf)]`-marked function across the LibraryLink C ABI.
 ///

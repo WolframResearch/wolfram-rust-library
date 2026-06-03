@@ -20,7 +20,7 @@ use crate::ty_classify::{classify, is_option_type, numeric_primitive_name, Field
 
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     let name = &input.ident;
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (_impl_generics, ty_generics, _where_clause) = input.generics.split_for_impl();
     let container_attrs = parse_container_attrs(&input.attrs)?;
     let name_str = name.to_string();
 
@@ -35,10 +35,34 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
         },
     };
 
+    // Thread the input-buffer lifetime `'de` through the impl (serde-style). The
+    // struct's own params follow it; for each of the struct's lifetimes we add
+    // `'de: 'a` so borrowed fields (`&'a str` filled from a `&'de` read) coerce.
+    let orig_params = input.generics.params.iter();
+    let impl_generics = quote! { <'de, #(#orig_params),*> };
+    let mut preds: Vec<TokenStream> = input
+        .generics
+        .lifetimes()
+        .map(|ld| {
+            let lt = &ld.lifetime;
+            quote! { 'de: #lt }
+        })
+        .collect();
+    if let Some(w) = &input.generics.where_clause {
+        for p in &w.predicates {
+            preds.push(quote! { #p });
+        }
+    }
+    let where_clause = if preds.is_empty() {
+        quote! {}
+    } else {
+        quote! { where #(#preds),* }
+    };
+
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics ::wolfram_wxf::FromWXF for #name #ty_generics #where_clause {
-            fn from_wxf_with_tag<__R: ::wolfram_wxf::Reader>(
+        impl #impl_generics ::wolfram_wxf::FromWXF<'de> for #name #ty_generics #where_clause {
+            fn from_wxf_with_tag<__R: ::wolfram_wxf::RefReader<'de>>(
                 __c: &mut ::wolfram_wxf::WxfReader<__R>,
                 __tok: ::wolfram_wxf::ExpressionEnum,
             ) -> ::core::result::Result<Self, ::wolfram_wxf::Error> {
@@ -290,11 +314,57 @@ fn expand_struct(
 /// Read a complete field value (its own token + body). Types that implement
 /// `FromWXF` go through it directly; the array/tuple kinds (which don't) read
 /// inline.
+/// `true` if `ty` is `&str` (any lifetime).
+fn is_ref_str(ty: &syn::Type) -> bool {
+    if let syn::Type::Reference(r) = ty {
+        if let syn::Type::Path(p) = &*r.elem {
+            return p.path.is_ident("str");
+        }
+    }
+    false
+}
+
+/// `true` if `ty` is `&[u8]` (any lifetime).
+fn is_ref_u8_slice(ty: &syn::Type) -> bool {
+    if let syn::Type::Reference(r) = ty {
+        if let syn::Type::Slice(s) = &*r.elem {
+            if let syn::Type::Path(p) = &*s.elem {
+                return p.path.is_ident("u8");
+            }
+        }
+    }
+    false
+}
+
 fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStream {
+    // Zero-copy borrowed fields: `&str` / `&[u8]` read views straight out of the
+    // input buffer (`&'de`), coercing into the field's lifetime via the `'de: 'a`
+    // impl bound. Can't route through `<&'a str as FromWXF<'de>>` (only `&'de str`
+    // impls it), so read inline.
+    if is_ref_str(ty) {
+        return quote_spanned! { span => {
+            if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::String {
+                return ::core::result::Result::Err(
+                    ::wolfram_wxf::from_wxf::err_at(#err_path, "String (&str)", "other".to_string()),
+                );
+            }
+            __c.read_str_ref()?
+        }};
+    }
+    if is_ref_u8_slice(ty) {
+        return quote_spanned! { span => {
+            if __c.read_expr_token()? != ::wolfram_wxf::ExpressionEnum::ByteArray {
+                return ::core::result::Result::Err(
+                    ::wolfram_wxf::from_wxf::err_at(#err_path, "ByteArray (&[u8])", "other".to_string()),
+                );
+            }
+            __c.read_byte_array_ref()?
+        }};
+    }
     match classify(ty) {
         FieldKind::VecOfU8 | FieldKind::VecOfNumeric { .. } | FieldKind::Other => {
             quote_spanned! { span =>
-                <#ty as ::wolfram_wxf::FromWXF>::from_wxf(__c)?
+                <#ty as ::wolfram_wxf::FromWXF<'de>>::from_wxf(__c)?
             }
         },
         // `Vec<T>` for non-numeric `T` has no blanket `FromWXF` unless `T:
@@ -310,7 +380,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
             __c.skip()?; // discard head
             let mut __out: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(__n as usize);
             for _ in 0..__n {
-                __out.push(<#elem_ty as ::wolfram_wxf::FromWXF>::from_wxf(__c)?);
+                __out.push(<#elem_ty as ::wolfram_wxf::FromWXF<'de>>::from_wxf(__c)?);
             }
             __out
         }},
@@ -402,7 +472,7 @@ fn expand_field_extract(ty: &syn::Type, err_path: &str, span: Span) -> TokenStre
                 }
                 let mut __vals: ::std::vec::Vec<#elem_ty> = ::std::vec::Vec::with_capacity(#len);
                 for _ in 0..#len {
-                    __vals.push(<#elem_ty as ::wolfram_wxf::FromWXF>::from_wxf(__c)?);
+                    __vals.push(<#elem_ty as ::wolfram_wxf::FromWXF<'de>>::from_wxf(__c)?);
                 }
                 <[#elem_ty; #len]>::try_from(__vals.as_slice()).map_err(|_| {
                     ::wolfram_wxf::from_wxf::err_at(
