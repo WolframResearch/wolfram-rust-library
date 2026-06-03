@@ -66,7 +66,7 @@ pub fn read_enum_header<'de, R: Reader<'de>>(
         ExpressionEnum::Function => {
             let n = r.read_varint()?;
             if n == 0 {
-                return Err(Error::EmptyEnum);
+                return Err(Error::invalid("enum List is empty".into()));
             }
             r.skip()?; // discard head
             let variant = r.read_string()?;

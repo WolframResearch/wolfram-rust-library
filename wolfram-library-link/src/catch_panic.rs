@@ -38,7 +38,9 @@ pub struct CaughtPanic {
 }
 
 impl CaughtPanic {
-    pub fn to_pretty_expr(&self) -> Expr {
+    /// The caught panic as a typed [`LibraryError::RustPanic`], carrying the
+    /// backtrace as a renderable [`Expr`].
+    pub fn to_library_error(&self) -> crate::errors::LibraryError {
         let CaughtPanic {
             message,
             location,
@@ -56,11 +58,16 @@ impl CaughtPanic {
         #[cfg(not(feature = "panic-failure-backtraces"))]
         let backtrace = crate::expr::expr!(Missing["NotEnabled"]);
 
-        crate::expr::expr!(Failure["RustPanic", {
-            "MessageTemplate"   -> message,
-            "SourceLocation"    -> location,
-            "Backtrace"         -> backtrace
-        }])
+        crate::errors::LibraryError::RustPanic {
+            message_template: message,
+            source_location: location,
+            backtrace,
+        }
+    }
+
+    /// The caught panic rendered as a `Failure["RustPanic", <|…|>]` [`Expr`].
+    pub fn to_pretty_expr(&self) -> Expr {
+        self.to_library_error().to_expr()
     }
 }
 

@@ -67,11 +67,24 @@ fn unexpected_token_carries_expected_and_got() {
 }
 
 #[test]
-fn unknown_token_carries_byte() {
+fn rule_outside_association_is_unexpected_token() {
+    // A Rule where a value was expected → UnexpectedToken with empty Expected.
+    let err = Error::unexpected_token(&[], wolfram_wxf::ExpressionEnum::Rule);
     assert_failure(
-        &Error::UnknownToken { byte: 0x7f },
-        "UnknownToken",
-        &[("Byte", Expr::from(0x7fi64))],
+        &err,
+        "UnexpectedToken",
+        &[("Expected", list_of(&[])), ("Got", Expr::from("Rule"))],
+    );
+}
+
+#[test]
+fn malformed_bytes_compress_to_invalid_with_message() {
+    // Unknown / malformed wire data → Invalid{message}, never a field-less Failure.
+    let err = Error::invalid("unknown WXF token byte 0x7F".into());
+    assert_failure(
+        &err,
+        "Invalid",
+        &[("Message", Expr::from("unknown WXF token byte 0x7F"))],
     );
 }
 
@@ -112,13 +125,9 @@ fn io_is_failure() {
 }
 
 #[test]
-fn empty_enum_is_unit_failure() {
-    assert_failure(&Error::EmptyEnum, "EmptyEnum", &[]);
-}
-
-#[test]
-fn malformed_bytes_produce_structured_header_error() {
-    // A truncated header (1 byte) → HeaderTooShort{needed:2, got:1}.
+fn no_field_less_variants() {
+    // Every variant must carry an association payload (never `Failure["Tag"]`).
+    // A truncated header (1 byte) → Invalid{message:...} with a Message key.
     let err = from_wxf::<Expr>(b"8").unwrap_err();
     let bytes = to_wxf(&err, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
@@ -127,14 +136,21 @@ fn malformed_bytes_produce_structured_header_error() {
         normal.head().try_as_symbol().unwrap().as_str(),
         "System`Failure"
     );
-    assert_eq!(normal.elements()[0].try_as_str().unwrap(), "HeaderTooShort");
+    assert_eq!(normal.elements()[0].try_as_str().unwrap(), "Invalid");
+    // There IS a second arg (the association) — not a bare Failure["Invalid"].
+    assert_eq!(
+        normal.elements().len(),
+        2,
+        "must have an association payload"
+    );
+    assert!(normal.elements()[1].try_as_association().is_some());
 }
 
 #[test]
 fn display_delegates_to_debug() {
     // The WxfError-derived Display is non-empty and mentions the variant + data.
-    let err = Error::UnknownToken { byte: 0x42 };
+    let err = Error::invalid("bad varint".into());
     let shown = format!("{}", err);
-    assert!(shown.contains("UnknownToken"), "Display: {}", shown);
-    assert!(shown.contains("66"), "Display: {}", shown); // 0x42 = 66
+    assert!(shown.contains("Invalid"), "Display: {}", shown);
+    assert!(shown.contains("bad varint"), "Display: {}", shown);
 }

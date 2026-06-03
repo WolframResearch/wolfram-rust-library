@@ -48,7 +48,7 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
             }
             shift += 7;
             if shift >= 64 {
-                return Err(Error::VarintTooLong);
+                return Err(Error::invalid("varint exceeds 64 bits".into()));
             }
         }
     }
@@ -58,19 +58,24 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
     /// Consume the next expression token byte.
     pub fn read_expr_token(&mut self) -> Result<ExpressionEnum, Error> {
         let b = self.inner.read_byte()?;
-        ExpressionEnum::try_from(b).map_err(|_| Error::UnknownToken { byte: b })
+        ExpressionEnum::try_from(b)
+            .map_err(|_| Error::invalid(format!("unknown WXF token byte 0x{:02X}", b)))
     }
 
     /// Consume a NumericArray element-type byte.
     pub fn read_numeric_type(&mut self) -> Result<NumericArrayEnum, Error> {
         let b = self.inner.read_byte()?;
-        NumericArrayEnum::try_from(b).map_err(|_| Error::UnknownNumericType { byte: b })
+        NumericArrayEnum::try_from(b).map_err(|_| {
+            Error::invalid(format!("unknown NumericArray element type 0x{:02X}", b))
+        })
     }
 
     /// Consume a PackedArray element-type byte (numeric subset).
     pub fn read_packed_type(&mut self) -> Result<PackedArrayEnum, Error> {
         let b = self.inner.read_byte()?;
-        PackedArrayEnum::try_from(b).map_err(|_| Error::UnknownPackedType { byte: b })
+        PackedArrayEnum::try_from(b).map_err(|_| {
+            Error::invalid(format!("unknown PackedArray element type 0x{:02X}", b))
+        })
     }
 
     //---- fixed-width integer / real payloads (tag already consumed) -----
@@ -112,7 +117,8 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
     pub fn read_str(&mut self) -> Result<&'de str, Error> {
         let len = self.read_varint()? as usize;
         let bytes = self.inner.read_bytes(len)?;
-        std::str::from_utf8(bytes).map_err(|_| Error::InvalidUtf8)
+        std::str::from_utf8(bytes)
+            .map_err(|_| Error::invalid("payload not valid UTF-8".into()))
     }
 
     /// Read a complete `String` value (token + payload) into an owned `String`.
@@ -239,8 +245,9 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
                     self.skip()?; // value
                 }
             },
+            // A Rule where a value was expected: "any token but this".
             other @ (ExpressionEnum::Rule | ExpressionEnum::RuleDelayed) => {
-                return Err(Error::RuleOutsideAssociation { got: other.name() })
+                return Err(Error::unexpected_token(&[], other))
             },
         }
         Ok(())

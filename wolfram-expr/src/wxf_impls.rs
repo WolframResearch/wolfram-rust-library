@@ -114,7 +114,7 @@ impl ToWXF for Expr {
 
 fn symbol_from_name(name: String) -> Result<Symbol, Error> {
     Symbol::try_from_wxf_name_owned(name)
-        .map_err(|n| Error::InvalidSymbolName { name: n })
+        .map_err(|n| Error::invalid(format!("invalid symbol name: {:?}", n)))
 }
 
 fn numeric_array_from_parts(
@@ -130,10 +130,12 @@ fn packed_array_from_parts(
     dims: Vec<usize>,
     bytes: Vec<u8>,
 ) -> Result<PackedArray, Error> {
-    let pdt =
-        PackedArrayEnum::try_from(dt).map_err(|_| Error::UnsupportedPackedType {
-            element_type: dt.name().to_string(),
-        })?;
+    let pdt = PackedArrayEnum::try_from(dt).map_err(|_| {
+        Error::invalid(format!(
+            "PackedArray does not support element type {}",
+            dt.name()
+        ))
+    })?;
     Ok(PackedArray::new(pdt, dims, bytes))
 }
 
@@ -234,7 +236,7 @@ impl<'de> FromWXF<'de> for Expr {
             ExpressionEnum::Real64 => {
                 let f = r.read_f64()?;
                 if f.is_nan() {
-                    return Err(Error::RealNaN);
+                    return Err(Error::invalid("Real64 token contained NaN".into()));
                 }
                 Ok(Expr::real(f))
             },
@@ -268,7 +270,7 @@ impl<'de> FromWXF<'de> for Expr {
             },
             ExpressionEnum::Association => Ok(Expr::from(read_association(r)?)),
             other @ (ExpressionEnum::Rule | ExpressionEnum::RuleDelayed) => {
-                Err(Error::RuleOutsideAssociation { got: other.name() })
+                Err(Error::unexpected_token(&[], other))
             },
         }
     }

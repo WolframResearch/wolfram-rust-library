@@ -222,6 +222,7 @@ mod args;
 mod async_tasks;
 mod catch_panic;
 mod data_store;
+mod errors;
 mod image;
 mod library_data;
 mod numeric_array;
@@ -261,6 +262,7 @@ pub use self::{
     args::{FromArg, IntoArg, NativeFunction},
     async_tasks::AsyncTaskObject,
     data_store::{DataStore, DataStoreNode, DataStoreNodeValue, Nodes},
+    errors::LibraryError,
     image::{ColorSpace, Image, ImageData, ImageType, Pixel, UninitImage},
     library_data::{get_library_data, initialize, WolframLibraryData},
     numeric_array::{
