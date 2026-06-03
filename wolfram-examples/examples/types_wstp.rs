@@ -1,5 +1,5 @@
 use wolfram_export::{export, wstp::Link};
-use wolfram_expr::{Expr, ExprKind, Symbol};
+use wolfram_expr::{Expr, ExprKind};
 
 #[export(wstp)]
 fn add(args: Vec<Expr>) -> Expr {
@@ -10,7 +10,7 @@ fn add(args: Vec<Expr>) -> Expr {
 
 #[export(wstp)]
 fn dot(link: &mut Link) {
-    let _n = link.test_head("List").unwrap();
+    enter_function(link); // List[a, b]
     let a = get_f64_numeric_array(link);
     let b = get_f64_numeric_array(link);
     link.put_f64(wolfram_examples::dot(&a, &b)).unwrap();
@@ -18,7 +18,7 @@ fn dot(link: &mut Link) {
 
 #[export(wstp)]
 fn scale_array(link: &mut Link) {
-    let _n = link.test_head("List").unwrap();
+    enter_function(link); // List[array, factor]
     let arr = get_f64_numeric_array(link);
     let factor = link.get_f64().unwrap();
     let result = wolfram_examples::scale_array(&arr, factor);
@@ -44,58 +44,23 @@ fn as_f64(e: &Expr) -> f64 {
     }
 }
 
-// Probe: for a single NumericArray arg, consume outer head then try get_f64_array on inner List.
-#[export(wstp)]
-fn probe(link: &mut Link) {
-    let _n = link.test_head("List").unwrap();
-
-    // Peek at what's coming
-    let tok = link.get_type().unwrap();
-    eprintln!("outer token_type = {tok:?}");
-
-    // Consume the NumericArray head (2 args: the List and the type string)
-    match link.test_head("NumericArray") {
-        Ok(argc) => {
-            eprintln!("  it's NumericArray with {argc} args — trying get_f64_array on inner List");
-            let arr_result = link
-                .get_f64_array()
-                .map(|a| (a.data().to_vec(), a.dimensions().to_vec()));
-            match arr_result {
-                Ok((data, dims)) => {
-                    eprintln!("  get_f64_array on inner List OK: len={}, dims={dims:?}, first={:?}",
-                        data.len(), data.first());
-                    // consume remaining args (type string "Real64", etc.)
-                    for _ in 1..argc {
-                        link.get_expr_with_resolver(&mut |name| {
-                            Symbol::try_new(&format!("System`{name}"))
-                        })
-                        .unwrap();
-                    }
-                },
-                Err(e) => {
-                    eprintln!("  get_f64_array on inner List FAIL: {e}");
-                },
-            }
-        },
-        Err(e) => {
-            eprintln!("  not a NumericArray: {e}");
-        },
-    }
-
-    link.put_symbol("System`Null").unwrap();
+// Reads `NumericArray[<Real64 data>, "Real64"]` off the link. We don't care what
+// the head symbols are called — `enter_function` just steps past `f[` so we can
+// read straight through to the binary array data.
+fn get_f64_numeric_array(link: &mut Link) -> Vec<f64> {
+    enter_function(link); // NumericArray[data, "Real64"]
+    let data = link.get_f64_array().unwrap().data().to_vec();
+    link.get_string_ref().unwrap(); // discard the "Real64" type string
+    data
 }
 
-// Reads NumericArray[List[...], "Real64"] off the link using binary transfer.
-fn get_f64_numeric_array(link: &mut Link) -> Vec<f64> {
-    let _argc = link
-        .test_head("NumericArray")
-        .expect("expected NumericArray");
-    let data = link
-        .get_f64_array()
-        .expect("expected Real64 array data")
-        .data()
-        .to_vec();
-    // consume the type string "Real64"
-    link.get_string_ref().expect("expected type string");
-    data
+/// Step past a `head[…]` function token of *any* name, returning its arity.
+/// Unlike `test_head`, it neither asserts nor inspects the head symbol — so it
+/// doesn't care whether the kernel sent `List` or `System`List` — it just
+/// consumes `head[` and leaves the link positioned at the first argument.
+fn enter_function(link: &mut Link) -> usize {
+    link.raw_get_next().unwrap(); // step onto the function token
+    let arity = link.get_arg_count().unwrap();
+    link.get_symbol_ref().unwrap(); // consume the head symbol (name irrelevant)
+    arity
 }
