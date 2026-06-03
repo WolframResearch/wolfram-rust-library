@@ -148,6 +148,21 @@ make_reader!(read_u64, u64, 8);
 make_reader!(read_f32, f32, 4);
 make_reader!(read_f64, f64, 8);
 
+#[inline]
+fn read_complex32(b: &[u8]) -> impl Iterator<Item = Complex32> + '_ {
+    b.chunks_exact(8).map(|c| Complex32 {
+        re: f32::from_le_bytes(c[..4].try_into().unwrap()),
+        im: f32::from_le_bytes(c[4..].try_into().unwrap()),
+    })
+}
+#[inline]
+fn read_complex64(b: &[u8]) -> impl Iterator<Item = Complex64> + '_ {
+    b.chunks_exact(16).map(|c| Complex64 {
+        re: f64::from_le_bytes(c[..8].try_into().unwrap()),
+        im: f64::from_le_bytes(c[8..].try_into().unwrap()),
+    })
+}
+
 fn reject(src: DT, target: DT) -> String {
     format!(
         "cannot widen {} → {} without truncation or precision loss",
@@ -156,41 +171,16 @@ fn reject(src: DT, target: DT) -> String {
     )
 }
 
-/// Copy `bytes` into a fresh, properly-aligned `Vec<T>` in one memcpy.
-/// Used for the identity case where no element-type conversion is needed.
-///
-/// SAFETY: caller guarantees `bytes.len()` is an exact multiple of
-/// `size_of::<T>()` and that the bytes represent valid `T` values in
-/// native little-endian layout (which is true for all WXF numeric payloads
-/// on x86-64 / arm64 macOS).
-#[inline]
-pub unsafe fn identity_cast<T: Copy>(bytes: &[u8]) -> Vec<T> {
-    let elem_size = std::mem::size_of::<T>();
-    let n = bytes.len() / elem_size;
-    let mut out: Vec<T> = Vec::with_capacity(n);
-    std::ptr::copy_nonoverlapping(
-        bytes.as_ptr(),
-        out.as_mut_ptr() as *mut u8,
-        bytes.len(),
-    );
-    out.set_len(n);
-    out
-}
-
+// Each impl_target! call names the target reader explicitly. The identity case
+// just calls collect() on it — no unsafe, no memcpy, same pattern as widening.
 macro_rules! impl_target {
-    ($t:ty, $target:ident, { $($src:ident => $reader:ident),* $(,)? }) => {
+    ($t:ty, $target:ident, $target_reader:ident, { $($src:ident => $reader:ident),* $(,)? }) => {
         impl NumericTarget for $t {
             const TARGET: DT = DT::$target;
             fn widen_from(src: DT, bytes: &[u8]) -> Result<Vec<Self>, String> {
-                if src == DT::$target {
-                    // Identity: bytes are already in native LE layout.
-                    // Allocate an aligned Vec<T> and do one memcpy — no element loop.
-                    return Ok(unsafe { identity_cast::<$t>(bytes) });
-                }
                 match src {
-                    $(
-                        DT::$src => Ok($reader(bytes).map(<$t>::from).collect()),
-                    )*
+                    DT::$target => Ok($target_reader(bytes).collect()),
+                    $(DT::$src => Ok($reader(bytes).map(<$t>::from).collect()),)*
                     other => Err(reject(other, DT::$target)),
                 }
             }
@@ -198,82 +188,15 @@ macro_rules! impl_target {
     };
 }
 
-// Widening matrix. See the plan for the rationale of each cell.
-impl_target!(i8, Integer8, {
-    Integer8 => read_i8,
-});
-impl_target!(i16, Integer16, {
-    Integer8 => read_i8,
-    Integer16 => read_i16,
-    UnsignedInteger8 => read_u8,
-});
-impl_target!(i32, Integer32, {
-    Integer8 => read_i8,
-    Integer16 => read_i16,
-    Integer32 => read_i32,
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-});
-impl_target!(i64, Integer64, {
-    Integer8 => read_i8,
-    Integer16 => read_i16,
-    Integer32 => read_i32,
-    Integer64 => read_i64,
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-    UnsignedInteger32 => read_u32,
-});
-impl_target!(u8, UnsignedInteger8, {
-    UnsignedInteger8 => read_u8,
-});
-impl_target!(u16, UnsignedInteger16, {
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-});
-impl_target!(u32, UnsignedInteger32, {
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-    UnsignedInteger32 => read_u32,
-});
-impl_target!(u64, UnsignedInteger64, {
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-    UnsignedInteger32 => read_u32,
-    UnsignedInteger64 => read_u64,
-});
-impl_target!(f32, Real32, {
-    Integer8 => read_i8,
-    Integer16 => read_i16,
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-    Real32 => read_f32,
-});
-impl_target!(f64, Real64, {
-    Integer8 => read_i8,
-    Integer16 => read_i16,
-    Integer32 => read_i32,
-    UnsignedInteger8 => read_u8,
-    UnsignedInteger16 => read_u16,
-    UnsignedInteger32 => read_u32,
-    Real32 => read_f32,
-    Real64 => read_f64,
-});
-
-// Complex — same impl_target! macro as primitives.
-// From<Complex32> for Complex64 widens each component (f32 → f64, always exact).
-//
-// Widening matrix:
-//   Complex32 ← ComplexReal32            (identity only)
-//   Complex64 ← ComplexReal32            (via From<Complex32>)
-//             ← ComplexReal64            (identity)
-#[inline]
-fn read_complex32(b: &[u8]) -> impl Iterator<Item = Complex32> + '_ {
-    b.chunks_exact(8).map(|c| Complex32 {
-        re: f32::from_le_bytes(c[..4].try_into().unwrap()),
-        im: f32::from_le_bytes(c[4..].try_into().unwrap()),
-    })
-}
-impl_target!(Complex32, ComplexReal32, {});
-impl_target!(Complex64, ComplexReal64, {
-    ComplexReal32 => read_complex32,
-});
+impl_target!(i8,  Integer8,          read_i8,  {});
+impl_target!(i16, Integer16,         read_i16, { Integer8 => read_i8, UnsignedInteger8 => read_u8 });
+impl_target!(i32, Integer32,         read_i32, { Integer8 => read_i8, Integer16 => read_i16, UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16 });
+impl_target!(i64, Integer64,         read_i64, { Integer8 => read_i8, Integer16 => read_i16, Integer32 => read_i32, UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16, UnsignedInteger32 => read_u32 });
+impl_target!(u8,  UnsignedInteger8,  read_u8,  {});
+impl_target!(u16, UnsignedInteger16, read_u16, { UnsignedInteger8 => read_u8 });
+impl_target!(u32, UnsignedInteger32, read_u32, { UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16 });
+impl_target!(u64, UnsignedInteger64, read_u64, { UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16, UnsignedInteger32 => read_u32 });
+impl_target!(f32, Real32,            read_f32, { Integer8 => read_i8, Integer16 => read_i16, UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16 });
+impl_target!(f64, Real64,            read_f64, { Integer8 => read_i8, Integer16 => read_i16, Integer32 => read_i32, UnsignedInteger8 => read_u8, UnsignedInteger16 => read_u16, UnsignedInteger32 => read_u32, Real32 => read_f32 });
+impl_target!(Complex32, ComplexReal32, read_complex32, {});
+impl_target!(Complex64, ComplexReal64, read_complex64, {});

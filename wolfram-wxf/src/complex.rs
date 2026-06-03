@@ -54,11 +54,6 @@ pub type Complex64 = Complex<f64>;
 /// exists in `WolframLibrary.h`, so this type is wolfram-expr-only.
 pub type Complex32 = Complex<f32>;
 
-impl From<Complex32> for Complex64 {
-    fn from(c: Complex32) -> Self {
-        Complex64 { re: c.re as f64, im: c.im as f64 }
-    }
-}
 
 #[cfg(test)]
 mod tests {
