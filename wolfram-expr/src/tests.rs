@@ -1,7 +1,7 @@
 use crate::symbol::{ContextRef, RelativeContext, SymbolNameRef, SymbolRef};
 use crate::{
-    expr, Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayEnum, PackedArray,
-    PackedArrayEnum, RuleEntry, Symbol,
+    Association, ByteArray, Expr, ExprKind, NumericArray, NumericArrayEnum, PackedArray,
+    PackedArrayEnum, Symbol,
 };
 
 /// `(input, is Symbol, is SymbolName, is Context, is RelativeContext)`

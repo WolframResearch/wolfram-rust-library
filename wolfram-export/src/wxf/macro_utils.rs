@@ -12,7 +12,7 @@
 use std::os::raw::c_int;
 use std::panic::AssertUnwindSafe;
 
-use wolfram_expr::{Association, Expr, ExprKind, RuleEntry, Symbol};
+use wolfram_expr::Expr;
 use wolfram_library_link::macro_utils::call_and_catch_as_expr;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::{NativeFunction, NumericArray};

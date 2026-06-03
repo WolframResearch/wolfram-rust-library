@@ -13,7 +13,7 @@ use backtrace::Backtrace;
 
 use once_cell::sync::Lazy;
 
-use crate::expr::{Expr, Symbol};
+use crate::expr::Expr;
 
 static CAUGHT_PANICS: Lazy<Mutex<HashMap<ThreadId, (Instant, CaughtPanic)>>> =
     Lazy::new(|| Default::default());
