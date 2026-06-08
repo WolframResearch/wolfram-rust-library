@@ -112,9 +112,13 @@ impl ToWXF for Expr {
 // FromWXF
 //==============================================================================
 
-fn symbol_from_name(name: String) -> Result<Symbol, Error> {
-    Symbol::try_from_wxf_name_owned(name)
-        .map_err(|n| Error::invalid(format!("invalid symbol name: {:?}", n)))
+/// Build a [`Symbol`] from a name read off the WXF wire — stored verbatim, no
+/// validation. The kernel produced it; re-parsing it would be pointless work.
+/// The `String` is moved straight into the `Symbol`'s storage (no extra copy).
+fn symbol_from_name(name: String) -> Symbol {
+    // SAFETY: a `Symbol` is just an `Arc<String>`; no syntax invariant is relied
+    // upon, so storing an arbitrary wire name is sound (see `Symbol::new`).
+    unsafe { Symbol::unchecked_new(name) }
 }
 
 fn numeric_array_from_parts(
@@ -147,7 +151,7 @@ impl<'de> FromWXF<'de> for Symbol {
         if tok != ExpressionEnum::Symbol {
             return Err(Error::unexpected_token(&["Symbol"], tok));
         }
-        symbol_from_name(r.read_symbol_name()?)
+        Ok(symbol_from_name(r.read_symbol_name()?))
     }
 }
 
@@ -242,7 +246,7 @@ impl<'de> FromWXF<'de> for Expr {
             },
             ExpressionEnum::String => Ok(Expr::string(r.read_str()?.to_owned())),
             ExpressionEnum::Symbol => {
-                Ok(Expr::symbol(symbol_from_name(r.read_symbol_name()?)?))
+                Ok(Expr::symbol(symbol_from_name(r.read_symbol_name()?)))
             },
             ExpressionEnum::ByteArray => Ok(Expr::from(r.read_byte_array()?.to_vec())),
             ExpressionEnum::BigInteger => {

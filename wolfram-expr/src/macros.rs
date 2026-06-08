@@ -8,6 +8,7 @@
 /// | `expr!(A::B::C[a, b])` | `Normal` with `` A`B`C `` (each `::` → a context backtick) |
 /// | `expr!(var[a, b])` | `Normal` with the variable `var` as head (call over `var`) |
 /// | `expr!(A::B::C)` | the symbol `` A`B`C `` |
+/// | `expr!(::Name)` / `expr!(::Name[…])` | the **context-less** symbol `Name` |
 /// | `expr!(k -> v)` | `Rule[k, v]` — usable inline inside `…[...]` |
 /// | `expr!({k -> v, ...})` | `Association` |
 /// | `expr!(true)` / `expr!(false)` | `True` / `False` symbols |
@@ -48,6 +49,20 @@ macro_rules! expr {
             $crate::Symbol::new("System`Rule"),
             vec![$crate::expr!($k), $crate::expr!($v)],
         )
+    };
+
+    // Context-less call: ::Name[args] applies the bare-name symbol `Name` (no
+    // context — the leading `::` means "no context prefix").
+    (:: $name:ident [ $($args:tt)* ]) => {
+        $crate::Expr::normal(
+            $crate::Symbol::new(stringify!($name)),
+            $crate::__expr_args![$($args)*],
+        )
+    };
+
+    // Context-less symbol value: ::Name -> the bare-name symbol `Name`.
+    (:: $name:ident) => {
+        $crate::Expr::symbol($crate::Symbol::new(stringify!($name)))
     };
 
     // Context-qualified call: A::B::C[args] applies the symbol `A`B`C`.

@@ -42,6 +42,18 @@ fn bare_symbol_value() {
 }
 
 #[test]
+fn context_less_symbol_via_leading_colons() {
+    // `::Name` is the context-less symbol `Name` (no context prefix).
+    let e = expr!(::Plus);
+    assert_eq!(e.try_as_symbol().unwrap().as_str(), "Plus");
+
+    // …and as a head: `::List[1, 2]` -> the bare `List` applied to args.
+    let call = expr!(::List[1, 2]);
+    assert_eq!(head(&call), "List");
+    assert_eq!(call.try_as_normal().unwrap().elements().len(), 2);
+}
+
+#[test]
 fn nested_qualified_call_mixed_with_variable_and_string() {
     // anything without `::` is a local variable; with `::` it's a symbol.
     let something = Expr::from(42i64);

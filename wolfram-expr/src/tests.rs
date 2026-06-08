@@ -118,7 +118,7 @@ fn packed_array_variant_roundtrip() {
 #[test]
 fn new_variants_have_no_tag() {
     // Symbol → has tag.
-    let sym = Expr::symbol(Symbol::new("Global`x"));
+    let sym = expr!(Global::x);
     assert!(sym.tag().is_some());
 
     // Atom-like new variants → no tag (matching the existing convention for

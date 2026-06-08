@@ -116,7 +116,8 @@ fn marker_unit_struct_emits_symbol() {
     let bytes = to_wxf(&m, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
     let s = expr.try_as_symbol().expect("Marker should be Symbol");
-    assert_eq!(s.as_str(), "Global`Marker");
+    // The bare ident name, verbatim — no context is imposed by the derive.
+    assert_eq!(s.as_str(), "Marker");
 }
 
 #[test]

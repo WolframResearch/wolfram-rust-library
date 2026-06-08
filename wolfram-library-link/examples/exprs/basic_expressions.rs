@@ -1,6 +1,6 @@
 use wolfram_library_link::{
     self as wll,
-    expr::{Expr, Symbol},
+    expr::{expr, Expr},
 };
 
 /// This function is loaded by evaluating:
@@ -19,7 +19,7 @@ pub fn echo_arguments(args: Vec<Expr>) -> Expr {
 
     for arg in args {
         // Echo[<arg>]
-        wll::evaluate(&Expr::normal(Symbol::new("System`Echo"), vec![arg]));
+        wll::evaluate(&expr!(System::Echo[arg]));
     }
 
     Expr::string(format!("finished echoing {} argument(s)", arg_count))

@@ -13,8 +13,7 @@ use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
 use crate::shared::{
-    parse_container_attrs, parse_field_attrs, process_key, qualify_symbol,
-    ContainerAttrs, EnumHead,
+    parse_container_attrs, parse_field_attrs, process_key, ContainerAttrs, EnumHead,
 };
 use crate::ty_classify::{classify, FieldKind};
 
@@ -99,7 +98,9 @@ fn expand_struct(
             })
         },
         Fields::Unit => {
-            let symbol = qualify_symbol(&name.to_string(), attrs);
+            // The bare Rust ident name, verbatim — no context is imposed. An
+            // explicit `#[wolfram(symbol = "Ctx`Name")]` overrides it.
+            let symbol = attrs.symbol.clone().unwrap_or_else(|| name.to_string());
             Ok(quote! {
                 __w.write_symbol(#symbol)?;
             })

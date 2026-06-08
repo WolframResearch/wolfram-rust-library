@@ -129,70 +129,23 @@ impl Symbol {
         Some(sym_ref.to_symbol())
     }
 
-    /// Construct a [`Symbol`] from a name produced by Wolfram WXF serialization,
-    /// which may be either fully-qualified (``"System`Plus"``) or context-less
-    /// (``"Plus"``) — the kernel deserializing the wire form re-resolves
-    /// context-less names against `$ContextPath`.
+    /// Construct a symbol from `input` — stored verbatim, **no validation**.
     ///
-    /// Accepts any string that parses as either an absolute [`Symbol`] or a bare
-    /// [`SymbolName`]. Returns `None` for malformed names (e.g. with spaces, leading
-    /// digits, or stray backticks).
-    pub fn try_from_wxf_name(input: &str) -> Option<Self> {
-        if let Some(sym_ref) = SymbolRef::try_new(input) {
-            return Some(sym_ref.to_symbol());
-        }
-        // Bare name (no backtick) — accept if it's a valid SymbolName.
-        if SymbolNameRef::try_new(input).is_some() {
-            // SAFETY: validated by SymbolNameRef::try_new — input is a valid WL
-            // identifier component, just lacks an explicit context.
-            return Some(unsafe { Symbol::unchecked_new(input.to_owned()) });
-        }
-        None
-    }
-
-    /// Same as [`try_from_wxf_name`][Self::try_from_wxf_name], but takes the name
-    /// by value so the underlying `String` can be moved into the [`Symbol`]'s
-    /// `Arc<String>` storage instead of being cloned. On failure, returns the
-    /// original `String` back via `Err` so the caller can include it in error
-    /// messages.
-    ///
-    /// This is the zero-extra-copy path used by the WXF deserializer: bytes from
-    /// the wire flow into a `Vec<u8>`, get consumed into a `String` via
-    /// `String::from_utf8`, and then become the `Arc<String>` inside `Symbol`
-    /// without an intermediate copy.
-    pub fn try_from_wxf_name_owned(input: String) -> Result<Self, String> {
-        if SymbolRef::try_new(&input).is_some()
-            || SymbolNameRef::try_new(&input).is_some()
-        {
-            // SAFETY: validated above by SymbolRef or SymbolNameRef parsing.
-            return Ok(unsafe { Symbol::unchecked_new(input) });
-        }
-        Err(input)
-    }
-
-    /// Construct a symbol from `input`.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `input` is not a valid Wolfram Language symbol.
-    /// `Symbol::try_new(input)` must succeed.
-    ///
-    /// This method is intended to be used for convenient construction of symbols from
-    /// string literals, where an error is unlikely to occur, e.g.:
+    /// Any string is accepted: a fully-qualified `` "System`Plus" ``, a
+    /// context-less `"Plus"`, or anything else. What goes into a symbol is the
+    /// caller's business — we don't police WL symbol syntax. A name the kernel
+    /// can't make sense of is the caller's problem, not ours.
     ///
     /// ```
     /// # use wolfram_expr::{Expr, Symbol};
     /// let expr = Expr::normal(Symbol::new("MyPackage`Foo"), vec![]);
     /// ```
     ///
-    /// If not using a string literal as the argument, prefer to use [`Symbol::try_new`]
-    /// and handle the error condition.
-    #[track_caller]
+    /// Use [`Symbol::try_new`] if you *want* to validate the name first.
     pub fn new(input: &str) -> Self {
-        match Symbol::try_new(input) {
-            Some(symbol) => symbol,
-            None => panic!("string is not parseable as a symbol: {}", input),
-        }
+        // SAFETY: a `Symbol` is just an `Arc<String>`; an unusual name is not
+        // unsound, merely (perhaps) meaningless to the kernel.
+        unsafe { Symbol::unchecked_new(input.to_owned()) }
     }
 
     /// Get a borrowed [`SymbolRef`] from this [`Symbol`].

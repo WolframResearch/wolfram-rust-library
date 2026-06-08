@@ -6,22 +6,14 @@ use wolfram_expr::{expr, Expr, Symbol};
 #[test]
 fn runtime_symbol_head() {
     let h = Symbol::new("Foo`Bar");
-    assert_eq!(
-        expr!(h[1, 2]),
-        Expr::normal(
-            Symbol::new("Foo`Bar"),
-            vec![Expr::from(1i64), Expr::from(2i64)]
-        )
-    );
+    // variable head `h` (= Foo`Bar) equals the literal qualified head.
+    assert_eq!(expr!(h[1, 2]), expr!(Foo::Bar[1, 2]));
 }
 
 #[test]
 fn runtime_expr_head() {
     let h: Expr = expr!(System::Function);
-    assert_eq!(
-        expr!(h[42]),
-        Expr::normal(Symbol::new("System`Function"), vec![Expr::from(42i64)])
-    );
+    assert_eq!(expr!(h[42]), expr!(System::Function[42i64]));
 }
 
 #[test]
@@ -64,8 +56,5 @@ fn splice_an_iterator_directly() {
 fn runtime_head_with_splice() {
     let h = Symbol::new("My`Fn");
     let v = vec![Expr::from(7i64)];
-    assert_eq!(
-        expr!(h[..v]),
-        Expr::normal(Symbol::new("My`Fn"), vec![Expr::from(7i64)])
-    );
+    assert_eq!(expr!(h[..v]), expr!(My::Fn[7i64]));
 }

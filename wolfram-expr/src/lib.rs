@@ -278,8 +278,7 @@ impl Expr {
     /// ```
     pub fn rule<LHS: Into<Expr>>(lhs: LHS, rhs: Expr) -> Expr {
         let lhs = lhs.into();
-
-        Expr::normal(Symbol::new("System`Rule"), vec![lhs, rhs])
+        crate::expr!(System::Rule[lhs, rhs])
     }
     /// Construct a new `RuleDelayed[_, _]` expression from the left-hand side and right-hand
     /// side.
@@ -298,8 +297,7 @@ impl Expr {
     /// ```
     pub fn rule_delayed<LHS: Into<Expr>>(lhs: LHS, rhs: Expr) -> Expr {
         let lhs = lhs.into();
-
-        Expr::normal(Symbol::new("System`RuleDelayed"), vec![lhs, rhs])
+        crate::expr!(System::RuleDelayed[lhs, rhs])
     }
 
     /// Construct a new `List[...]`(`{...}`) expression from it's elements.
@@ -314,7 +312,9 @@ impl Expr {
     /// let list = Expr::list(vec![Expr::from(1), Expr::from(2), Expr::from(3)]);
     /// ```
     pub fn list(elements: Vec<Expr>) -> Expr {
-        Expr::normal(Symbol::new("System`List"), elements)
+        // `..elements` splices the Vec; the in-place `collect` reuses its
+        // allocation (no realloc), so this is as cheap as the direct form.
+        crate::expr!(System::List[..elements])
     }
 }
 

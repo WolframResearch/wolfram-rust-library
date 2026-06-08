@@ -14,7 +14,7 @@ use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
 use crate::shared::{
-    parse_container_attrs, parse_field_attrs, process_key, qualify_symbol, ContainerAttrs,
+    parse_container_attrs, parse_field_attrs, process_key, ContainerAttrs,
 };
 use crate::ty_classify::{classify, is_option_type, numeric_primitive_name, FieldKind};
 
@@ -292,7 +292,9 @@ fn expand_struct(
             })
         },
         Fields::Unit => {
-            let symbol = qualify_symbol(name_str, attrs);
+            // Match the bare ident name verbatim — no context imposed; an
+            // explicit `#[wolfram(symbol = "Ctx`Name")]` overrides it.
+            let symbol = attrs.symbol.clone().unwrap_or_else(|| name_str.to_string());
             Ok(quote! {
                 if __tok != ::wolfram_wxf::ExpressionEnum::Symbol {
                     return ::core::result::Result::Err(

@@ -1,4 +1,4 @@
-use wolfram_expr::{Expr, Symbol};
+use wolfram_expr::{expr, Expr};
 use wstp::{sys, Link, LinkStr, Protocol, Token, TokenType};
 
 fn check_loopback_roundtrip(expr: Expr) {
@@ -14,14 +14,8 @@ fn check_loopback_roundtrip(expr: Expr) {
 #[test]
 fn test_loopback_link() {
     check_loopback_roundtrip(Expr::from(5i64));
-    check_loopback_roundtrip(Expr::normal(
-        Expr::symbol(Symbol::new("System`List")),
-        vec![Expr::from(1i64)],
-    ));
-    check_loopback_roundtrip(Expr::normal(
-        Expr::symbol(Symbol::new("Global`MyHead")),
-        vec![Expr::from(1i16)],
-    ));
+    check_loopback_roundtrip(expr!(System::List[1]));
+    check_loopback_roundtrip(expr!(Global::MyHead[1i16]));
 }
 
 #[test]
@@ -37,8 +31,7 @@ fn test_loopback_get_put_atoms() {
 
     {
         // Test the `Link::get_symbol_ref()` method.
-        link.put_expr(&Expr::symbol(Symbol::new("System`Plot")))
-            .unwrap();
+        link.put_expr(&expr!(System::Plot)).unwrap();
         let link_str: LinkStr = link.get_symbol_ref().unwrap();
         assert_eq!(link_str.as_str(), "System`Plot")
     }

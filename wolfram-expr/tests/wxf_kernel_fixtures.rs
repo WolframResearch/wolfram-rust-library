@@ -13,7 +13,7 @@
 //! you add a test case or want to refresh against a newer kernel.
 
 use wolfram_expr::{expr, from_wxf, to_wxf};
-use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry, Symbol};
+use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry};
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;
@@ -57,43 +57,25 @@ fn symbol() {
     // The kernel strips the System` context on the wire — `Plus` arrives bare
     // and the cursor stores it as a context-less Symbol (it does NOT silently
     // re-add System`). User-package symbols like `MyPkg`x` keep their context.
-    assert_parses_to(
-        fix::SYMBOL_PLUS,
-        Expr::symbol(Symbol::try_from_wxf_name("Plus").unwrap()),
-    );
-    assert_parses_to(fix::SYMBOL_MYPKG_X, Expr::symbol(Symbol::new("MyPkg`x")));
+    // `::Plus` is the context-less symbol `Plus` (leading `::` = no context).
+    assert_parses_to(fix::SYMBOL_PLUS, expr!(::Plus));
+    assert_parses_to(fix::SYMBOL_MYPKG_X, expr!(MyPkg::x));
 }
 
 #[test]
 fn list() {
     // `List` arrives bare from the kernel (System` stripped), so use the
-    // explicit `Expr::normal(Symbol::try_from_wxf_name("List").unwrap(), …)` form — `Expr::list(…)`
+    // context-less `::List` form — `expr!(System::List[…])` / `Expr::list(…)`
     // would prefix it with System` and not match.
-    let int_list = Expr::normal(
-        Symbol::try_from_wxf_name("List").unwrap(),
-        vec![Expr::from(1), Expr::from(2), Expr::from(3)],
-    );
-    assert_parses_to(fix::LIST_INTS, int_list);
+    assert_parses_to(fix::LIST_INTS, expr!(::List[1, 2, 3]));
+    assert_parses_to(fix::LIST_EMPTY, expr!(::List[]));
 
-    assert_parses_to(
-        fix::LIST_EMPTY,
-        Expr::normal(Symbol::try_from_wxf_name("List").unwrap(), vec![]),
-    );
-
-    let mixed = Expr::normal(
-        Symbol::try_from_wxf_name("List").unwrap(),
-        vec![Expr::from("a"), Expr::from(1), Expr::real(2.5)],
-    );
-    assert_parses_to(fix::LIST_MIXED, mixed);
+    assert_parses_to(fix::LIST_MIXED, expr!(::List["a", 1, 2.5]));
 }
 
 #[test]
 fn function_user_context() {
-    let f = Expr::normal(
-        Symbol::new("MyPkg`myFunc"),
-        vec![Expr::from(1), Expr::from(2), Expr::from(3)],
-    );
-    assert_parses_to(fix::FUNCTION_MYPKG, f);
+    assert_parses_to(fix::FUNCTION_MYPKG, expr!(MyPkg::myFunc[1, 2, 3]));
 }
 
 #[test]
