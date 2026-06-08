@@ -53,23 +53,6 @@ pub use wolfram_wxf::{
 #[cfg(feature = "unstable_parse")]
 pub use self::ptr_cmp::ExprRefCmp;
 
-/// Upper-camel-case a snake_case identifier (`out_of_range` → `OutOfRange`).
-///
-/// Implementation detail of the [`failure!`][crate::failure] macro's bare-ident
-/// association sugar; not part of the public API.
-#[doc(hidden)]
-pub fn camel_case(s: &str) -> String {
-    s.split('_')
-        .map(|seg| {
-            let mut chars = seg.chars();
-            match chars.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                None => String::new(),
-            }
-        })
-        .collect()
-}
-
 /// Wolfram Language expression.
 ///
 /// # Example

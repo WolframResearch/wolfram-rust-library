@@ -68,10 +68,12 @@ pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
 }
 
 /// Encode an argument-decode failure for the kernel. A `wolfram_wxf::Error` is
-/// not itself a `Failure[…]`; we build one explicitly with `failure!`, carrying
+/// not itself a `Failure[…]`; we build one explicitly with `expr!`, carrying
 /// the error's `Debug` detail under `"Message"`, then serialize it.
 pub fn encode_arg_error(e: wolfram_wxf::Error) -> NumericArray<u8> {
-    encode(&wolfram_expr::failure!(format!("{e:?}"), "ArgumentError"))
+    encode(&wolfram_expr::expr!(
+        System::Failure["ArgumentError", { "Message" -> (format!("{e:?}")) }]
+    ))
 }
 
 /// Serialize a result to owned WXF bytes. The bridge calls this *inside* the

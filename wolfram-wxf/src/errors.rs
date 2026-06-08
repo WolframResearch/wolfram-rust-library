@@ -4,8 +4,8 @@
 //! so *every* serialization failure across the whole workspace funnels through it.
 //! It carries only `Debug` — no `Display`/[`std::error::Error`] impls — and does **not**
 //! serialize itself to a Wolfram `Failure[…]`. When a caller needs to surface a failure to
-//! the kernel, it builds one explicitly with the `failure!` macro (e.g. the WXF export
-//! bridge wraps an arg-decode `Error` as `Failure["ArgumentError", <|"Message" -> …|>]`).
+//! the kernel, it builds one explicitly with `expr!` (e.g. the WXF export bridge wraps an
+//! arg-decode `Error` as `Failure["ArgumentError", <|"Message" -> …|>]`).
 //!
 //! Design: structured data is carried only where it's *useful* — an unexpected token
 //! reports the tokens it would have accepted and the one it got, a size mismatch reports

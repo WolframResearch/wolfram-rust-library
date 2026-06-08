@@ -26,8 +26,7 @@ pub fn call_and_catch_as_expr<T, F>(func: F) -> Result<T, Expr>
 where
     F: FnOnce() -> T + std::panic::UnwindSafe,
 {
-    call_and_catch_panic(func)
-        .map_err(|caught| Expr::from(&caught.to_library_error()))
+    call_and_catch_panic(func).map_err(|caught| Expr::from(&caught.to_library_error()))
 }
 
 //==================

@@ -3,15 +3,16 @@
 //! Generates `impl From<Enum> for Expr` that turns each variant into its
 //! `Failure["VariantName", <|fields|>]` expression — the variant name becomes the
 //! tag, and its fields become the association (snake_case → `CamelCase` keys),
-//! built with the `failure!` macro. So the hand-written
+//! built with the `expr!` macro. So the hand-written
 //!
 //! ```ignore
 //! impl From<ValidationError> for Expr {
 //!     fn from(e: ValidationError) -> Expr {
 //!         match e {
 //!             ValidationError::OutOfRange { value, min, max } =>
-//!                 failure!({ value, min, max }, "OutOfRange"),
-//!             ValidationError::NotAnInteger { value } => failure!({ value }, "NotAnInteger"),
+//!                 expr!(System::Failure["OutOfRange", {"Value" -> value, "Min" -> min, "Max" -> max}]),
+//!             ValidationError::NotAnInteger { value } =>
+//!                 expr!(System::Failure["NotAnInteger", {"Value" -> value}]),
 //!         }
 //!     }
 //! }
@@ -22,6 +23,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, Result};
+
+use crate::shared::process_key;
 
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     let name = &input.ident;
@@ -49,22 +52,31 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                     .iter()
                     .map(|f| f.ident.as_ref().expect("named field"))
                     .collect();
+                // CamelCase the field names into association keys at codegen time.
+                let keys: Vec<String> = idents
+                    .iter()
+                    .map(|id| process_key(&id.to_string(), Some("CamelCase")))
+                    .collect();
                 quote! {
                     #name::#v_name { #(#idents),* } =>
-                        ::wolfram_expr::failure!({ #(#idents),* }, #v_str),
+                        ::wolfram_expr::expr!(System::Failure[
+                            #v_str, { #( #keys -> #idents ),* }
+                        ]),
                 }
             },
             // V(x) -> Failure["V", <|"Message" -> x|>]
             Fields::Unnamed(unnamed) if unnamed.unnamed.len() == 1 => {
                 quote! {
                     #name::#v_name(__payload) =>
-                        ::wolfram_expr::failure!(__payload, #v_str),
+                        ::wolfram_expr::expr!(System::Failure[
+                            #v_str, { "Message" -> __payload }
+                        ]),
                 }
             },
             // V -> Failure["V", <||>]
             Fields::Unit => {
                 quote! {
-                    #name::#v_name => ::wolfram_expr::failure!({}, #v_str),
+                    #name::#v_name => ::wolfram_expr::expr!(System::Failure[#v_str, {}]),
                 }
             },
             Fields::Unnamed(_) => {

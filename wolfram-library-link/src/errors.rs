@@ -13,7 +13,7 @@
 
 use std::os::raw::c_int;
 
-use crate::expr::{failure, Expr};
+use crate::expr::{expr, Expr};
 
 // C-ABI return codes for macro-generated wrapper code. `OFFSET` avoids clashing
 // with `sys::LIBRARY_FUNCTION_ERROR` and related kernel codes.
@@ -70,7 +70,7 @@ pub enum LibraryError {
 }
 
 /// Render a [`LibraryError`] as its `Failure["Variant", <|…|>]` expression — each
-/// arm builds the Failure with `failure!` (the shapes are custom per variant).
+/// arm builds the Failure with `expr!` (the shapes are custom per variant).
 impl From<&LibraryError> for Expr {
     fn from(err: &LibraryError) -> Expr {
         match err.clone() {
@@ -80,33 +80,33 @@ impl From<&LibraryError> for Expr {
                 message,
                 source_location,
                 backtrace,
-            } => failure!({
+            } => expr!(System::Failure["RustPanic", {
                 "MessageTemplate"   -> "Rust LibraryLink function panic: `message`",
                 "MessageParameters" -> {"message" -> message},
                 "SourceLocation"    -> source_location,
                 "Backtrace"         -> backtrace
-            }, "RustPanic"),
+            }]),
             LibraryError::Loader {
                 message,
                 expected,
                 got,
-            } => {
-                failure!({ "Message" -> message, "Expected" -> expected, "Got" -> got }, "LoaderError")
+            } => expr!(System::Failure["LoaderError", {
+                "Message" -> message,
+                "Expected" -> expected,
+                "Got" -> got
+            }]),
+            LibraryError::NotInitialized => expr!(System::Failure["NotInitialized", {
+                "Message" -> "the LibraryLink library failed to initialize"
+            }]),
+            LibraryError::InvalidArgCount => expr!(System::Failure["InvalidArgCount", {
+                "Message" -> "the kernel passed an unrepresentable argument count"
+            }]),
+            LibraryError::ArgumentRead { message } => {
+                expr!(System::Failure["ArgumentRead", { "Message" -> message }])
             },
-            LibraryError::NotInitialized => {
-                failure!(
-                    "the LibraryLink library failed to initialize",
-                    "NotInitialized"
-                )
+            LibraryError::ResultWrite { message } => {
+                expr!(System::Failure["ResultWrite", { "Message" -> message }])
             },
-            LibraryError::InvalidArgCount => {
-                failure!(
-                    "the kernel passed an unrepresentable argument count",
-                    "InvalidArgCount"
-                )
-            },
-            LibraryError::ArgumentRead { message } => failure!(message, "ArgumentRead"),
-            LibraryError::ResultWrite { message } => failure!(message, "ResultWrite"),
         }
     }
 }

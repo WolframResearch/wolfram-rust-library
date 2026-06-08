@@ -39,8 +39,8 @@ pub fn derive_from_wxf(input: TokenStream) -> TokenStream {
 }
 
 /// Derive `From<Enum> for Expr` for an error enum: each variant becomes its
-/// `Failure["VariantName", <|fields|>]` expression (the boilerplate the
-/// `failure!` macro would write by hand, inferred from the enum).
+/// `Failure["VariantName", <|fields|>]` expression (the `expr!` boilerplate one
+/// would otherwise write by hand, inferred from the enum).
 #[proc_macro_derive(Failure, attributes(wolfram))]
 pub fn derive_failure(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
