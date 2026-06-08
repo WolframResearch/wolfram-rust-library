@@ -76,11 +76,6 @@ impl CaughtPanic {
             backtrace,
         }
     }
-
-    /// The caught panic rendered as a `Failure["RustPanic", <|…|>]` [`Expr`].
-    pub(crate) fn to_pretty_expr(&self) -> Expr {
-        Expr::from(&self.to_library_error())
-    }
 }
 
 /// Whether to resolve and show a backtrace, gated on the `LIBRARY_LINK_RUST_BACKTRACE`
