@@ -52,12 +52,6 @@ pub enum LibraryError {
         /// What it got — an arbitrary [`Expr`].
         got: Expr,
     },
-    /// [`initialize()`][crate::initialize] failed — the library is unusable, so
-    /// this surfaces only as the [`FAILED_TO_INIT`] return code.
-    NotInitialized,
-    /// The kernel passed an argument count that didn't fit in `usize`. Surfaces
-    /// as the `LIBRARY_FUNCTION_ERROR` return code.
-    InvalidArgCount,
     /// A WSTP `fn(Vec<Expr>)` export failed to read its argument `List` off the link.
     ArgumentRead {
         /// The underlying WSTP error message.
@@ -124,8 +118,6 @@ mod tests {
                 expected: "e".into(),
                 got: Expr::from(1i64),
             },
-            LibraryError::NotInitialized,
-            LibraryError::InvalidArgCount,
             LibraryError::ArgumentRead {
                 message: "m".into(),
             },
