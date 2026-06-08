@@ -47,8 +47,12 @@ unsafe fn call_wstp_link_wolfram_library_function<
 
 fn write_failure_to_link(
     link: &mut Link,
-    failure: wolfram_library_link::expr::Expr,
+    failure: impl Into<wolfram_library_link::expr::Expr>,
 ) -> Result<(), wstp::Error> {
+    // Accepts either a ready `Expr` (a caught panic) or a `&LibraryError` — the
+    // latter is rendered to its `Failure[…]` Expr here.
+    let failure = failure.into();
+
     // The panic that brought us here may have been triggered by code like
     // `link.do_something(...).unwrap()`, which would have left the link in
     // an error state. Clear it before we try to put our own expression.
@@ -103,7 +107,7 @@ pub unsafe fn load_library_functions_impl(
             expected: expected.to_string(),
             got,
         };
-        let _ = write_failure_to_link(link, f.to_expr());
+        let _ = write_failure_to_link(link, &f);
     };
 
     call_wstp_link_wolfram_library_function(lib_data, raw_link, |link: &mut Link| {

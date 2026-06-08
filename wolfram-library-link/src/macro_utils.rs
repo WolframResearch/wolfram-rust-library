@@ -59,7 +59,7 @@ unsafe fn call_wstp_link_wolfram_library_function<
         // if even that fails, surrender to the FAILED_WITH_PANIC return code.
         Err(panic) => {
             let err = panic.to_library_error();
-            match write_failure_to_link(link, &err.to_expr()) {
+            match write_failure_to_link(link, &err) {
                 Ok(()) => LIBRARY_NO_ERROR as c_int,
                 Err(_wstp_err) => err.return_code(),
             }
@@ -73,8 +73,11 @@ unsafe fn call_wstp_link_wolfram_library_function<
 #[cfg(feature = "wstp")]
 pub(crate) fn write_failure_to_link(
     link: &mut Link,
-    failure: &Expr,
+    failure: &LibraryError,
 ) -> Result<(), wstp::Error> {
+    // Render the failure to its `Failure[…]` Expr here, so callers pass the enum.
+    let failure: Expr = failure.into();
+
     // Clear any poisoned error state so our own `put_expr` can proceed.
     link.clear_error();
 
@@ -87,7 +90,7 @@ pub(crate) fn write_failure_to_link(
         }
     }
 
-    link.put_expr(failure)
+    link.put_expr(&failure)
 }
 
 //======================================
@@ -171,7 +174,7 @@ pub unsafe fn load_library_functions_impl(
             expected: expected.to_string(),
             got,
         };
-        let _ = write_failure_to_link(link, &f.to_expr());
+        let _ = write_failure_to_link(link, &f);
     };
 
     call_wstp_link_wolfram_library_function(lib_data, raw_link, |link: &mut Link| {

@@ -906,7 +906,7 @@ mod wstp_impls {
             ArgFail::Read(message) => crate::LibraryError::ArgumentRead { message },
             ArgFail::Write(message) => crate::LibraryError::ResultWrite { message },
         };
-        let _ = crate::macro_utils::write_failure_to_link(link, &err.to_expr());
+        let _ = crate::macro_utils::write_failure_to_link(link, &err);
     }
 
     //----------------------------

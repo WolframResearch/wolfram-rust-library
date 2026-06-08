@@ -79,7 +79,7 @@ impl CaughtPanic {
 
     /// The caught panic rendered as a `Failure["RustPanic", <|…|>]` [`Expr`].
     pub(crate) fn to_pretty_expr(&self) -> Expr {
-        self.to_library_error().to_expr()
+        Expr::from(&self.to_library_error())
     }
 }
 

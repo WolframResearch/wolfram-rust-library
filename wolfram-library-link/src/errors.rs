@@ -2,7 +2,7 @@
 //!
 //! [`LibraryError`] enumerates every failure the LibraryLink bridges can hit.
 //! Each variant both:
-//!   * renders to a structured `Failure["Variant", <|…|>]` via [`to_expr`][LibraryError::to_expr]
+//!   * renders to a structured `Failure["Variant", <|…|>]` via `From<&LibraryError> for Expr`
 //!     (what the kernel sees when the failure can be communicated over the link / WXF), and
 //!   * maps to a C-ABI return code via [`return_code`][LibraryError::return_code]
 //!     (the fallback the LibraryFunction returns when an expression can't be sent —
@@ -13,7 +13,7 @@
 
 use std::os::raw::c_int;
 
-use crate::expr::{expr, Expr};
+use crate::expr::{failure, Expr};
 
 // C-ABI return codes for macro-generated wrapper code. `OFFSET` avoids clashing
 // with `sys::LIBRARY_FUNCTION_ERROR` and related kernel codes.
@@ -69,52 +69,51 @@ pub enum LibraryError {
     },
 }
 
-impl LibraryError {
-    /// Render this error as its `Failure["Variant", <|…|>]` [`Expr`].
-    pub fn to_expr(&self) -> Expr {
-        match self.clone() {
+/// Render a [`LibraryError`] as its `Failure["Variant", <|…|>]` expression — each
+/// arm builds the Failure with `failure!` (the shapes are custom per variant).
+impl From<&LibraryError> for Expr {
+    fn from(err: &LibraryError) -> Expr {
+        match err.clone() {
             // Same shape as upstream: a MessageTemplate with a `message` slot
             // filled by MessageParameters, plus SourceLocation and Backtrace.
             LibraryError::RustPanic {
                 message,
                 source_location,
                 backtrace,
-            } => expr!(System::Failure["RustPanic", {
+            } => failure!({
                 "MessageTemplate"   -> "Rust LibraryLink function panic: `message`",
                 "MessageParameters" -> {"message" -> message},
                 "SourceLocation"    -> source_location,
                 "Backtrace"         -> backtrace
-            }]),
+            }, "RustPanic"),
             LibraryError::Loader {
                 message,
                 expected,
                 got,
-            } => expr!(System::Failure["LoaderError", {
-                "Message"  -> message,
-                "Expected" -> expected,
-                "Got"      -> got
-            }]),
-            LibraryError::NotInitialized => expr!(System::Failure["NotInitialized", {
-                "Message" -> "the LibraryLink library failed to initialize"
-            }]),
-            LibraryError::InvalidArgCount => expr!(System::Failure["InvalidArgCount", {
-                "Message" -> "the kernel passed an unrepresentable argument count"
-            }]),
-            LibraryError::ArgumentRead { message } => {
-                expr!(System::Failure["ArgumentRead", {
-                    "Message" -> message
-                }])
+            } => {
+                failure!({ "Message" -> message, "Expected" -> expected, "Got" -> got }, "LoaderError")
             },
-            LibraryError::ResultWrite { message } => {
-                expr!(System::Failure["ResultWrite", {
-                    "Message" -> message
-                }])
+            LibraryError::NotInitialized => {
+                failure!(
+                    "the LibraryLink library failed to initialize",
+                    "NotInitialized"
+                )
             },
+            LibraryError::InvalidArgCount => {
+                failure!(
+                    "the kernel passed an unrepresentable argument count",
+                    "InvalidArgCount"
+                )
+            },
+            LibraryError::ArgumentRead { message } => failure!(message, "ArgumentRead"),
+            LibraryError::ResultWrite { message } => failure!(message, "ResultWrite"),
         }
     }
+}
 
+impl LibraryError {
     /// The C-ABI return code a LibraryFunction returns for this error when it
-    /// can't (or didn't) communicate the [`to_expr`][Self::to_expr] Failure.
+    /// can't (or didn't) communicate the `Failure[…]` expression.
     pub fn return_code(&self) -> c_int {
         match self {
             LibraryError::NotInitialized => FAILED_TO_INIT,
@@ -127,7 +126,7 @@ impl LibraryError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expr::Symbol;
+    use crate::expr::expr;
 
     fn failure_tag(e: &Expr) -> &str {
         e.try_as_normal().unwrap().elements()[0]
@@ -137,16 +136,13 @@ mod tests {
 
     #[test]
     fn rust_panic_is_failure_with_backtrace_expr() {
-        let backtrace = Expr::normal(
-            Symbol::new("System`Missing"),
-            vec![Expr::string("NotEnabled")],
-        );
+        let backtrace = expr!(System::Missing["NotEnabled"]);
         let err = LibraryError::RustPanic {
             message: "boom".into(),
             source_location: "src/x.rs:1".into(),
             backtrace: backtrace.clone(),
         };
-        let e = err.to_expr();
+        let e = Expr::from(&err);
         let normal = e.try_as_normal().expect("Failure[...]");
         assert_eq!(
             normal.head().try_as_symbol().unwrap().as_str(),
@@ -203,8 +199,8 @@ mod tests {
             },
         ];
         for v in &variants {
-            // to_expr is always a Failure[tag, <|…|>] — never field-less.
-            let e = v.to_expr();
+            // The conversion is always a Failure[tag, <|…|>] — never field-less.
+            let e = Expr::from(v);
             let normal = e.try_as_normal().expect("Failure[...]");
             assert_eq!(
                 normal.head().try_as_symbol().unwrap().as_str(),
