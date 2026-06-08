@@ -43,7 +43,7 @@ unsafe fn call_wstp_link_wolfram_library_function<
 ) -> c_int {
     // Initialize the library.
     if crate::initialize(libdata).is_err() {
-        return LibraryError::NotInitialized.return_code();
+        return crate::errors::FAILED_TO_INIT;
     }
 
     let link = Link::unchecked_ref_cast_mut(&mut unsafe_link);
@@ -61,7 +61,7 @@ unsafe fn call_wstp_link_wolfram_library_function<
             let err = panic.to_library_error();
             match write_failure_to_link(link, &err) {
                 Ok(()) => LIBRARY_NO_ERROR as c_int,
-                Err(_wstp_err) => err.return_code(),
+                Err(_wstp_err) => crate::errors::FAILED_WITH_PANIC,
             }
         },
     }
@@ -108,12 +108,12 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
 
     // Initialize the library.
     if crate::initialize(lib_data).is_err() {
-        return LibraryError::NotInitialized.return_code();
+        return crate::errors::FAILED_TO_INIT;
     }
 
     let argc = match usize::try_from(argc) {
         Ok(argc) => argc,
-        Err(_) => return LibraryError::InvalidArgCount.return_code(),
+        Err(_) => return crate::sys::LIBRARY_FUNCTION_ERROR as c_int,
     };
 
     // FIXME: This isn't safe! 'a could be 'static, and then the user could store the
@@ -429,7 +429,7 @@ pub unsafe fn init_with_user_function(
     user_init_func: fn(),
 ) -> c_int {
     if let Err(()) = crate::initialize(lib) {
-        return LibraryError::NotInitialized.return_code() as c_int;
+        return crate::errors::FAILED_TO_INIT as c_int;
     }
 
     if let Err(_) = call_and_catch_panic(user_init_func) {

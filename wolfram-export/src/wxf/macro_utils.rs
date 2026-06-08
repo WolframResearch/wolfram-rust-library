@@ -119,9 +119,7 @@ pub unsafe fn call_wxf_wolfram_library_function<'a, F: NativeFunction<'a>>(
 
     let argc = match usize::try_from(argc) {
         Ok(argc) => argc,
-        Err(_) => {
-            return wolfram_library_link::LibraryError::InvalidArgCount.return_code()
-        },
+        Err(_) => return wolfram_library_link::sys::LIBRARY_FUNCTION_ERROR as c_int,
     };
 
     let args: &[MArgument] = std::slice::from_raw_parts(args, argc);

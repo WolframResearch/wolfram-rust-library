@@ -1,12 +1,12 @@
 //! Typed errors surfaced across the LibraryLink boundary.
 //!
-//! [`LibraryError`] enumerates every failure the LibraryLink bridges can hit.
-//! Each variant both:
-//!   * renders to a structured `Failure["Variant", <|…|>]` via `From<&LibraryError> for Expr`
-//!     (what the kernel sees when the failure can be communicated over the link / WXF), and
-//!   * maps to a C-ABI return code via [`return_code`][LibraryError::return_code]
-//!     (the fallback the LibraryFunction returns when an expression can't be sent —
-//!     e.g. the library never initialized, or writing the Failure to the link failed).
+//! [`LibraryError`] enumerates every failure the LibraryLink bridges can hit and
+//! renders to a structured `Failure["Variant", <|…|>]` via `From<&LibraryError>
+//! for Expr` (the `#[derive(Failure)]`) — what the kernel sees when the failure
+//! can be communicated over the link / WXF. When it can't (the library never
+//! initialized, or writing the Failure to the link failed), the bridge returns a
+//! C-ABI code directly: [`FAILED_TO_INIT`], [`FAILED_WITH_PANIC`], or
+//! [`LIBRARY_FUNCTION_ERROR`][crate::sys::LIBRARY_FUNCTION_ERROR].
 //!
 //! Link communication trades in [`Expr`], so the Failure is built directly — no
 //! detour through WXF bytes.
@@ -70,18 +70,6 @@ pub enum LibraryError {
     },
 }
 
-impl LibraryError {
-    /// The C-ABI return code a LibraryFunction returns for this error when it
-    /// can't (or didn't) communicate the `Failure[…]` expression.
-    pub fn return_code(&self) -> c_int {
-        match self {
-            LibraryError::NotInitialized => FAILED_TO_INIT,
-            LibraryError::InvalidArgCount => crate::sys::LIBRARY_FUNCTION_ERROR as c_int,
-            _ => FAILED_WITH_PANIC,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn every_variant_has_failure_and_code() {
+    fn every_variant_renders_a_failure() {
         let backtrace = Expr::string("bt");
         let variants = [
             LibraryError::RustPanic {
@@ -155,9 +143,6 @@ mod tests {
             );
             assert!(!failure_tag(&e).is_empty());
             assert_eq!(normal.elements().len(), 2, "must carry an association");
-            // return_code is always a valid non-success code.
-            assert_ne!(v.return_code(), crate::sys::LIBRARY_NO_ERROR as c_int);
         }
-        assert_eq!(LibraryError::NotInitialized.return_code(), FAILED_TO_INIT);
     }
 }

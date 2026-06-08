@@ -35,9 +35,7 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
 
     let argc = match usize::try_from(argc) {
         Ok(argc) => argc,
-        Err(_) => {
-            return wolfram_library_link::LibraryError::InvalidArgCount.return_code()
-        },
+        Err(_) => return wolfram_library_link::sys::LIBRARY_FUNCTION_ERROR as c_int,
     };
 
     // FIXME: This isn't safe! 'a could be 'static, and then the user could store the
