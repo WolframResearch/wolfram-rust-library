@@ -139,3 +139,136 @@ macro_rules! __expr_assoc {
         vec![$crate::RuleEntry::rule($crate::expr!($k), $crate::expr!($v))]
     };
 }
+
+/// Compose a `Failure[tag, <|…|>]` [`Expr`][crate::Expr] — the explicit,
+/// `Expr`-native replacement for the old `#[derive(WxfError)]` magic.
+///
+/// Unlike that derive (which serialized an error straight to WXF *bytes*),
+/// `failure!` produces a real [`Expr`][crate::Expr], so the result can be sent
+/// natively over WSTP (`Link::put_expr`) *and* serialized to WXF for free
+/// (`Expr: ToWXF`). The head is always `` System`Failure ``; the **tag** (first
+/// element) defaults to `"RustError"` and is overridable via a second argument.
+///
+/// # Syntax
+///
+/// | Pattern | Result |
+/// |---------|--------|
+/// | `failure!(msg)` | `Failure["RustError", <\|"Message" -> msg\|>]` |
+/// | `failure!(msg, "IoError")` | `Failure["IoError", <\|"Message" -> msg\|>]` |
+/// | `failure!({ a, b })` | `Failure["RustError", <\|"A"->a, "B"->b\|>]` |
+/// | `failure!({ a, b }, "OutOfRange")` | `Failure["OutOfRange", <\|…\|>]` |
+///
+/// A bare scalar (`String`, number, any `Into<Expr>`) is wrapped under the
+/// `"Message"` key. A `{ … }` becomes the association directly: a bare
+/// identifier `field` → `"CamelCase(field)" -> field` (value = the local
+/// variable), and an explicit `key -> value` rule passes through like in
+/// [`expr!`][crate::expr].
+///
+/// Auto-deriving `Failure["VariantName", <|fields|>]` straight from an enum
+/// *value* would require a `derive` (a `macro_rules!` can't read a value's
+/// variant/fields); for now, `match` the enum and call `failure!` per arm.
+///
+/// # Examples
+///
+/// ```
+/// # use wolfram_expr::{Expr, Symbol, failure};
+/// let (value, min, max) = (300.0_f64, 0.0_f64, 255.0_f64);
+/// let f = failure!({ value, min, max }, "OutOfRange");
+/// // => Failure["OutOfRange", <|"Value"->300., "Min"->0., "Max"->255.|>]
+/// let io = failure!("disk full", "IoError");
+/// // => Failure["IoError", <|"Message" -> "disk full"|>]
+/// ```
+#[macro_export]
+macro_rules! failure {
+    // { entries }, "Tag"  — association payload, custom tag.
+    ({ $($entries:tt)* }, $tag:expr) => {
+        $crate::__failure_build!($tag, $crate::__failure_assoc![$($entries)*])
+    };
+    // { entries }  — association payload, default tag.
+    ({ $($entries:tt)* }) => {
+        $crate::__failure_build!("RustError", $crate::__failure_assoc![$($entries)*])
+    };
+    // msg, "Tag"  — scalar wrapped under "Message", custom tag.
+    ($msg:expr, $tag:expr) => {
+        $crate::__failure_build!(
+            $tag,
+            vec![$crate::RuleEntry::rule($crate::Expr::string("Message"), $crate::Expr::from($msg))]
+        )
+    };
+    // msg  — scalar wrapped under "Message", default tag.
+    ($msg:expr) => {
+        $crate::__failure_build!(
+            "RustError",
+            vec![$crate::RuleEntry::rule($crate::Expr::string("Message"), $crate::Expr::from($msg))]
+        )
+    };
+}
+
+/// Internal: assemble `Failure[tag, <|entries|>]` from a tag and a
+/// `Vec<RuleEntry>` association body.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __failure_build {
+    ($tag:expr, $entries:expr) => {
+        $crate::Expr::normal(
+            $crate::Symbol::new("System`Failure"),
+            vec![
+                $crate::Expr::string($tag),
+                $crate::Expr::new($crate::ExprKind::Association($entries)),
+            ],
+        )
+    };
+}
+
+/// Internal tt-muncher for [`failure!`][crate::failure] association entries.
+///
+/// Each entry is either a bare `ident` (→ `"CamelCase(ident)" -> ident`) or an
+/// explicit `key -> value` rule (value may be a `Head[...]` expression).
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __failure_assoc {
+    () => { vec![] };
+    (,) => { vec![] };
+    // explicit rule: key -> Head[...] value, rest
+    ($k:tt -> $vh:ident [ $($vi:tt)* ], $($rest:tt)*) => {{
+        let mut __v = vec![$crate::RuleEntry::rule(
+            $crate::expr!($k),
+            $crate::expr!($vh [ $($vi)* ]),
+        )];
+        __v.extend($crate::__failure_assoc![$($rest)*]);
+        __v
+    }};
+    // explicit rule: key -> Head[...] value, last
+    ($k:tt -> $vh:ident [ $($vi:tt)* ]) => {
+        vec![$crate::RuleEntry::rule(
+            $crate::expr!($k),
+            $crate::expr!($vh [ $($vi)* ]),
+        )]
+    };
+    // explicit rule: key -> v, rest
+    ($k:tt -> $v:tt, $($rest:tt)*) => {{
+        let mut __v = vec![$crate::RuleEntry::rule($crate::expr!($k), $crate::expr!($v))];
+        __v.extend($crate::__failure_assoc![$($rest)*]);
+        __v
+    }};
+    // explicit rule: key -> v, last
+    ($k:tt -> $v:tt) => {
+        vec![$crate::RuleEntry::rule($crate::expr!($k), $crate::expr!($v))]
+    };
+    // bare ident sugar: ident, rest
+    ($f:ident, $($rest:tt)*) => {{
+        let mut __v = vec![$crate::RuleEntry::rule(
+            $crate::Expr::string($crate::camel_case(stringify!($f))),
+            $crate::Expr::from($f),
+        )];
+        __v.extend($crate::__failure_assoc![$($rest)*]);
+        __v
+    }};
+    // bare ident sugar: ident, last
+    ($f:ident) => {
+        vec![$crate::RuleEntry::rule(
+            $crate::Expr::string($crate::camel_case(stringify!($f))),
+            $crate::Expr::from($f),
+        )]
+    };
+}
