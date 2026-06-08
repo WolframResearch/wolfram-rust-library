@@ -5,7 +5,7 @@
 //! always `System`Failure`, tag defaulting to `"RustError"`. Each case is
 //! compared against the exact `expr!`-built expected value.
 
-use wolfram_expr::{expr, failure, Expr};
+use wolfram_expr::{expr, failure, Expr, Failure};
 
 #[test]
 fn scalar_wraps_under_message_default_tag() {
@@ -90,25 +90,13 @@ fn inline_association_payload_like_expr_macro() {
 }
 
 #[test]
-fn typical_enum_match_arm_usage() {
-    // The intended pattern for converting an error enum by hand: match, then one
-    // `failure!` per arm with the variant name as the tag.
-    #[derive(Debug)]
+fn derive_failure_infers_the_boilerplate() {
+    // `#[derive(Failure)]` infers `From<ValidationError> for Expr`: each variant
+    // becomes `Failure["VariantName", <|CamelCase fields|>]`.
+    #[derive(Debug, Failure)]
     enum ValidationError {
         OutOfRange { value: f64, min: f64, max: f64 },
         NotAnInteger { value: f64 },
-    }
-    impl From<ValidationError> for Expr {
-        fn from(e: ValidationError) -> Expr {
-            match e {
-                ValidationError::OutOfRange { value, min, max } => {
-                    failure!({ value, min, max }, "OutOfRange")
-                },
-                ValidationError::NotAnInteger { value } => {
-                    failure!({ value }, "NotAnInteger")
-                },
-            }
-        }
     }
 
     assert_eq!(

@@ -45,7 +45,7 @@ pub use crate::wxf::reader::WxfReader;
 pub use crate::wxf::writer::WxfWriter;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
-pub use wolfram_wxf_macros::{FromWXF, ToWXF};
+pub use wolfram_wxf_macros::{Failure, FromWXF, ToWXF};
 
 /// zlib compression level passed to [`to_wxf`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

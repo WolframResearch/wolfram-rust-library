@@ -15,6 +15,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod deserialize;
+mod failure_derive;
 mod serialize;
 mod shared;
 mod ty_classify;
@@ -33,6 +34,17 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 pub fn derive_from_wxf(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     deserialize::expand(&input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Derive `From<Enum> for Expr` for an error enum: each variant becomes its
+/// `Failure["VariantName", <|fields|>]` expression (the boilerplate the
+/// `failure!` macro would write by hand, inferred from the enum).
+#[proc_macro_derive(Failure, attributes(wolfram))]
+pub fn derive_failure(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    failure_derive::expand(&input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }
