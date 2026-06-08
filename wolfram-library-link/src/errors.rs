@@ -13,7 +13,7 @@
 
 use std::os::raw::c_int;
 
-use crate::expr::{expr, Expr};
+use crate::expr::{Expr, Failure};
 
 // C-ABI return codes for macro-generated wrapper code. `OFFSET` avoids clashing
 // with `sys::LIBRARY_FUNCTION_ERROR` and related kernel codes.
@@ -24,15 +24,16 @@ pub const FAILED_TO_INIT: c_int = OFFSET + 1;
 pub const FAILED_WITH_PANIC: c_int = OFFSET + 2;
 
 /// An error raised at the LibraryLink boundary.
-#[derive(Debug, Clone)]
+///
+/// `#[derive(Failure)]` renders each variant to its `Failure["VariantName",
+/// <|CamelCase fields|>]` expression (e.g. `RustPanic { message, .. }` →
+/// `Failure["RustPanic", <|"Message" -> …, "SourceLocation" -> …, "Backtrace" -> …|>]`).
+#[derive(Debug, Clone, Failure)]
 pub enum LibraryError {
     /// A Rust panic caught while running an exported function. The `backtrace`
     /// is a renderable [`Expr`] (a clickable `Column` of frames when the
     /// `panic-failure-backtraces` feature is on *and* the backtrace env var is
     /// set, else `Missing[…]`).
-    ///
-    /// Renders to the same `Failure["RustPanic", …]` shape as upstream: a
-    /// `MessageTemplate` with a `` `message` `` slot filled by `MessageParameters`.
     RustPanic {
         /// The panic message (substituted into the `MessageTemplate`).
         message: String,
@@ -67,48 +68,6 @@ pub enum LibraryError {
         /// The underlying WSTP error message.
         message: String,
     },
-}
-
-/// Render a [`LibraryError`] as its `Failure["Variant", <|…|>]` expression — each
-/// arm builds the Failure with `expr!` (the shapes are custom per variant).
-impl From<&LibraryError> for Expr {
-    fn from(err: &LibraryError) -> Expr {
-        match err.clone() {
-            // Same shape as upstream: a MessageTemplate with a `message` slot
-            // filled by MessageParameters, plus SourceLocation and Backtrace.
-            LibraryError::RustPanic {
-                message,
-                source_location,
-                backtrace,
-            } => expr!(System::Failure["RustPanic", {
-                "MessageTemplate"   -> "Rust LibraryLink function panic: `message`",
-                "MessageParameters" -> {"message" -> message},
-                "SourceLocation"    -> source_location,
-                "Backtrace"         -> backtrace
-            }]),
-            LibraryError::Loader {
-                message,
-                expected,
-                got,
-            } => expr!(System::Failure["LoaderError", {
-                "Message" -> message,
-                "Expected" -> expected,
-                "Got" -> got
-            }]),
-            LibraryError::NotInitialized => expr!(System::Failure["NotInitialized", {
-                "Message" -> "the LibraryLink library failed to initialize"
-            }]),
-            LibraryError::InvalidArgCount => expr!(System::Failure["InvalidArgCount", {
-                "Message" -> "the kernel passed an unrepresentable argument count"
-            }]),
-            LibraryError::ArgumentRead { message } => {
-                expr!(System::Failure["ArgumentRead", { "Message" -> message }])
-            },
-            LibraryError::ResultWrite { message } => {
-                expr!(System::Failure["ResultWrite", { "Message" -> message }])
-            },
-        }
-    }
 }
 
 impl LibraryError {
@@ -156,20 +115,8 @@ mod tests {
                 .find(|e| e.key == Expr::from(k))
                 .map(|e| e.value.clone())
         };
-        // Upstream-compatible shape: template + MessageParameters carry the message.
-        assert_eq!(
-            find("MessageTemplate"),
-            Some(Expr::from("Rust LibraryLink function panic: `message`"))
-        );
-        let params = find("MessageParameters").unwrap();
-        let params = params.try_as_association().unwrap();
-        assert_eq!(
-            params
-                .iter()
-                .find(|e| e.key == Expr::from("message"))
-                .map(|e| e.value.clone()),
-            Some(Expr::from("boom"))
-        );
+        // Derived shape: snake_case fields → CamelCase association keys.
+        assert_eq!(find("Message"), Some(Expr::from("boom")));
         assert_eq!(find("SourceLocation"), Some(Expr::from("src/x.rs:1")));
         // The backtrace Expr is carried through verbatim — no serialization detour.
         assert_eq!(find("Backtrace"), Some(backtrace));

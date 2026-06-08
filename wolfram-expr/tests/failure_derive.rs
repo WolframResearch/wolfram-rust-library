@@ -6,7 +6,7 @@ use wolfram_expr::{expr, Expr, Failure};
 
 #[test]
 fn named_fields_camel_case_keys() {
-    #[derive(Debug, Failure)]
+    #[derive(Debug, Clone, Failure)]
     enum ValidationError {
         OutOfRange { value: f64, min: f64, max: f64 },
         NotAnInteger { value: f64 },
@@ -28,7 +28,7 @@ fn named_fields_camel_case_keys() {
 
 #[test]
 fn multi_word_field_camel_cases() {
-    #[derive(Debug, Failure)]
+    #[derive(Debug, Clone, Failure)]
     enum E {
         V { out_of_range: bool },
     }
@@ -40,7 +40,7 @@ fn multi_word_field_camel_cases() {
 
 #[test]
 fn tuple_and_unit_variants() {
-    #[derive(Debug, Failure)]
+    #[derive(Debug, Clone, Failure)]
     enum E {
         // single-field tuple → carried under "Message"
         Io(String),

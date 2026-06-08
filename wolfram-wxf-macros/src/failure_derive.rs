@@ -1,9 +1,9 @@
 //! Expansion for `#[derive(Failure)]`.
 //!
-//! Generates `impl From<Enum> for Expr` that turns each variant into its
-//! `Failure["VariantName", <|fields|>]` expression — the variant name becomes the
-//! tag, and its fields become the association (snake_case → `CamelCase` keys),
-//! built with the `expr!` macro. So the hand-written
+//! Generates `From<Enum> for Expr` (and `From<&Enum>`) turning each variant into
+//! its `Failure["VariantName", <|fields|>]` expression — the variant name becomes
+//! the tag, and its fields become the association (snake_case → `CamelCase` keys),
+//! built with `expr!`. So the hand-written
 //!
 //! ```ignore
 //! impl From<ValidationError> for Expr {
@@ -18,7 +18,7 @@
 //! }
 //! ```
 //!
-//! is just `#[derive(Failure)]` on the enum.
+//! is just `#[derive(Failure)]` on the enum (which must be `Clone`).
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -59,18 +59,14 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                     .collect();
                 quote! {
                     #name::#v_name { #(#idents),* } =>
-                        ::wolfram_expr::expr!(System::Failure[
-                            #v_str, { #( #keys -> #idents ),* }
-                        ]),
+                        ::wolfram_expr::expr!(System::Failure[#v_str, { #( #keys -> #idents ),* }]),
                 }
             },
             // V(x) -> Failure["V", <|"Message" -> x|>]
             Fields::Unnamed(unnamed) if unnamed.unnamed.len() == 1 => {
                 quote! {
                     #name::#v_name(__payload) =>
-                        ::wolfram_expr::expr!(System::Failure[
-                            #v_str, { "Message" -> __payload }
-                        ]),
+                        ::wolfram_expr::expr!(System::Failure[#v_str, { "Message" -> __payload }]),
                 }
             },
             // V -> Failure["V", <||>]
@@ -91,13 +87,22 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 
     Ok(quote! {
         #[automatically_derived]
+        impl #impl_generics ::core::convert::From<&#name #ty_generics>
+            for ::wolfram_expr::Expr #where_clause
+        {
+            fn from(__value: &#name #ty_generics) -> ::wolfram_expr::Expr {
+                match ::core::clone::Clone::clone(__value) {
+                    #(#arms)*
+                }
+            }
+        }
+
+        #[automatically_derived]
         impl #impl_generics ::core::convert::From<#name #ty_generics>
             for ::wolfram_expr::Expr #where_clause
         {
             fn from(__value: #name #ty_generics) -> ::wolfram_expr::Expr {
-                match __value {
-                    #(#arms)*
-                }
+                ::wolfram_expr::Expr::from(&__value)
             }
         }
     })
