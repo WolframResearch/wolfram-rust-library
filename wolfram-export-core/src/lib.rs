@@ -208,25 +208,28 @@ impl ExportEntry {
             ExportEntry::Native { name, signature } => {
                 let (args, ret) = signature()?;
                 let name = *name;
-                expr!(LibraryFunctionLoad[library, name, args, ret])
+                expr!(System::LibraryFunctionLoad[library, name, args, ret])
             },
             // WSTP-mode: wraps LibraryFunctionLoad in Function[Block[...]] that
             // resets $Context for predictable symbol resolution across the link.
             ExportEntry::Wstp { name } => {
                 let name = *name;
-                let load_call =
-                    expr!(LibraryFunctionLoad[library, name, "LinkObject", "LinkObject"]);
-                let var = Expr::from(Symbol::new("RustLink`Private`wstpFunc"));
+                let load_call = expr!(
+                    System::LibraryFunctionLoad[library, name, "LinkObject", "LinkObject"]
+                );
+                let var = expr!(RustLink::Private::wstpFunc);
+                // `$Context` / `$ContextPath` can't be `::`-idents (`$` isn't a
+                // Rust ident char), so build those symbols from strings.
                 let ctx = Expr::from(Symbol::new("System`$Context"));
                 let ctx_path = Expr::from(Symbol::new("System`$ContextPath"));
                 let var2 = var.clone();
-                let body = Expr::normal(var, vec![expr!(SlotSequence[1])]);
-                expr!(With[
-                    List[Set[var2, load_call]],
-                    Function[Block[
-                        List[
-                            Set[ctx, "RustLinkWSTPPrivateContext`"],
-                            Set[ctx_path, List[]]
+                let body = expr!((var)[System::SlotSequence[1]]);
+                expr!(System::With[
+                    System::List[System::Set[var2, load_call]],
+                    System::Function[System::Block[
+                        System::List[
+                            System::Set[ctx, "RustLinkWSTPPrivateContext`"],
+                            System::Set[ctx_path, System::List[]]
                         ],
                         body
                     ]]
@@ -235,7 +238,7 @@ impl ExportEntry {
             // Wxf-mode: wire shape is always {ByteArray} -> ByteArray.
             ExportEntry::Wxf { name, .. } => {
                 let name = *name;
-                expr!(LibraryFunctionLoad[library, name, List["ByteArray"], "ByteArray"])
+                expr!(System::LibraryFunctionLoad[library, name, System::List["ByteArray"], "ByteArray"])
             },
         };
 

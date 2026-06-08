@@ -35,7 +35,9 @@ fn transparent_variant_serializes_payload_directly() {
 fn sibling_variants_keep_their_heads() {
     assert_eq!(rt(&Outcome::Ok(7)), expr!(Success["Ok", 7]));
     assert_eq!(
-        rt(&Outcome::Bad { message: "boom".into() }),
+        rt(&Outcome::Bad {
+            message: "boom".into()
+        }),
         expr!(Failure["Bad", {"Message" -> "boom"}])
     );
 }

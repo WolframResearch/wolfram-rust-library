@@ -257,7 +257,7 @@ impl Expr {
 
     /// [`Null`](https://reference.wolfram.com/language/ref/Null.html) <sub>WL</sub>.
     pub fn null() -> Expr {
-        Expr::symbol(unsafe { Symbol::unchecked_new("System`Null") })
+        crate::expr!(System::Null)
     }
 
     //==================================

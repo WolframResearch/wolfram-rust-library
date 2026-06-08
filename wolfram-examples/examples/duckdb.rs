@@ -19,7 +19,7 @@ use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::{types::ToSql, Connection};
 use uuid::Uuid;
 use wolfram_export::export;
-use wolfram_expr::{Expr, Symbol, ToWXF};
+use wolfram_expr::{expr, Expr, ToWXF};
 
 /// Every DuckDB operation resolves to one of these. Per-variant `#[wolfram(enum_head)]`
 /// makes the success branches serialize under `System`Success` and the error
@@ -185,7 +185,8 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
     // Encode the Arrow batches as an IPC stream.
     let mut buf = Vec::new();
     {
-        let mut writer = match arrow_ipc::writer::StreamWriter::try_new(&mut buf, &schema) {
+        let mut writer = match arrow_ipc::writer::StreamWriter::try_new(&mut buf, &schema)
+        {
             Ok(writer) => writer,
             Err(e) => {
                 return DuckDbResult::QueryError {
@@ -210,11 +211,10 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
     let byte_array = Expr::from(buf);
     // Tabular`Arrow`ToTabular[Tabular`Arrow`ReadArrowIPCByteArray[ba]] — the
     // internal path Import[…, "ArrowIPC", "Tabular"] uses, skipping the importer.
-    let read = Expr::symbol(Symbol::new("Tabular`Arrow`ReadArrowIPCByteArray"));
-    let to_tabular = Expr::symbol(Symbol::new("Tabular`Arrow`ToTabular"));
-    DuckDbResult::Result(Expr::normal(
-        to_tabular,
-        vec![Expr::normal(read, vec![byte_array])],
+    // `::` in expr! builds a context-qualified symbol; `byte_array` (no `::`) is
+    // the local variable.
+    DuckDbResult::Result(expr!(
+        Tabular::Arrow::ToTabular[Tabular::Arrow::ReadArrowIPCByteArray[byte_array]]
     ))
 }
 

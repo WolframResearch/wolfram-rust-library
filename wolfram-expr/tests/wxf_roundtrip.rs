@@ -1,9 +1,9 @@
 //! WXF self-roundtrip tests: serialize → deserialize → equal.
 
-use wolfram_expr::{from_wxf, to_wxf, CompressionLevel};
+use wolfram_expr::{expr, from_wxf, to_wxf, CompressionLevel};
 use wolfram_expr::{
     Association, ByteArray, Complex32, Complex64, Expr, NumericArray, NumericArrayEnum,
-    PackedArray, PackedArrayEnum, RuleEntry, Symbol,
+    PackedArray, PackedArrayEnum, RuleEntry,
 };
 
 fn roundtrip(expr: Expr) {
@@ -39,32 +39,23 @@ fn string_unicode() {
 
 #[test]
 fn symbol_roundtrip() {
-    roundtrip(Expr::symbol(Symbol::new("System`Plus")));
-    roundtrip(Expr::symbol(Symbol::new("Global`x")));
+    roundtrip(expr!(System::Plus));
+    roundtrip(expr!(Global::x));
 }
 
 #[test]
 fn function_nested() {
     // Plus[1, Times[2, 3], "x"]
-    let times = Expr::normal(
-        Symbol::new("System`Times"),
-        vec![Expr::from(2), Expr::from(3)],
-    );
-    let plus = Expr::normal(
-        Symbol::new("System`Plus"),
-        vec![Expr::from(1), times, Expr::from("x")],
-    );
+    let times = expr!(Times[2, 3]);
+    let plus = expr!(Plus[1, times, "x"]);
     roundtrip(plus);
 }
 
 #[test]
 fn function_curried_head() {
     // f[1, 2][3, 4] — head is itself a Normal
-    let inner = Expr::normal(
-        Expr::symbol(Symbol::new("Global`f")),
-        vec![Expr::from(1), Expr::from(2)],
-    );
-    let outer = Expr::normal(inner, vec![Expr::from(3), Expr::from(4)]);
+    let inner = expr!(Global::f[1, 2]);
+    let outer = expr!((inner)[3, 4]);
     roundtrip(outer);
 }
 
@@ -126,7 +117,7 @@ fn packed_array_int32_2d() {
 
 #[test]
 fn empty_function() {
-    roundtrip(Expr::list(vec![]));
+    roundtrip(expr!(List[]));
 }
 
 // `Vec<T>` direct serialization: numeric `T` → `NumericArray`; `u8` → `ByteArray`.
@@ -236,11 +227,7 @@ fn big_real_roundtrip() {
 
 /// Build a sufficiently-compressible expression: a List of repeated symbols.
 fn compressible_expr() -> Expr {
-    Expr::list(
-        (0..100)
-            .map(|_| Expr::symbol(Symbol::new("System`x")))
-            .collect(),
-    )
+    expr!(List[..(0..100).map(|_| expr!(System::x))])
 }
 
 #[test]

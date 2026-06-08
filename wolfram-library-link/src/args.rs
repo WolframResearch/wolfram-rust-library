@@ -12,7 +12,7 @@ use ref_cast::RefCast;
 #[cfg(feature = "wstp")]
 use crate::wstp::Link;
 use crate::{
-    expr::{Expr, Symbol},
+    expr::{expr, Expr, Symbol},
     rtl,
     sys::{self, mint, mreal, MArgument},
     DataStore, Image, NumericArray,
@@ -133,7 +133,7 @@ impl FromArg<'_> for mint {
     }
 
     fn parameter_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -143,7 +143,7 @@ impl FromArg<'_> for mreal {
     }
 
     fn parameter_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Real"))
+        expr!(System::Real)
     }
 }
 
@@ -153,7 +153,7 @@ impl FromArg<'_> for sys::mcomplex {
     }
 
     fn parameter_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Complex"))
+        expr!(System::Complex)
     }
 }
 
@@ -180,7 +180,7 @@ impl<'a> FromArg<'a> for CString {
     }
 
     fn parameter_type() -> Expr {
-        Expr::symbol(Symbol::new("System`String"))
+        expr!(System::String)
     }
 }
 
@@ -204,7 +204,7 @@ impl<'a> FromArg<'a> for String {
     }
 
     fn parameter_type() -> Expr {
-        Expr::symbol(Symbol::new("System`String"))
+        expr!(System::String)
     }
 }
 
@@ -456,7 +456,7 @@ impl IntoArg for mint {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -466,7 +466,7 @@ impl IntoArg for mreal {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Real"))
+        expr!(System::Real)
     }
 }
 
@@ -476,7 +476,7 @@ impl IntoArg for sys::mcomplex {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Complex"))
+        expr!(System::Complex)
     }
 }
 
@@ -490,7 +490,7 @@ impl IntoArg for i8 {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -500,7 +500,7 @@ impl IntoArg for i16 {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -510,7 +510,7 @@ impl IntoArg for i32 {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -520,7 +520,7 @@ impl IntoArg for u8 {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -530,7 +530,7 @@ impl IntoArg for u16 {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -543,7 +543,7 @@ impl IntoArg for u32 {
     }
 
     fn return_type() -> Expr {
-        Expr::symbol(Symbol::new("System`Integer"))
+        expr!(System::Integer)
     }
 }
 
@@ -589,7 +589,7 @@ impl IntoArg for CString {
     }
 
     fn return_type() -> Expr {
-        Expr::from(Symbol::new("System`String"))
+        expr!(System::String)
     }
 }
 
@@ -605,7 +605,7 @@ impl IntoArg for String {
     }
 
     fn return_type() -> Expr {
-        Expr::from(Symbol::new("System`String"))
+        expr!(System::String)
     }
 }
 

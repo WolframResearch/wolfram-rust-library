@@ -291,7 +291,7 @@ use {once_cell::sync::Lazy, std::sync::Mutex, wstp::Link};
 #[cfg(feature = "wstp")]
 pub(crate) use self::library_data::assert_main_thread;
 #[cfg(feature = "wstp")]
-use crate::expr::{Expr, ExprKind, Symbol};
+use crate::expr::{expr, Expr, ExprKind, Symbol};
 
 //--------------------------------------
 // Re-exported items
@@ -728,13 +728,9 @@ pub fn evaluate(expr: &Expr) -> Expr {
 #[cfg(feature = "wstp")]
 pub fn try_evaluate(expr: &Expr) -> Result<Expr, String> {
     with_link(|link: &mut Link| {
-        // Send an EvaluatePacket['expr].
+        // Send an EvaluatePacket[expr].
         let _: () = link
-            // .put_expr(&Expr! { EvaluatePacket['expr] })
-            .put_expr(&Expr::normal(
-                Symbol::new("System`EvaluatePacket"),
-                vec![expr.clone()],
-            ))
+            .put_expr(&expr!(EvaluatePacket[(expr.clone())]))
             .map_err(|e| e.to_string())?;
 
         let _: () = process_wstp_link(link)?;

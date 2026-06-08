@@ -1,5 +1,5 @@
 use wolfram_export::export;
-use wolfram_expr::{Expr, ExprKind};
+use wolfram_expr::{expr, Expr, ExprKind};
 
 // Native — MArgument scalars.
 #[export]
@@ -14,8 +14,8 @@ fn reverse(args: Vec<Expr>) -> Expr {
     match list.kind() {
         ExprKind::Normal(normal) => {
             let head = normal.head().clone();
-            let items: Vec<Expr> = normal.elements().to_vec();
-            Expr::normal(head, items.into_iter().rev().collect())
+            // runtime head + spliced (reversed) elements, straight from the iterator.
+            expr!((head)[..normal.elements().iter().rev().cloned()])
         },
         _ => list,
     }

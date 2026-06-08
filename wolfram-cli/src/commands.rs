@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use wolfram_app_discovery::{SystemID, WolframApp};
-use wolfram_expr::{expr, Expr, ExprKind, Symbol};
+use wolfram_expr::{expr, Expr, ExprKind};
 
 use crate::build::{
     collect_dylib_info, generate_package, resolve_paclet_config, run_cargo_build,
@@ -119,8 +119,7 @@ fn run_wl_script(
 
     let content_str = content.trim();
 
-    let input_form = Expr::symbol(Symbol::new("System`InputForm"));
-    let call = expr!(Export[out_str, Apply[ToExpression[content_str, input_form], List[{
+    let call = expr!(Export[out_str, Apply[ToExpression[content_str, System::InputForm], List[{
         "Files"    -> files_list,
         "Cwd"      -> cwd_str,
         "LibPaths" -> lib_paths_list

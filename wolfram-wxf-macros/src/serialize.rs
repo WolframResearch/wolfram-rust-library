@@ -13,8 +13,8 @@ use syn::spanned::Spanned;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
 use crate::shared::{
-    parse_container_attrs, parse_field_attrs, process_key, qualify_symbol, ContainerAttrs,
-    EnumHead,
+    parse_container_attrs, parse_field_attrs, process_key, qualify_symbol,
+    ContainerAttrs, EnumHead,
 };
 use crate::ty_classify::{classify, FieldKind};
 

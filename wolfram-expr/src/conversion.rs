@@ -116,8 +116,8 @@ impl From<Normal> for Expr {
 impl From<bool> for Expr {
     fn from(value: bool) -> Expr {
         match value {
-            true => Expr::symbol(Symbol::new("System`True")),
-            false => Expr::symbol(Symbol::new("System`False")),
+            true => crate::expr!(System::True),
+            false => crate::expr!(System::False),
         }
     }
 }
