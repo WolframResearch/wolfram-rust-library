@@ -171,7 +171,7 @@ fn big_integer_variant_roundtrip() {
 #[test]
 fn expr_macro_nested_head_in_arg() {
     // Style[Foo[2]] — nested function call in arg position
-    let by_macro = expr!(Style[Foo[2]]);
+    let by_macro = expr!(System::Style[System::Foo[2]]);
     let by_hand = Expr::normal(
         Symbol::new("System`Style"),
         vec![Expr::normal(Symbol::new("System`Foo"), vec![Expr::from(2)])],
@@ -179,7 +179,7 @@ fn expr_macro_nested_head_in_arg() {
     assert_eq!(by_macro, by_hand);
 
     // Deeply nested: Style[Foo[Bar[3]], "x" -> "y"]
-    let by_macro = expr!(Style[Foo[Bar[3]], "x" -> "y"]);
+    let by_macro = expr!(System::Style[System::Foo[System::Bar[3]], "x" -> "y"]);
     let by_hand = Expr::normal(
         Symbol::new("System`Style"),
         vec![
@@ -200,7 +200,7 @@ fn expr_macro_nested_head_in_arg() {
 fn expr_macro_inline_rule() {
     // expr!(Style[col, "FontFamily" -> "Courier"]) must equal the hand-built form
     let col = Expr::from("content");
-    let by_macro = expr!(Style[col, "FontFamily" -> "Courier"]);
+    let by_macro = expr!(System::Style[col, "FontFamily" -> "Courier"]);
 
     let col = Expr::from("content");
     let by_hand = Expr::normal(

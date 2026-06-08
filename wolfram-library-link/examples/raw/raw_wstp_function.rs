@@ -160,7 +160,7 @@ pub extern "C" fn wstp_expr_function(
 
             let msg = err.to_string();
             let err = wolfram_library_link::expr::expr!(
-                Failure["WSTP Error", {"Message" -> msg}]
+                System::Failure["WSTP Error", {"Message" -> msg}]
             );
             match link.put_expr(&err) {
                 Ok(()) => return LIBRARY_NO_ERROR,

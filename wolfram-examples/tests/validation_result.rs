@@ -15,7 +15,7 @@ fn roundtrip(v: &ValidationResult) -> Expr {
 fn success_branch_uses_success_head() {
     assert_eq!(
         roundtrip(&ValidationResult::Valid(42)),
-        expr!(Success["Valid", 42])
+        expr!(System::Success["Valid", 42])
     );
 }
 
@@ -27,11 +27,11 @@ fn failure_branches_use_failure_head_with_camel_keys() {
             min: 0.0,
             max: 255.0,
         }),
-        expr!(Failure["OutOfRange", {"Value" -> 300.0, "Min" -> 0.0, "Max" -> 255.0}])
+        expr!(System::Failure["OutOfRange", {"Value" -> 300.0, "Min" -> 0.0, "Max" -> 255.0}])
     );
 
     assert_eq!(
         roundtrip(&ValidationResult::NotAnInteger { value: 1.5 }),
-        expr!(Failure["NotAnInteger", {"Value" -> 1.5}])
+        expr!(System::Failure["NotAnInteger", {"Value" -> 1.5}])
     );
 }

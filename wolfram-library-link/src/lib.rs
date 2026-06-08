@@ -730,7 +730,7 @@ pub fn try_evaluate(expr: &Expr) -> Result<Expr, String> {
     with_link(|link: &mut Link| {
         // Send an EvaluatePacket[expr].
         let _: () = link
-            .put_expr(&expr!(EvaluatePacket[(expr.clone())]))
+            .put_expr(&expr!(System::EvaluatePacket[(expr.clone())]))
             .map_err(|e| e.to_string())?;
 
         let _: () = process_wstp_link(link)?;

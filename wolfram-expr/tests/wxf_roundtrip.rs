@@ -46,8 +46,8 @@ fn symbol_roundtrip() {
 #[test]
 fn function_nested() {
     // Plus[1, Times[2, 3], "x"]
-    let times = expr!(Times[2, 3]);
-    let plus = expr!(Plus[1, times, "x"]);
+    let times = expr!(System::Times[2, 3]);
+    let plus = expr!(System::Plus[1, times, "x"]);
     roundtrip(plus);
 }
 
@@ -117,7 +117,7 @@ fn packed_array_int32_2d() {
 
 #[test]
 fn empty_function() {
-    roundtrip(expr!(List[]));
+    roundtrip(expr!(System::List[]));
 }
 
 // `Vec<T>` direct serialization: numeric `T` → `NumericArray`; `u8` → `ByteArray`.
@@ -227,7 +227,7 @@ fn big_real_roundtrip() {
 
 /// Build a sufficiently-compressible expression: a List of repeated symbols.
 fn compressible_expr() -> Expr {
-    expr!(List[..(0..100).map(|_| expr!(System::x))])
+    expr!(System::List[..(0..100).map(|_| expr!(System::x))])
 }
 
 #[test]

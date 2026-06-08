@@ -79,7 +79,7 @@ impl LibraryError {
                 message,
                 source_location,
                 backtrace,
-            } => expr!(Failure["RustPanic", {
+            } => expr!(System::Failure["RustPanic", {
                 "MessageTemplate"   -> "Rust LibraryLink function panic: `message`",
                 "MessageParameters" -> {"message" -> message},
                 "SourceLocation"    -> source_location,
@@ -89,23 +89,27 @@ impl LibraryError {
                 message,
                 expected,
                 got,
-            } => expr!(Failure["LoaderError", {
+            } => expr!(System::Failure["LoaderError", {
                 "Message"  -> message,
                 "Expected" -> expected,
                 "Got"      -> got
             }]),
-            LibraryError::NotInitialized => expr!(Failure["NotInitialized", {
+            LibraryError::NotInitialized => expr!(System::Failure["NotInitialized", {
                 "Message" -> "the LibraryLink library failed to initialize"
             }]),
-            LibraryError::InvalidArgCount => expr!(Failure["InvalidArgCount", {
+            LibraryError::InvalidArgCount => expr!(System::Failure["InvalidArgCount", {
                 "Message" -> "the kernel passed an unrepresentable argument count"
             }]),
-            LibraryError::ArgumentRead { message } => expr!(Failure["ArgumentRead", {
-                "Message" -> message
-            }]),
-            LibraryError::ResultWrite { message } => expr!(Failure["ResultWrite", {
-                "Message" -> message
-            }]),
+            LibraryError::ArgumentRead { message } => {
+                expr!(System::Failure["ArgumentRead", {
+                    "Message" -> message
+                }])
+            },
+            LibraryError::ResultWrite { message } => {
+                expr!(System::Failure["ResultWrite", {
+                    "Message" -> message
+                }])
+            },
         }
     }
 

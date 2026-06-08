@@ -11,7 +11,7 @@ use wolfram_expr::{expr, failure, Expr};
 fn scalar_wraps_under_message_default_tag() {
     assert_eq!(
         failure!("disk full"),
-        expr!(Failure["RustError", {"Message" -> "disk full"}])
+        expr!(System::Failure["RustError", {"Message" -> "disk full"}])
     );
 }
 
@@ -20,7 +20,7 @@ fn scalar_with_custom_tag() {
     let msg = String::from("connection refused");
     assert_eq!(
         failure!(msg, "IoError"),
-        expr!(Failure["IoError", {"Message" -> "connection refused"}])
+        expr!(System::Failure["IoError", {"Message" -> "connection refused"}])
     );
 }
 
@@ -28,7 +28,7 @@ fn scalar_with_custom_tag() {
 fn non_string_scalar_message() {
     assert_eq!(
         failure!(42i64, "Code"),
-        expr!(Failure["Code", {"Message" -> 42}])
+        expr!(System::Failure["Code", {"Message" -> 42}])
     );
 }
 
@@ -39,7 +39,7 @@ fn brace_bare_ident_sugar_camel_cases_keys() {
     let max = 255.0_f64;
     assert_eq!(
         failure!({ value, min, max }, "OutOfRange"),
-        expr!(Failure["OutOfRange", {"Value" -> 300.0, "Min" -> 0.0, "Max" -> 255.0}])
+        expr!(System::Failure["OutOfRange", {"Value" -> 300.0, "Min" -> 0.0, "Max" -> 255.0}])
     );
 }
 
@@ -48,7 +48,7 @@ fn brace_default_tag() {
     let value = 1.0_f64;
     assert_eq!(
         failure!({ value }),
-        expr!(Failure["RustError", {"Value" -> 1.0}])
+        expr!(System::Failure["RustError", {"Value" -> 1.0}])
     );
 }
 
@@ -57,7 +57,7 @@ fn multi_word_ident_camel_cases() {
     let out_of_range = "x";
     assert_eq!(
         failure!({ out_of_range }, "V"),
-        expr!(Failure["V", {"OutOfRange" -> "x"}])
+        expr!(System::Failure["V", {"OutOfRange" -> "x"}])
     );
 }
 
@@ -68,12 +68,12 @@ fn brace_explicit_keys_and_nested_exprs() {
         failure!({
             path,
             "Expected" -> "Association",
-            "Got" -> List["a", "b"]
+            "Got" -> System::List["a", "b"]
         }, "Deserialize"),
-        expr!(Failure["Deserialize", {
+        expr!(System::Failure["Deserialize", {
             "Path" -> "Frame.payload",
             "Expected" -> "Association",
-            "Got" -> List["a", "b"]
+            "Got" -> System::List["a", "b"]
         }])
     );
 }
@@ -85,7 +85,7 @@ fn inline_association_payload_like_expr_macro() {
     let a = 2i64;
     assert_eq!(
         failure!({ a -> 2, "B" -> 3 }, "InvalidData"),
-        expr!(Failure["InvalidData", {a -> 2, "B" -> 3}])
+        expr!(System::Failure["InvalidData", {a -> 2, "B" -> 3}])
     );
 }
 
@@ -117,10 +117,10 @@ fn typical_enum_match_arm_usage() {
             min: 0.0,
             max: 255.0,
         }),
-        expr!(Failure["OutOfRange", {"Value" -> 300.0, "Min" -> 0.0, "Max" -> 255.0}])
+        expr!(System::Failure["OutOfRange", {"Value" -> 300.0, "Min" -> 0.0, "Max" -> 255.0}])
     );
     assert_eq!(
         Expr::from(ValidationError::NotAnInteger { value: 1.5 }),
-        expr!(Failure["NotAnInteger", {"Value" -> 1.5}])
+        expr!(System::Failure["NotAnInteger", {"Value" -> 1.5}])
     );
 }

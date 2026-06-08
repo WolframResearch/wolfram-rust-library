@@ -26,18 +26,18 @@ fn transparent_variant_serializes_payload_directly() {
     // The whole enum serializes as just the inner Expr — no Success/Failure/tag.
     assert_eq!(rt(&Outcome::Raw(Expr::from(7i64))), expr!(7));
     assert_eq!(
-        rt(&Outcome::Raw(expr!(List[1, 2, 3]))),
-        expr!(List[1, 2, 3])
+        rt(&Outcome::Raw(expr!(System::List[1, 2, 3]))),
+        expr!(System::List[1, 2, 3])
     );
 }
 
 #[test]
 fn sibling_variants_keep_their_heads() {
-    assert_eq!(rt(&Outcome::Ok(7)), expr!(Success["Ok", 7]));
+    assert_eq!(rt(&Outcome::Ok(7)), expr!(System::Success["Ok", 7]));
     assert_eq!(
         rt(&Outcome::Bad {
             message: "boom".into()
         }),
-        expr!(Failure["Bad", {"Message" -> "boom"}])
+        expr!(System::Failure["Bad", {"Message" -> "boom"}])
     );
 }

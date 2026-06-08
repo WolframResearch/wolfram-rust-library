@@ -119,7 +119,7 @@ fn run_wl_script(
 
     let content_str = content.trim();
 
-    let call = expr!(Export[out_str, Apply[ToExpression[content_str, System::InputForm], List[{
+    let call = expr!(System::Export[out_str, System::Apply[System::ToExpression[content_str, System::InputForm], System::List[{
         "Files"    -> files_list,
         "Cwd"      -> cwd_str,
         "LibPaths" -> lib_paths_list

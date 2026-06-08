@@ -61,12 +61,12 @@ impl CaughtPanic {
                 if should_show_backtrace() {
                     display_backtrace(backtrace)
                 } else {
-                    crate::expr::expr!(Missing["NotEnabled"])
+                    crate::expr::expr!(System::Missing["NotEnabled"])
                 }
             }
             #[cfg(not(feature = "panic-failure-backtraces"))]
             {
-                crate::expr::expr!(Missing["NotEnabled"])
+                crate::expr::expr!(System::Missing["NotEnabled"])
             }
         };
 
@@ -133,23 +133,23 @@ fn display_backtrace(bt: Option<Backtrace>) -> Expr {
             // in by the compiler that are not present on the user's machine.
             let location = if file_exists {
                 let path_clone = path_str.clone();
-                crate::expr::expr!(Button[Style[label, RGBColor[0.25f64, 0.48f64, 1.0f64], "Small", "FontFamily" -> "Courier"], SystemOpen[path_clone], "Appearance" -> "Frameless"])
+                crate::expr::expr!(System::Button[System::Style[label, System::RGBColor[0.25f64, 0.48f64, 1.0f64], "Small", "FontFamily" -> "Courier"], System::SystemOpen[path_clone], "Appearance" -> "Frameless"])
             } else {
-                crate::expr::expr!(Style[label, "Small", "FontFamily" -> "Courier"])
+                crate::expr::expr!(System::Style[label, "Small", "FontFamily" -> "Courier"])
             };
 
             let row = if path_str.is_empty() {
                 Expr::string(name.clone())
             } else {
                 let name_expr = name.clone();
-                crate::expr::expr!(Row[List[location, " in ", name_expr]])
+                crate::expr::expr!(System::Row[System::List[location, " in ", name_expr]])
             };
 
             frames.push(row);
         }
 
         let frames_list = Expr::list(frames);
-        crate::expr::expr!(Style[Column[frames_list], "FontFamily" -> "Courier"])
+        crate::expr::expr!(System::Style[System::Column[frames_list], "FontFamily" -> "Courier"])
     } else {
         Expr::string("<unable to capture backtrace>")
     };

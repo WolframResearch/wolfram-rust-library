@@ -300,8 +300,8 @@ impl<'a, T: crate::NumericArrayType> FromArg<'a> for &'a NumericArray<T> {
 
         // {LibraryDataType[NumericArray, "<T>"], "Constant"}
         let type_name = T::TYPE.name();
-        let ldt = crate::expr::expr!(LibraryDataType["NumericArray", type_name]);
-        crate::expr::expr!(List[ldt, "Constant"])
+        let ldt = crate::expr::expr!(System::LibraryDataType["NumericArray", type_name]);
+        crate::expr::expr!(System::List[ldt, "Constant"])
     }
 }
 
@@ -313,8 +313,8 @@ impl<'a, T: crate::NumericArrayType> FromArg<'a> for NumericArray<T> {
     fn parameter_type() -> Expr {
         // {LibraryDataType[NumericArray, "<T>"], "Shared"}
         let type_name = T::TYPE.name();
-        let ldt = crate::expr::expr!(LibraryDataType["NumericArray", type_name]);
-        crate::expr::expr!(List[ldt, "Shared"])
+        let ldt = crate::expr::expr!(System::LibraryDataType["NumericArray", type_name]);
+        crate::expr::expr!(System::List[ldt, "Shared"])
     }
 }
 
@@ -325,7 +325,7 @@ impl<'a> FromArg<'a> for &'a NumericArray<()> {
 
     fn parameter_type() -> Expr {
         // {NumericArray, "Constant"}
-        crate::expr::expr!(List["NumericArray", "Constant"])
+        crate::expr::expr!(System::List["NumericArray", "Constant"])
     }
 }
 
@@ -336,7 +336,7 @@ impl<'a> FromArg<'a> for NumericArray<()> {
 
     fn parameter_type() -> Expr {
         // {NumericArray, "Shared"}
-        crate::expr::expr!(List["NumericArray", "Shared"])
+        crate::expr::expr!(System::List["NumericArray", "Shared"])
     }
 }
 
@@ -352,9 +352,9 @@ impl<'a, T: crate::ImageData> FromArg<'a> for &'a Image<T> {
     fn parameter_type() -> Expr {
         // {LibraryDataType[Image | Image3D, "<T>"], "Constant"}
         let type_name = T::TYPE.name();
-        let alts = crate::expr::expr!(Alternatives["Image", "Image3D"]);
-        let ldt = crate::expr::expr!(LibraryDataType[alts, type_name]);
-        crate::expr::expr!(List[ldt, "Constant"])
+        let alts = crate::expr::expr!(System::Alternatives["Image", "Image3D"]);
+        let ldt = crate::expr::expr!(System::LibraryDataType[alts, type_name]);
+        crate::expr::expr!(System::List[ldt, "Constant"])
     }
 }
 
@@ -366,9 +366,9 @@ impl<'a, T: crate::ImageData> FromArg<'a> for Image<T> {
     fn parameter_type() -> Expr {
         // {LibraryDataType[Image | Image3D, "<T>"], "Shared"}
         let type_name = T::TYPE.name();
-        let alts = crate::expr::expr!(Alternatives["Image", "Image3D"]);
-        let ldt = crate::expr::expr!(LibraryDataType[alts, type_name]);
-        crate::expr::expr!(List[ldt, "Shared"])
+        let alts = crate::expr::expr!(System::Alternatives["Image", "Image3D"]);
+        let ldt = crate::expr::expr!(System::LibraryDataType[alts, type_name]);
+        crate::expr::expr!(System::List[ldt, "Shared"])
     }
 }
 
@@ -379,8 +379,8 @@ impl<'a> FromArg<'a> for &'a Image<()> {
 
     fn parameter_type() -> Expr {
         // {Image | Image3D, "Constant"}
-        let alts = crate::expr::expr!(Alternatives["Image", "Image3D"]);
-        crate::expr::expr!(List[alts, "Constant"])
+        let alts = crate::expr::expr!(System::Alternatives["Image", "Image3D"]);
+        crate::expr::expr!(System::List[alts, "Constant"])
     }
 }
 
@@ -391,8 +391,8 @@ impl<'a> FromArg<'a> for Image<()> {
 
     fn parameter_type() -> Expr {
         // {Image | Image3D, "Shared"}
-        let alts = crate::expr::expr!(Alternatives["Image", "Image3D"]);
-        crate::expr::expr!(List[alts, "Shared"])
+        let alts = crate::expr::expr!(System::Alternatives["Image", "Image3D"]);
+        crate::expr::expr!(System::List[alts, "Shared"])
     }
 }
 
@@ -621,7 +621,7 @@ impl<T: crate::NumericArrayType> IntoArg for NumericArray<T> {
     fn return_type() -> Expr {
         // LibraryDataType[NumericArray, "<T>"]
         let type_name = T::TYPE.name();
-        crate::expr::expr!(LibraryDataType["NumericArray", type_name])
+        crate::expr::expr!(System::LibraryDataType["NumericArray", type_name])
     }
 }
 
@@ -644,9 +644,9 @@ impl<T: crate::ImageData> IntoArg for Image<T> {
     fn return_type() -> Expr {
         // LibraryDataType[Image | Image3D, "<T>"]
         let type_name = T::TYPE.name();
-        let alts = crate::expr::expr!(Alternatives["Image", "Image3D"]);
-        let ldt = crate::expr::expr!(LibraryDataType[alts, type_name]);
-        crate::expr::expr!(List[ldt, "Shared"])
+        let alts = crate::expr::expr!(System::Alternatives["Image", "Image3D"]);
+        let ldt = crate::expr::expr!(System::LibraryDataType[alts, type_name]);
+        crate::expr::expr!(System::List[ldt, "Shared"])
     }
 }
 
