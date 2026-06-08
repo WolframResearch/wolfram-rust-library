@@ -7,7 +7,6 @@
 /// | `expr!(System::Head[a, b])` | `Normal` with the symbol `` System`Head `` |
 /// | `expr!(A::B::C[a, b])` | `Normal` with `` A`B`C `` (each `::` → a context backtick) |
 /// | `expr!(var[a, b])` | `Normal` with the variable `var` as head (call over `var`) |
-/// | `expr!((rust_expr)[a, b])` | `Normal` with a runtime head expression |
 /// | `expr!(A::B::C)` | the symbol `` A`B`C `` |
 /// | `expr!(k -> v)` | `Rule[k, v]` — usable inline inside `…[...]` |
 /// | `expr!({k -> v, ...})` | `Association` |
@@ -35,7 +34,7 @@
 /// let list = expr!(System::List[1, 2, 3]);
 /// let table = expr!(Tabular::Arrow::ToTabular[list]);
 /// let head = Symbol::new("Global`f");
-/// let call = expr!((head)[1, 2]);
+/// let call = expr!(head[1, 2]);   // a variable head — a call over `head`
 /// ```
 #[macro_export]
 macro_rules! expr {
@@ -61,15 +60,10 @@ macro_rules! expr {
         )
     };
 
-    // Runtime head: (rust_expr)[args] applies any `Into<Expr>` head (a `Symbol`
-    // or `Expr` value) to args — the escape hatch for a non-literal head.
-    ( ($head:expr) [ $($args:tt)* ] ) => {
-        $crate::Expr::normal($head, $crate::__expr_args![$($args)*])
-    };
-
     // Function call over a variable: var[args] applies the (`Into<Expr>`) value
     // `var` to args. A bare ident is *always* a Rust variable — symbols must be
     // `::`-qualified (`System::Times[…]`); there is no implicit `System`` prefix.
+    // (A non-ident head expression has no inline form — bind it to a variable.)
     // Args are parsed by the __expr_args! tt-muncher, which handles:
     //   - single-tt args (literals, variables, {..} associations)
     //   - (rust_expr) parenthesized Rust expressions, ..iter splices
@@ -149,16 +143,6 @@ macro_rules! __expr_args {
         ::core::iter::IntoIterator::into_iter($e)
             .map(|__x| $crate::Expr::from(__x))
             .collect::<::std::vec::Vec<$crate::Expr>>()
-    };
-    // (rust_head)[...] runtime-head call arg, followed by more
-    ( ($h:expr) [ $($inner:tt)* ], $($rest:tt)* ) => {{
-        let mut __args = vec![$crate::Expr::normal($h, $crate::__expr_args![$($inner)*])];
-        __args.extend($crate::__expr_args![$($rest)*]);
-        __args
-    }};
-    // (rust_head)[...] runtime-head call arg, last
-    ( ($h:expr) [ $($inner:tt)* ] ) => {
-        vec![$crate::Expr::normal($h, $crate::__expr_args![$($inner)*])]
     };
     // Head[...] arg, followed by more args
     ($head:ident [ $($inner:tt)* ], $($rest:tt)*) => {{

@@ -223,7 +223,7 @@ impl ExportEntry {
                 let ctx = Expr::from(Symbol::new("System`$Context"));
                 let ctx_path = Expr::from(Symbol::new("System`$ContextPath"));
                 let var2 = var.clone();
-                let body = expr!((var)[System::SlotSequence[1]]);
+                let body = expr!(var[System::SlotSequence[1]]);
                 expr!(System::With[
                     System::List[System::Set[var2, load_call]],
                     System::Function[System::Block[

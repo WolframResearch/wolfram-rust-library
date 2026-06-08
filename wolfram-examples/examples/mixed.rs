@@ -15,7 +15,7 @@ fn reverse(args: Vec<Expr>) -> Expr {
         ExprKind::Normal(normal) => {
             let head = normal.head().clone();
             // runtime head + spliced (reversed) elements, straight from the iterator.
-            expr!((head)[..normal.elements().iter().rev().cloned()])
+            expr!(head[..normal.elements().iter().rev().cloned()])
         },
         _ => list,
     }

@@ -55,7 +55,7 @@ fn function_nested() {
 fn function_curried_head() {
     // f[1, 2][3, 4] — head is itself a Normal
     let inner = expr!(Global::f[1, 2]);
-    let outer = expr!((inner)[3, 4]);
+    let outer = expr!(inner[3, 4]);
     roundtrip(outer);
 }
 
