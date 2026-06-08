@@ -66,6 +66,9 @@ pub struct TestArgs {
     /// Where to write the result expression as WXF (default: temp dir)
     #[arg(long)]
     pub out: Option<PathBuf>,
+    /// Cargo features to enable when building examples (comma-separated or repeated)
+    #[arg(long, value_delimiter = ',')]
+    pub features: Vec<String>,
     /// Test files (.wlt) to run; defaults to all *.wlt found recursively
     pub files: Vec<String>,
 }

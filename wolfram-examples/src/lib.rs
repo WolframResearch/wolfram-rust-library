@@ -1,6 +1,9 @@
 use wolfram_expr::Expr;
 use wolfram_wxf_macros::{FromWXF, ToWXF, WxfError};
 
+#[cfg(feature = "duckdb")]
+pub mod duckdb;
+
 // ── Shared computation helpers ────────────────────────────────────────────────
 
 pub fn add(a: f64, b: f64) -> f64 {

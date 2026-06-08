@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use wolfram_app_discovery::{SystemID, WolframApp};
-use wolfram_expr::{expr, Expr, ExprKind};
+use wolfram_expr::{expr, Expr, ExprKind, Symbol};
 
 use crate::build::{
     collect_dylib_info, generate_package, resolve_paclet_config, run_cargo_build,
@@ -15,7 +15,11 @@ pub fn cmd_test(args: TestArgs) -> Result<()> {
 
     // Always build with --workspace so running from the workspace root picks
     // up examples from every member package, not just the current one.
-    let build_args = vec!["--workspace".to_string(), "--examples".to_string()];
+    let mut build_args = vec!["--workspace".to_string(), "--examples".to_string()];
+    if !args.features.is_empty() {
+        build_args.push("--features".to_string());
+        build_args.push(args.features.join(","));
+    }
 
     let dylibs = run_cargo_build(&build_args, None)?;
     if dylibs.is_empty() {
@@ -115,7 +119,8 @@ fn run_wl_script(
 
     let content_str = content.trim();
 
-    let call = expr!(Export[out_str, Apply[ToExpression[content_str, "InputForm"], List[{
+    let input_form = Expr::symbol(Symbol::new("System`InputForm"));
+    let call = expr!(Export[out_str, Apply[ToExpression[content_str, input_form], List[{
         "Files"    -> files_list,
         "Cwd"      -> cwd_str,
         "LibPaths" -> lib_paths_list
