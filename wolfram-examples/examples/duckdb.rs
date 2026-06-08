@@ -19,7 +19,7 @@ use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::{types::ToSql, Connection};
 use uuid::Uuid;
 use wolfram_export::export;
-use wolfram_expr::{expr, Expr, ToWXF};
+use wolfram_expr::{Expr, Symbol, ToWXF};
 
 /// Every DuckDB operation resolves to one of these. Per-variant `#[wolfram(enum_head)]`
 /// makes the success branches serialize under `System`Success` and the error
@@ -208,7 +208,14 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
     }
 
     let byte_array = Expr::from(buf);
-    DuckDbResult::Result(expr!(ImportByteArray[byte_array, "ArrowIPC"]))
+    // Tabular`Arrow`ToTabular[Tabular`Arrow`ReadArrowIPCByteArray[ba]] — the
+    // internal path Import[…, "ArrowIPC", "Tabular"] uses, skipping the importer.
+    let read = Expr::symbol(Symbol::new("Tabular`Arrow`ReadArrowIPCByteArray"));
+    let to_tabular = Expr::symbol(Symbol::new("Tabular`Arrow`ToTabular"));
+    DuckDbResult::Result(Expr::normal(
+        to_tabular,
+        vec![Expr::normal(read, vec![byte_array])],
+    ))
 }
 
 /// Close connection `id`, returning `Success["ConnectionClosed", id]` — or
