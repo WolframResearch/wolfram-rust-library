@@ -14,6 +14,7 @@ use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
 use crate::shared::{
     parse_container_attrs, parse_field_attrs, process_key, qualify_symbol, ContainerAttrs,
+    EnumHead,
 };
 use crate::ty_classify::{classify, FieldKind};
 
@@ -22,8 +23,9 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     expand_with_attrs(input, &container_attrs)
 }
 
-/// `ToWXF` expansion with caller-supplied container attrs. Lets the `WxfError`
-/// derive force `enum_head = "System`Failure"` while reusing all the codegen.
+/// `ToWXF` expansion with caller-supplied container attrs. Set
+/// `#[wolfram(enum_head = "System`Failure", key_processor = "CamelCase")]` to
+/// emit `Failure["Variant", <|UpperCamel -> …|>]` for an enum.
 pub(crate) fn expand_with_attrs(
     input: &DeriveInput,
     container_attrs: &ContainerAttrs,
@@ -242,17 +244,64 @@ fn parse_dotted_index_path(p: &str, span: Span) -> TokenStream {
 // Each variant becomes an Association keyed by `"Enum"` (variant name) and
 // optionally `"Data"` (a List for tuple variants, an Association for struct
 // variants). `"Enum"` is always written first.
+/// Resolve a variant's effective head: the variant's own setting, else the
+/// container default, else `System`List`. Returns `None` for a *transparent*
+/// head (`enum_head = false`).
+fn resolve_enum_head(variant: &EnumHead, container: &EnumHead) -> Option<String> {
+    match variant {
+        EnumHead::Head(s) => Some(s.clone()),
+        EnumHead::Transparent => None,
+        EnumHead::Unset => match container {
+            EnumHead::Head(s) => Some(s.clone()),
+            EnumHead::Transparent => None,
+            EnumHead::Unset => Some("System`List".to_string()),
+        },
+    }
+}
+
 fn expand_enum(
     name: &syn::Ident,
     attrs: &ContainerAttrs,
     data: &DataEnum,
 ) -> Result<TokenStream> {
-    let head = attrs.enum_head.as_deref().unwrap_or("System`List");
     let mut arms = Vec::with_capacity(data.variants.len());
     for v in &data.variants {
-        let _v_attrs = parse_container_attrs(&v.attrs)?;
+        // A per-variant `#[wolfram(enum_head = …)]` overrides the container's
+        // default head, so one enum can mix heads — e.g. `Query` → `Success[…]`
+        // and `ConnectionError` → `Failure[…]`.
+        let v_attrs = parse_container_attrs(&v.attrs)?;
         let v_name = &v.ident;
         let v_str = v_name.to_string();
+
+        // `None` = transparent (`enum_head = false`): drop both the head and the
+        // variant tag and serialize the variant's single payload directly.
+        let head = match resolve_enum_head(&v_attrs.enum_head, &attrs.enum_head) {
+            Some(head) => head,
+            None => {
+                let arm = match &v.fields {
+                    Fields::Unnamed(u) if u.unnamed.len() == 1 => {
+                        let f = &u.unnamed[0];
+                        let write = emit_write_field(&quote! { __bind_0 }, &f.ty, f.ty.span());
+                        quote! { #name :: #v_name(__bind_0) => { #write } }
+                    },
+                    Fields::Named(n) if n.named.len() == 1 => {
+                        let f = &n.named[0];
+                        let id = f.ident.as_ref().expect("named field");
+                        let write = emit_write_field(&quote! { #id }, &f.ty, f.ty.span());
+                        quote! { #name :: #v_name { #id } => { #write } }
+                    },
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            v,
+                            "enum_head = false requires the variant to carry exactly one field",
+                        ))
+                    },
+                };
+                arms.push(arm);
+                continue;
+            },
+        };
+
         match &v.fields {
             Fields::Unit => {
                 arms.push(quote! {

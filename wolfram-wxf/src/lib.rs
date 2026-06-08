@@ -16,7 +16,7 @@
 #![warn(missing_docs)]
 
 // Lets the derive macros' absolute `::wolfram_wxf::…` paths resolve while
-// compiling this crate itself — so `#[derive(WxfError)]` works on our own `Error`.
+// compiling this crate itself — so `#[derive(ToWXF)]` works on our own types.
 extern crate self as wolfram_wxf;
 
 pub mod complex;
@@ -45,7 +45,7 @@ pub use crate::wxf::reader::WxfReader;
 pub use crate::wxf::writer::WxfWriter;
 // Procedural derives — same names as the traits, resolved by Rust's separate
 // macro / type namespaces.
-pub use wolfram_wxf_macros::{FromWXF, ToWXF, WxfError};
+pub use wolfram_wxf_macros::{FromWXF, ToWXF};
 
 /// zlib compression level passed to [`to_wxf`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

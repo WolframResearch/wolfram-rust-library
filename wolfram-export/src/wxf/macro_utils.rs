@@ -28,7 +28,7 @@ pub fn wxf_signature() -> Result<(Vec<Expr>, Expr), String> {
 
 /// Deserialize WXF bytes from `input` into a typed value of type `A`.
 pub fn decode<A: for<'de> FromWXF<'de>>(input: &NumericArray<u8>) -> Result<A, String> {
-    from_wxf::<A>(input.as_slice()).map_err(|e| e.to_string())
+    from_wxf::<A>(input.as_slice()).map_err(|e| format!("{e:?}"))
 }
 
 /// Drive a [`WxfReader`] over `input`'s bytes, expecting the wire shape
@@ -63,8 +63,15 @@ where
 /// Serialize `value` to WXF bytes and wrap them in a UInt8 NumericArray.
 pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
     let bytes: Vec<u8> =
-        to_wxf(value, None).unwrap_or_else(|e| panic!("WXF serialize failed: {}", e));
+        to_wxf(value, None).unwrap_or_else(|e| panic!("WXF serialize failed: {:?}", e));
     NumericArray::<u8>::from_slice(&bytes)
+}
+
+/// Encode an argument-decode failure for the kernel. A `wolfram_wxf::Error` is
+/// not itself a `Failure[…]`; we build one explicitly with `failure!`, carrying
+/// the error's `Debug` detail under `"Message"`, then serialize it.
+pub fn encode_arg_error(e: wolfram_wxf::Error) -> NumericArray<u8> {
+    encode(&wolfram_expr::failure!(format!("{e:?}"), "ArgumentError"))
 }
 
 /// Serialize a result to owned WXF bytes. The bridge calls this *inside* the

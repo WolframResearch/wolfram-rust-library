@@ -464,7 +464,7 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
     let wxf = unsafe { std::slice::from_raw_parts(ptr.add(8), len) };
 
     wolfram_wxf::from_wxf::<Vec<FunctionEntry>>(wxf)
-        .map_err(|e| anyhow::anyhow!("manifest WXF deserialization failed: {e}"))
+        .map_err(|e| anyhow::anyhow!("manifest WXF deserialization failed: {e:?}"))
 }
 
 fn rust_target(id: SystemID) -> Result<&'static str> {

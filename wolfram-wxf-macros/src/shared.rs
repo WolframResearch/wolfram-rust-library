@@ -7,6 +7,20 @@
 
 use syn::{Attribute, Error, Lit, Meta, NestedMeta, Result};
 
+/// The WL head used to wrap an enum variant on the wire. Set at the container
+/// (default for all variants) and/or per variant (override).
+#[derive(Default, Clone)]
+pub(crate) enum EnumHead {
+    /// Not specified here — inherit the container default (ultimately `System`List`).
+    #[default]
+    Unset,
+    /// `#[wolfram(enum_head = false)]` — *transparent*: no head and no variant tag;
+    /// the variant's single payload is serialized directly.
+    Transparent,
+    /// `#[wolfram(enum_head = "Sym")]` — wrap as `Sym["Variant", …]`.
+    Head(String),
+}
+
 /// Container/variant-level attributes parsed from `#[wolfram(...)]`.
 #[derive(Default)]
 pub(crate) struct ContainerAttrs {
@@ -14,14 +28,14 @@ pub(crate) struct ContainerAttrs {
     /// the wire (e.g. `"MyPkg`Foo"`). When `None`, the macro qualifies the
     /// Rust ident with `Global`` automatically.
     pub symbol: Option<String>,
-    /// Override for the List head used to wrap enum variants on the wire.
-    /// Defaults to `"System`List"`. Use `#[wolfram(enum_head = "System`Failure")]`
-    /// to emit `Failure["VariantName", <|fields|>]` instead of `{"VariantName", ...}`.
-    pub enum_head: Option<String>,
+    /// Head used to wrap enum variants. Defaults to `System`List`;
+    /// `#[wolfram(enum_head = "System`Failure")]` emits `Failure["Variant", …]`,
+    /// `#[wolfram(enum_head = false)]` emits the bare payload (see [`EnumHead`]).
+    pub enum_head: EnumHead,
     /// Transform applied to every Association key that lacks an explicit
     /// `#[wolfram(rename = "...")]`. `None` (default) leaves keys verbatim;
     /// `"CamelCase"` upper-camel-cases them (`out_of_range` → `OutOfRange`).
-    /// `WxfError` defaults this to `"CamelCase"` so failures get Wolfram-style keys.
+    /// Pair with `enum_head = "System`Failure"` to get Wolfram-style failure keys.
     ///
     /// Must be a compile-time-known name, not a function path: keys are baked into
     /// the generated code as string literals, and the deserialize side matches them
@@ -78,7 +92,16 @@ pub(crate) fn parse_container_attrs(attrs: &[Attribute]) -> Result<ContainerAttr
                 NestedMeta::Meta(Meta::NameValue(nv))
                     if nv.path.is_ident("enum_head") =>
                 {
-                    out.enum_head = Some(string_lit(&nv.lit)?);
+                    out.enum_head = match &nv.lit {
+                        Lit::Str(s) => EnumHead::Head(s.value()),
+                        Lit::Bool(b) if !b.value => EnumHead::Transparent,
+                        other => {
+                            return Err(Error::new_spanned(
+                                other,
+                                "enum_head expects a head string (e.g. \"System`Failure\") or `false` for no head",
+                            ))
+                        },
+                    };
                 },
                 NestedMeta::Meta(Meta::NameValue(nv))
                     if nv.path.is_ident("key_processor") =>

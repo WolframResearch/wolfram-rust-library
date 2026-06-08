@@ -2,26 +2,22 @@
 //!
 //! [`Error`] is the error type of [`ToWXF`][crate::ToWXF] / [`FromWXF`][crate::FromWXF],
 //! so *every* serialization failure across the whole workspace funnels through it.
-//! It derives [`WxfError`][crate::WxfError], which emits `ToWXF` (with `Failure` head),
-//! `Display`, and `std::error::Error` in one shot — so an error that reaches the Wolfram
-//! kernel arrives as a structured `Failure[…]` the kernel can pattern-match.
+//! It carries only `Debug` — no `Display`/[`std::error::Error`] impls — and does **not**
+//! serialize itself to a Wolfram `Failure[…]`. When a caller needs to surface a failure to
+//! the kernel, it builds one explicitly with the `failure!` macro (e.g. the WXF export
+//! bridge wraps an arg-decode `Error` as `Failure["ArgumentError", <|"Message" -> …|>]`).
 //!
 //! Design: structured data is carried only where it's *useful* — an unexpected token
-//! reports the tokens it would have accepted and the one it got
-//! (`Failure["UnexpectedToken", <|Expected -> {"Integer8", "Integer16"}, Got -> "Real64"|>]`),
-//! a size mismatch reports both counts, a typed field error reports the path. Everything
-//! else — malformed headers, truncated varints, unknown bytes, bad UTF-8 — is a plain
-//! [`Invalid`][Error::Invalid] with a `message`. **No variant is field-less**: every one
-//! produces an association payload, never a bare `Failure["Tag"]`.
+//! reports the tokens it would have accepted and the one it got, a size mismatch reports
+//! both counts, a typed field error reports the path. Everything else — malformed headers,
+//! truncated varints, unknown bytes, bad UTF-8 — is a plain [`Invalid`][Error::Invalid]
+//! with a `message`. The `Debug` text carries this detail.
 
 use crate::constants::ExpressionEnum;
-use crate::WxfError;
 
 /// Errors returned by [`to_wxf`][crate::to_wxf] / [`from_wxf`][crate::from_wxf] and every
 /// [`ToWXF`][crate::ToWXF] / [`FromWXF`][crate::FromWXF] impl.
-///
-/// Serializes to a Wolfram `Failure["<Variant>", <|fields|>]` with `CamelCase` keys.
-#[derive(Debug, WxfError)]
+#[derive(Debug)]
 pub enum Error {
     /// An underlying [`std::io::Error`] from a writer, flattened to its message.
     Io {
@@ -97,3 +93,4 @@ impl From<std::io::Error> for Error {
         }
     }
 }
+

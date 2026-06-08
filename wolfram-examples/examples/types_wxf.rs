@@ -1,4 +1,4 @@
-use wolfram_examples::{Dataset, DatasetRef, Point, ValidationError};
+use wolfram_examples::{Dataset, DatasetRef, Point, ValidationResult};
 use wolfram_export::export;
 use wolfram_expr::Expr;
 
@@ -59,9 +59,10 @@ fn force_trim_number(n: f64) -> Result<u8, String> {
     wolfram_examples::force_trim_number(n)
 }
 
-// Returns Ok(n) or a Failure[...] expression as the error.
+// Per-variant `enum_head`: returns Success["Valid", n] on success, or
+// Failure["OutOfRange"/"NotAnInteger", <|…|>] on failure.
 #[export(wxf)]
-fn strict_trim_number(n: f64) -> Result<i64, ValidationError> {
+fn strict_trim_number(n: f64) -> ValidationResult {
     wolfram_examples::strict_trim_number(n)
 }
 

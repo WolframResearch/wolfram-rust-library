@@ -1,8 +1,5 @@
 use wolfram_expr::Expr;
-use wolfram_wxf_macros::{FromWXF, ToWXF, WxfError};
-
-#[cfg(feature = "duckdb")]
-pub mod duckdb;
+use wolfram_wxf_macros::{FromWXF, ToWXF};
 
 // ── Shared computation helpers ────────────────────────────────────────────────
 
@@ -84,28 +81,39 @@ pub fn resolve_number_error(v: Result<i64, String>) -> i64 {
     v.unwrap_or(0)
 }
 
-/// Structured error type that serializes as WL `Failure[...]` expressions.
-/// `WxfError` gives it the `Failure` head, `CamelCase` keys
-/// (`value` → `Value`), plus `Display` + `Error` — all from one derive.
-#[derive(Debug, WxfError)]
-pub enum ValidationError {
+/// A `Result`-like enum showcasing **per-variant** `enum_head`: the success
+/// branch serializes under `System`Success`, the failure branches under the
+/// container default `System`Failure`. `#[derive(ToWXF)]` + the `enum_head` /
+/// `key_processor` attributes spell the heads and key policy out explicitly —
+/// no `WxfError` magic. [`strict_trim_number`] returns this directly in place of
+/// a `Result`, so the kernel sees `Success["Valid", 42]` or
+/// `Failure["OutOfRange", <|Value -> …, Min -> …, Max -> …|>]`.
+#[derive(Debug, ToWXF)]
+#[wolfram(enum_head = "System`Failure", key_processor = "CamelCase")]
+pub enum ValidationResult {
+    /// Validation passed — carries the trimmed value; head `System`Success`.
+    #[wolfram(enum_head = "System`Success")]
+    Valid(i64),
+    /// Value was outside the `[min, max]` range.
     OutOfRange { value: f64, min: f64, max: f64 },
+    /// Value was not an integer.
     NotAnInteger { value: f64 },
 }
 
-/// Returns `Ok(n as u8)` or a structured `ValidationError`.
-pub fn strict_trim_number(n: f64) -> Result<i64, ValidationError> {
+/// Validate that `n` is an integer in `[0, 255]`, returning a [`ValidationResult`]
+/// whose success / failure branches carry distinct WL heads.
+pub fn strict_trim_number(n: f64) -> ValidationResult {
     if n.fract() != 0.0 {
-        return Err(ValidationError::NotAnInteger { value: n });
+        return ValidationResult::NotAnInteger { value: n };
     }
     if n < 0.0 || n > 255.0 {
-        return Err(ValidationError::OutOfRange {
+        return ValidationResult::OutOfRange {
             value: n,
             min: 0.0,
             max: 255.0,
-        });
+        };
     }
-    Ok(n as i64)
+    ValidationResult::Valid(n as i64)
 }
 
 /// Returns `Some(n as u8)` if `n` is an integer in 0–255, `None` otherwise.
