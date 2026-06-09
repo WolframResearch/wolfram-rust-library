@@ -877,7 +877,7 @@ impl Link {
                     Err(_) => {
                         self.clear_error();
                         let digits = self.get_number_as_string()?;
-                        Expr::new(ExprKind::BigInteger(BigInteger::new(digits)))
+                        Expr::new(ExprKind::BigInteger(BigInteger(digits)))
                     },
                 }
             },
@@ -888,7 +888,7 @@ impl Link {
                 // silently lost. Plain reals parse via f64.
                 let s = self.get_number_as_string()?;
                 if s.contains('`') {
-                    Expr::new(ExprKind::BigReal(BigReal::new(s)))
+                    Expr::new(ExprKind::BigReal(BigReal(s)))
                 } else {
                     match s.parse::<f64>() {
                         Ok(v) => {
@@ -899,7 +899,7 @@ impl Link {
                             })?;
                             Expr::number(Number::Real(real))
                         },
-                        Err(_) => Expr::new(ExprKind::BigReal(BigReal::new(s))),
+                        Err(_) => Expr::new(ExprKind::BigReal(BigReal(s))),
                     }
                 }
             },

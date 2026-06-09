@@ -192,7 +192,7 @@ impl<'de> FromWXF<'de> for BigInteger {
         if tok != ExpressionEnum::BigInteger {
             return Err(Error::unexpected_token(&["BigInteger"], tok));
         }
-        Ok(BigInteger::new(r.read_symbol_name()?))
+        Ok(BigInteger(r.read_symbol_name()?))
     }
 }
 
@@ -204,7 +204,7 @@ impl<'de> FromWXF<'de> for BigReal {
         if tok != ExpressionEnum::BigReal {
             return Err(Error::unexpected_token(&["BigReal"], tok));
         }
-        Ok(BigReal::new(r.read_symbol_name()?))
+        Ok(BigReal(r.read_symbol_name()?))
     }
 }
 
@@ -250,10 +250,10 @@ impl<'de> FromWXF<'de> for Expr {
             },
             ExpressionEnum::ByteArray => Ok(Expr::from(r.read_byte_array()?.to_vec())),
             ExpressionEnum::BigInteger => {
-                Ok(Expr::from(BigInteger::new(r.read_symbol_name()?)))
+                Ok(Expr::from(BigInteger(r.read_symbol_name()?)))
             },
             ExpressionEnum::BigReal => {
-                Ok(Expr::from(BigReal::new(r.read_symbol_name()?)))
+                Ok(Expr::from(BigReal(r.read_symbol_name()?)))
             },
             ExpressionEnum::NumericArray => {
                 let (dt, dims, bytes) = r.read_numeric_array_parts()?;
