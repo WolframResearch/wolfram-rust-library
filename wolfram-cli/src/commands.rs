@@ -98,21 +98,19 @@ fn run_wl_script(
                 .map(|s| s.to_owned())
         })
         .collect::<Result<_>>()?;
-    let files_list =
-        Expr::list(abs_files.iter().map(|f| Expr::string(f.as_str())).collect());
+    let files_list: Vec<Expr> =
+        abs_files.iter().map(|f| Expr::string(f.as_str())).collect();
     let cwd_str = cwd
         .to_str()
         .context("current directory is not valid UTF-8")?;
-    let lib_paths_list = Expr::list(
-        lib_dirs
-            .iter()
-            .map(|p| {
-                p.to_str().map(Expr::string).with_context(|| {
-                    format!("lib dir is not valid UTF-8: {}", p.display())
-                })
+    let lib_paths_list: Vec<Expr> = lib_dirs
+        .iter()
+        .map(|p| {
+            p.to_str().map(Expr::string).with_context(|| {
+                format!("lib dir is not valid UTF-8: {}", p.display())
             })
-            .collect::<Result<_>>()?,
-    );
+        })
+        .collect::<Result<_>>()?;
 
     let out_path = out.unwrap_or_else(temp_wxf_path);
     let out_str = out_path.to_str().context("out path is not valid UTF-8")?;

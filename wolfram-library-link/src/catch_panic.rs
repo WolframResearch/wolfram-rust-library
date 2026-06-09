@@ -143,8 +143,7 @@ fn display_backtrace(bt: Option<Backtrace>) -> Expr {
             frames.push(row);
         }
 
-        let frames_list = Expr::list(frames);
-        crate::expr::expr!(System::Style[System::Column[frames_list], "FontFamily" -> "Courier"])
+        crate::expr::expr!(System::Style[System::Column[frames], "FontFamily" -> "Courier"])
     } else {
         Expr::string("<unable to capture backtrace>")
     };
