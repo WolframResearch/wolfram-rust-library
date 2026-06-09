@@ -867,13 +867,13 @@ mod wstp_impls {
         unsafe fn call(&self, link: &mut Link) {
             let args: Vec<Expr> = match get_args_list(link) {
                 Ok(args) => args,
-                Err(message) => return write_arg_failure(link, ArgFail::Read(message)),
+                Err(err) => return write_arg_failure(link, err),
             };
 
             let result: Expr = self(args);
 
             if let Err(err) = link.put_expr(&result) {
-                write_arg_failure(link, ArgFail::Write(err.to_string()));
+                write_arg_failure(link, err.into());
             }
         }
     }
@@ -882,30 +882,20 @@ mod wstp_impls {
         unsafe fn call(&self, link: &mut Link) {
             let args: Vec<Expr> = match get_args_list(link) {
                 Ok(args) => args,
-                Err(message) => return write_arg_failure(link, ArgFail::Read(message)),
+                Err(err) => return write_arg_failure(link, err),
             };
 
             let _null: () = self(args);
 
             if let Err(err) = link.put_symbol("System`Null") {
-                write_arg_failure(link, ArgFail::Write(err.to_string()));
+                write_arg_failure(link, err.into());
             }
         }
     }
 
-    /// Which side of the WSTP `Vec<Expr>` exchange failed.
-    enum ArgFail {
-        Read(String),
-        Write(String),
-    }
-
     /// Write a structured `Failure[...]` to the link for an argument read /
     /// result write failure, instead of panicking into a generic RustPanic.
-    fn write_arg_failure(link: &mut Link, fail: ArgFail) {
-        let err = match fail {
-            ArgFail::Read(message) => crate::LibraryError::ArgumentRead { message },
-            ArgFail::Write(message) => crate::LibraryError::ResultWrite { message },
-        };
+    fn write_arg_failure(link: &mut Link, err: crate::LibraryError) {
         let _ = crate::macro_utils::write_failure_to_link(link, &err);
     }
 
@@ -913,10 +903,8 @@ mod wstp_impls {
     // Utilities
     //----------------------------
 
-    fn get_args_list(link: &mut Link) -> Result<Vec<Expr>, String> {
-        get_args_list_impl(link).map_err(|err: wstp::Error| {
-            format!("WSTP error reading argument List expression: {}", err)
-        })
+    fn get_args_list(link: &mut Link) -> Result<Vec<Expr>, crate::LibraryError> {
+        Ok(get_args_list_impl(link)?)
     }
 
     fn get_args_list_impl(link: &mut Link) -> Result<Vec<Expr>, wstp::Error> {

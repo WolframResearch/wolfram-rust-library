@@ -52,16 +52,35 @@ pub enum LibraryError {
         /// What it got — an arbitrary [`Expr`].
         got: Expr,
     },
-    /// A WSTP `fn(Vec<Expr>)` export failed to read its argument `List` off the link.
-    ArgumentRead {
-        /// The underlying WSTP error message.
+    /// A WSTP error with an error code.
+    #[cfg(feature = "wstp")]
+    WstpError {
+        /// The WSTP error code.
+        code: i32,
+        /// The WSTP error message.
         message: String,
     },
-    /// A WSTP `fn(Vec<Expr>)` export failed to write its return expression to the link.
-    ResultWrite {
-        /// The underlying WSTP error message.
+    /// A WSTP error without an error code.
+    #[cfg(feature = "wstp")]
+    WstpErrorMessage {
+        /// The WSTP error message.
         message: String,
     },
+}
+
+#[cfg(feature = "wstp")]
+impl From<wstp::Error> for LibraryError {
+    fn from(e: wstp::Error) -> Self {
+        match e.code() {
+            Some(code) => LibraryError::WstpError {
+                code,
+                message: e.to_string(),
+            },
+            None => LibraryError::WstpErrorMessage {
+                message: e.to_string(),
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -117,12 +136,6 @@ mod tests {
                 message: "m".into(),
                 expected: "e".into(),
                 got: Expr::from(1i64),
-            },
-            LibraryError::ArgumentRead {
-                message: "m".into(),
-            },
-            LibraryError::ResultWrite {
-                message: "m".into(),
             },
         ];
         for v in &variants {
