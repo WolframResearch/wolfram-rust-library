@@ -367,6 +367,13 @@ pub fn generate_package(
          Function[Block[{$Context = \"RustLinkWSTPPrivateContext`\", $ContextPath = {}}, \
          f[##1]]]]]".to_string(),
         "  WXFCaller = Function[Composition[BinaryDeserialize, #1, BinarySerialize, List]]".to_string(),
+        "  WXFFFICaller = Function[With[{ff = #1, lc = RawMemoryAllocate[\"UnsignedInteger64\", 1]}, \
+         Function[Module[{in, ptr, n, out}, \
+         in = BinarySerialize[{##}]; \
+         ptr = ff[in, Length[in], lc]; \
+         n = RawMemoryRead[lc, 0]; \
+         out = RawMemoryImport[ptr, {\"ByteArray\", n}]; \
+         BinaryDeserialize[out]]]]]".to_string(),
     ];
     bindings.extend(active.iter().enumerate().map(|(i, (_, dest))| {
         format!(
@@ -396,6 +403,11 @@ pub fn generate_package(
                 "Wxf" => format!(
                     "  \"{}\" -> WXFCaller @ LibraryFunctionLoad[{}, \"{}\", \
                      {{{{ByteArray, \"Constant\"}}}}, {{ByteArray, Automatic}}]",
+                    key, lib_var, e.name),
+                "WxfFfi" => format!(
+                    "  \"{}\" -> WXFFFICaller @ ForeignFunctionLoad[{}, \"{}\", \
+                     {{\"RawPointer\"::[\"UnsignedInteger8\"], \"UnsignedInteger64\", \"RawPointer\"::[\"UnsignedInteger64\"]}} \
+                     -> \"RawPointer\"::[\"UnsignedInteger8\"]]",
                     key, lib_var, e.name),
                 other => format!("  (* unknown kind {}: {} *)", other, e.name),
             }

@@ -211,13 +211,13 @@ fn rejects_wrong_version() {
 #[test]
 fn big_integer_roundtrip() {
     use wolfram_expr::BigInteger;
-    let huge = BigInteger::new("99999999999999999999999999999999999999999");
+    let huge = BigInteger("99999999999999999999999999999999999999999".into());
     roundtrip(Expr::from(huge));
 }
 #[test]
 fn big_real_roundtrip() {
     use wolfram_expr::BigReal;
-    let r = BigReal::new("3.14159265358979323846`50.");
+    let r = BigReal("3.14159265358979323846`50.".into());
     roundtrip(Expr::from(r));
 }
 

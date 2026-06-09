@@ -53,12 +53,17 @@ pub mod wstp;
 #[cfg(feature = "wxf")]
 pub mod wxf;
 
+#[cfg(feature = "wxf-ffi")]
+pub mod wxf_ffi;
+
 //==============================================================================
 // Proc-macro re-exports — `wolfram_export::export` works in user code without
 // a separate `wolfram-export-macros` dep.
 //==============================================================================
 
-pub use wolfram_export_macros::{export, export_native, export_wstp, export_wxf, init};
+pub use wolfram_export_macros::{
+    export, export_native, export_wstp, export_wxf, export_wxf_ffi, init,
+};
 
 //==============================================================================
 // Macro-emission surface.
@@ -94,6 +99,11 @@ pub mod macro_utils {
 
     #[cfg(feature = "wxf")]
     pub use crate::wxf::macro_utils::*;
+
+    // wxf-ffi shares all of wxf's typed-WXF helpers (brought in by the glob
+    // above, since `wxf-ffi` implies `wxf`); it only adds the FFI C-ABI entry.
+    #[cfg(feature = "wxf-ffi")]
+    pub use crate::wxf_ffi::macro_utils::call_wxf_ffi;
 
     // The `#[export(wxf)]` bridge names `NumericArray<u8>` (the input ByteArray
     // buffer). It's `wolfram-library-link`'s runtime type — re-exported here for
@@ -147,4 +157,13 @@ pub const fn __assert_wxf_enabled() {}
 #[doc(hidden)]
 pub const fn __assert_wxf_enabled() {
     panic!("`#[export(wxf)]` requires enabling the `wxf` feature of `wolfram-export`");
+}
+
+#[cfg(feature = "wxf-ffi")]
+#[doc(hidden)]
+pub const fn __assert_wxf_ffi_enabled() {}
+#[cfg(not(feature = "wxf-ffi"))]
+#[doc(hidden)]
+pub const fn __assert_wxf_ffi_enabled() {
+    panic!("`#[export(ffi)]` requires enabling the `wxf-ffi` feature of `wolfram-export`");
 }

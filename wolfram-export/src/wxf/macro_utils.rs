@@ -36,14 +36,14 @@ pub fn decode<A: for<'de> FromWXF<'de>>(input: &NumericArray<u8>) -> Result<A, S
 /// emitted bridge passes `read` as a small closure that reads each argument
 /// in turn via `<T as FromWXF>::from_wxf`.
 pub fn decode_args<R, F>(
-    input: &NumericArray<u8>,
+    input: &[u8],
     n_expected: u64,
     read: F,
 ) -> Result<R, wolfram_wxf::Error>
 where
     F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_wxf::Error>,
 {
-    wolfram_wxf::read_wxf(input.as_slice(), |r| {
+    wolfram_wxf::read_wxf(input, |r| {
         let tok = r.read_expr_token()?;
         if tok != ExpressionEnum::Function {
             return Err(wolfram_wxf::Error::unexpected_token(&["Function"], tok));
@@ -67,13 +67,25 @@ pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
     NumericArray::<u8>::from_slice(&bytes)
 }
 
-/// Encode an argument-decode failure for the kernel. A `wolfram_wxf::Error` is
-/// not itself a `Failure[…]`; we build one explicitly with `expr!`, carrying
-/// the error's `Debug` detail under `"Message"`, then serialize it.
+/// WXF bytes of a `Failure["ArgumentError", …]` built from a decode error. A
+/// `wolfram_wxf::Error` is not itself a `Failure[…]`; we build one explicitly
+/// with `expr!`, carrying the error's `Debug` detail under `"Message"`.
+///
+/// Shared by both WXF transports — the LibraryLink `wxf` mode (via
+/// [`encode_arg_error`]) and the FFI `wxf-ffi` mode (which returns raw bytes).
+pub fn encode_arg_error_bytes(e: wolfram_wxf::Error) -> Vec<u8> {
+    to_wxf(
+        &wolfram_expr::expr!(
+            System::Failure["ArgumentError", { "Message" -> (format!("{e:?}")) }]
+        ),
+        None,
+    )
+    .unwrap_or_else(|e| panic!("WXF serialize failed: {:?}", e))
+}
+
+/// Encode an argument-decode failure for the kernel as a UInt8 NumericArray.
 pub fn encode_arg_error(e: wolfram_wxf::Error) -> NumericArray<u8> {
-    encode(&wolfram_expr::expr!(
-        System::Failure["ArgumentError", { "Message" -> (format!("{e:?}")) }]
-    ))
+    NumericArray::<u8>::from_slice(&encode_arg_error_bytes(e))
 }
 
 /// Serialize a result to owned WXF bytes. The bridge calls this *inside* the
@@ -93,6 +105,24 @@ where
     match call_and_catch_as_expr(AssertUnwindSafe(func)) {
         Ok(result) => result,
         Err(failure_expr) => encode(&failure_expr),
+    }
+}
+
+/// Byte-returning twin of [`call_and_encode_panic`] for the FFI `wxf-ffi`
+/// transport: run `func` (a WXF bridge body that yields owned WXF bytes), catch
+/// any panic, and return either the successful bytes or a WXF-serialized
+/// `Failure["RustPanic", …]`. Catching the panic only needs `catch_unwind` and
+/// `Expr` building — no `WolframLibraryData`, so the FFI path never initializes
+/// LibraryLink.
+pub fn call_and_encode_panic_bytes<F>(func: F) -> Vec<u8>
+where
+    F: FnOnce() -> Vec<u8>,
+{
+    match call_and_catch_as_expr(AssertUnwindSafe(func)) {
+        Ok(bytes) => bytes,
+        Err(failure_expr) => {
+            to_wxf(&failure_expr, None).unwrap_or_else(|e| panic!("WXF serialize failed: {:?}", e))
+        },
     }
 }
 

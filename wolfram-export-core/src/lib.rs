@@ -65,6 +65,17 @@ pub enum ExportEntry {
         /// `LibraryFunctionLoad` call (which is always `{ByteArray} -> ByteArray`).
         signature: fn() -> Result<(Vec<Expr>, Expr), String>,
     },
+    /// Typed-args WXF export over a plain `extern "C"` ABI loaded with
+    /// `ForeignFunctionLoad` (same WXF wire as [`ExportEntry::Wxf`], no LibraryLink
+    /// dispatch). The C signature is `(*const u8, usize, *mut usize) -> *const u8`.
+    WxfFfi {
+        /// Exported symbol name.
+        name: &'static str,
+        /// Closure returning (arg types, return type) as Wolfram Language `Expr`s
+        /// — for manifest display only; the WL side uses a fixed `ForeignFunctionLoad`
+        /// signature (raw-pointer in, raw-pointer out).
+        signature: fn() -> Result<(Vec<Expr>, Expr), String>,
+    },
 }
 
 #[cfg(feature = "automate-function-loading-boilerplate")]
@@ -141,6 +152,12 @@ pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
                 params: vec![],
                 ret: String::new(),
             },
+            ExportEntry::WxfFfi { name, .. } => FunctionEntry {
+                name: (*name).to_owned(),
+                kind: "WxfFfi".to_owned(),
+                params: vec![],
+                ret: String::new(),
+            },
         })
         .collect();
 
@@ -194,6 +211,7 @@ impl ExportEntry {
             ExportEntry::Native { name, .. } => name,
             ExportEntry::Wstp { name } => name,
             ExportEntry::Wxf { name, .. } => name,
+            ExportEntry::WxfFfi { name, .. } => name,
         }
     }
 
@@ -240,8 +258,51 @@ impl ExportEntry {
                 let name = *name;
                 expr!(System::LibraryFunctionLoad[library, name, System::List["ByteArray"], "ByteArray"])
             },
+            // WxfFfi-mode: a self-contained `ForeignFunctionLoad` wrapped in the
+            // FFI marshalling, parsed from canonical WL text at load time. The
+            // compiler type-specifiers (`"RawPointer"::["UnsignedInteger8"]`) have
+            // no convenient structured `expr!` form, so we defer to `ToExpression`.
+            // The primary load path (`cargo wl build`) emits the same WL directly.
+            ExportEntry::WxfFfi { name, .. } => {
+                let text = wxf_ffi_caller_text(library, name);
+                expr!(System::ToExpression[(text.as_str())])
+            },
         };
 
         Ok(code)
     }
+}
+
+/// Canonical self-contained WL for loading one `wxf-ffi` function at runtime:
+/// `ForeignFunctionLoad` wrapped in the marshalling that `BinarySerialize`s the
+/// typed call to WXF bytes and turns the returned pointer back into an expression.
+/// Mirrors the (preamble-shared) `WXFFFICaller @ ForeignFunctionLoad[...]` form
+/// that `cargo wl build` emits.
+#[cfg_attr(
+    not(feature = "automate-function-loading-boilerplate"),
+    allow(dead_code)
+)]
+fn wxf_ffi_caller_text(library: &str, name: &str) -> String {
+    let lib = wl_string_escape(library);
+    let name = wl_string_escape(name);
+    format!(
+        "With[{{ff = ForeignFunctionLoad[\"{lib}\", \"{name}\", \
+         {{\"RawPointer\"::[\"UnsignedInteger8\"], \"UnsignedInteger64\", \"RawPointer\"::[\"UnsignedInteger64\"]}} -> \"RawPointer\"::[\"UnsignedInteger8\"]], \
+         lc = RawMemoryAllocate[\"UnsignedInteger64\", 1]}}, \
+         Function[Module[{{in, ptr, n, out}}, \
+         in = BinarySerialize[{{##}}]; \
+         ptr = ff[in, Length[in], lc]; \
+         n = RawMemoryRead[lc, 0]; \
+         out = RawMemoryImport[ptr, {{\"ByteArray\", n}}]; \
+         BinaryDeserialize[out]]]]"
+    )
+}
+
+/// Escape a Rust string for embedding inside a WL `"..."` string literal.
+#[cfg_attr(
+    not(feature = "automate-function-loading-boilerplate"),
+    allow(dead_code)
+)]
+fn wl_string_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }

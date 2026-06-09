@@ -161,7 +161,7 @@ fn display_of_new_variants_is_non_empty() {
 #[test]
 fn big_integer_variant_roundtrip() {
     use crate::BigInteger;
-    let huge = BigInteger::new("999999999999999999999999999999");
+    let huge = BigInteger("999999999999999999999999999999".into());
     let expr = Expr::from(huge.clone());
     match expr.kind() {
         ExprKind::BigInteger(n) => assert_eq!(n, &huge),
@@ -220,7 +220,7 @@ fn expr_macro_inline_rule() {
 #[test]
 fn big_real_variant_roundtrip() {
     use crate::BigReal;
-    let r = BigReal::new("3.14159265358979323846`50.");
+    let r = BigReal("3.14159265358979323846`50.".into());
     let expr = Expr::from(r.clone());
     match expr.kind() {
         ExprKind::BigReal(s) => assert_eq!(s, &r),

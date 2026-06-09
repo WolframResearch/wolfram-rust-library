@@ -151,3 +151,20 @@ pub fn export_wxf(attrs: TokenStream, item: TokenStream) -> TokenStream {
         Err(err) => err.into_compile_error().into(),
     }
 }
+
+//======================================
+// #[export_wxf_ffi]
+//======================================
+
+/// Annotate a function for export via the WXF-over-FFI ABI. Same typed-WXF
+/// payload as [`export_wxf`], but emitted as a plain `extern "C"` function loaded
+/// with `ForeignFunctionLoad` instead of `LibraryFunctionLoad`. Equivalent to
+/// `#[export(ffi)]`.
+#[proc_macro_attribute]
+pub fn export_wxf_ffi(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
+    match self::export::export(self::export::Mode::WxfFfi, attrs, item) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}

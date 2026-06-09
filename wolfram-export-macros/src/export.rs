@@ -23,6 +23,9 @@ pub(crate) enum Mode {
     Native,
     Wstp,
     Wxf,
+    /// Same typed-WXF payload as [`Mode::Wxf`], exported as a plain `extern "C"`
+    /// function loaded via `ForeignFunctionLoad` rather than `LibraryFunctionLoad`.
+    WxfFfi,
 }
 
 /// Path prefix the macro emits — points at the host crate that re-exports
@@ -81,13 +84,18 @@ fn assert_fn_ident(mode: Mode) -> Ident {
         Mode::Native => format_ident!("__assert_native_enabled"),
         Mode::Wstp => format_ident!("__assert_wstp_enabled"),
         Mode::Wxf => format_ident!("__assert_wxf_enabled"),
+        Mode::WxfFfi => format_ident!("__assert_wxf_ffi_enabled"),
     }
 }
 
-/// Detect the export mode from the keyword args: `wstp`, `wxf`, or native (default).
+/// Detect the export mode from the keyword args: `ffi` (wxf-over-FFI), `wstp`,
+/// `wxf`, or native (default). `ffi` is checked first so `#[export(ffi)]` wins.
 pub(crate) fn detect_mode_from_args(attrs: &syn::AttributeArgs) -> Mode {
     for attr in attrs {
         if let NestedMeta::Meta(Meta::Path(path)) = attr {
+            if path.is_ident("ffi") {
+                return Mode::WxfFfi;
+            }
             if path.is_ident("wstp") {
                 return Mode::Wstp;
             }
@@ -99,14 +107,14 @@ pub(crate) fn detect_mode_from_args(attrs: &syn::AttributeArgs) -> Mode {
     Mode::Native
 }
 
-/// Drop the mode keyword (`wstp`, `wxf`) from the arg list — only meaningful
-/// to the dispatch shim; the regular arg parser would reject them.
+/// Drop the mode keyword (`wstp`, `wxf`, `ffi`) from the arg list — only
+/// meaningful to the dispatch shim; the regular arg parser would reject them.
 pub(crate) fn strip_wstp_arg(attrs: syn::AttributeArgs) -> syn::AttributeArgs {
     attrs
         .into_iter()
         .filter(|attr| match attr {
             NestedMeta::Meta(Meta::Path(path)) => {
-                !path.is_ident("wstp") && !path.is_ident("wxf")
+                !path.is_ident("wstp") && !path.is_ident("wxf") && !path.is_ident("ffi")
             },
             _ => true,
         })
@@ -158,6 +166,9 @@ pub(crate) fn export(
         },
         Mode::Wstp => export_wstp_function(&name, &exported_name, params, hidden, prefix),
         Mode::Wxf => export_wxf_function(&name, &exported_name, params, hidden, prefix),
+        Mode::WxfFfi => {
+            export_wxf_ffi_function(&name, &exported_name, params, hidden, prefix)
+        },
     };
 
     Ok(quote! {
@@ -275,16 +286,15 @@ fn export_wstp_function(
 // WXF (typed-arg ByteArray) wrapper
 //--------------------------------------
 
-fn export_wxf_function(
-    name: &Ident,
-    exported_name: &Ident,
-    params: syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
-    hidden: bool,
-    prefix: &Prefix,
-) -> TokenStream2 {
-    let p = &prefix.crate_path;
+/// Build the argument-reading pieces shared by the `wxf` and `wxf-ffi` bridges
+/// (their wire payload — `BinarySerialize[List[args…]]` — is identical): the arg
+/// count, the `__arg{i}` binding idents, the tuple pattern binding them, and the
+/// tuple of `<Ti as FromWXF>::from_wxf(__c)?` reads in declaration order.
+fn wxf_arg_reader(
+    params: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+    p: &proc_macro2::TokenStream,
+) -> (u64, Vec<Ident>, TokenStream2, TokenStream2) {
     let n = params.len();
-    let n_u64 = n as u64;
 
     // The user's parameter types, in declaration order. `self` (Receiver) is
     // not expected for free functions but we filter it out defensively.
@@ -296,7 +306,8 @@ fn export_wxf_function(
         })
         .collect();
 
-    let arg_idents: Vec<_> = (0..n).map(|i| quote::format_ident!("__arg{}", i)).collect();
+    let arg_idents: Vec<Ident> =
+        (0..n).map(|i| quote::format_ident!("__arg{}", i)).collect();
 
     // Tuple-pattern with a trailing comma for the 1-arity case (Rust syntax).
     let tuple_pat = match arg_idents.len() {
@@ -323,6 +334,19 @@ fn export_wxf_function(
         _ => quote! { (#(#from_cursor_calls),*) },
     };
 
+    (n as u64, arg_idents, tuple_pat, tuple_read)
+}
+
+fn export_wxf_function(
+    name: &Ident,
+    exported_name: &Ident,
+    params: syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+    hidden: bool,
+    prefix: &Prefix,
+) -> TokenStream2 {
+    let p = &prefix.crate_path;
+    let (n_u64, arg_idents, tuple_pat, tuple_read) = wxf_arg_reader(&params, p);
+
     let assert_fn = assert_fn_ident(Mode::Wxf);
     let mut tokens = quote! {
         const _: () = #p::#assert_fn();
@@ -342,7 +366,7 @@ fn export_wxf_function(
                     // buffer are live. The closure returns owned `Vec<u8>`, which
                     // does not borrow the buffer, so zero-copy `&str` / `&[u8]`
                     // arguments are sound.
-                    let __decoded = #p::macro_utils::decode_args(__input, #n_u64, |__c| {
+                    let __decoded = #p::macro_utils::decode_args(__input.as_slice(), #n_u64, |__c| {
                         let #tuple_pat = #tuple_read;
                         let __result = super::#name(#(#arg_idents),*);
                         #p::macro_utils::to_wxf_bytes(&__result)
@@ -383,6 +407,75 @@ fn export_wxf_function(
         tokens.extend(quote! {
             #p::inventory::submit! {
                 #p::macro_utils::LibraryLinkFunction::Wxf {
+                    name: stringify!(#exported_name),
+                    signature: || #p::macro_utils::wxf_signature(),
+                }
+            }
+        });
+    }
+
+    tokens
+}
+
+//--------------------------------------
+// WXF-over-FFI (ForeignFunctionLoad) wrapper
+//--------------------------------------
+
+fn export_wxf_ffi_function(
+    name: &Ident,
+    exported_name: &Ident,
+    params: syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+    hidden: bool,
+    prefix: &Prefix,
+) -> TokenStream2 {
+    let p = &prefix.crate_path;
+    let (n_u64, arg_idents, tuple_pat, tuple_read) = wxf_arg_reader(&params, p);
+
+    let assert_fn = assert_fn_ident(Mode::WxfFfi);
+    let mut tokens = quote! {
+        const _: () = #p::#assert_fn();
+
+        mod #name {
+            use super::*;
+
+            // Same typed-WXF bridge as `#[export(wxf)]`, but byte-oriented: the
+            // input is a borrowed `&[u8]` (the kernel's ByteArray data pointer)
+            // and the output is owned WXF `Vec<u8>`. All borrows into the input
+            // stay confined to the arg-reading closure, which returns owned bytes.
+            fn __wxf_ffi_bridge(__input: &[u8]) -> ::std::vec::Vec<u8> {
+                #p::macro_utils::call_and_encode_panic_bytes(|| {
+                    let __decoded = #p::macro_utils::decode_args(__input, #n_u64, |__c| {
+                        let #tuple_pat = #tuple_read;
+                        let __result = super::#name(#(#arg_idents),*);
+                        #p::macro_utils::to_wxf_bytes(&__result)
+                    });
+                    match __decoded {
+                        ::core::result::Result::Ok(__bytes) => __bytes,
+                        ::core::result::Result::Err(__err) => {
+                            #p::macro_utils::encode_arg_error_bytes(__err)
+                        }
+                    }
+                })
+            }
+
+            // Plain C ABI loaded via `ForeignFunctionLoad` — no LibraryLink
+            // dispatch, no `WolframLibraryData`. Returns a pointer to thread-local
+            // WXF output bytes (length via the `out_len` out-parameter).
+            #[no_mangle]
+            pub unsafe extern "C" fn #exported_name(
+                in_ptr: *const u8,
+                in_len: usize,
+                out_len: *mut usize,
+            ) -> *const u8 {
+                #p::macro_utils::call_wxf_ffi(in_ptr, in_len, out_len, __wxf_ffi_bridge)
+            }
+        }
+    };
+
+    if !hidden && cfg!(feature = "automate-function-loading-boilerplate") {
+        tokens.extend(quote! {
+            #p::inventory::submit! {
+                #p::macro_utils::LibraryLinkFunction::WxfFfi {
                     name: stringify!(#exported_name),
                     signature: || #p::macro_utils::wxf_signature(),
                 }

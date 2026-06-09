@@ -45,6 +45,11 @@ wxf = [
     "wolfram-library-link/panic-failure-backtraces",
 ]
 
+# Same typed-WXF payload as `wxf`, but exported as a plain `extern "C"` function
+# loaded via `ForeignFunctionLoad` (no LibraryLink dispatch at call time). Reuses
+# the byte-oriented `wxf` arg-decode/result-encode core, so it builds on `wxf`.
+wxf-ffi = ["wxf"]
+
 # Inventory + __wolfram_manifest__ C-ABI symbols. Forwards to wolfram-export-core
 # and (if wolfram-library-link is already activated) to that crate too, so that
 # load_library_functions_impl is available when both wstp and this feature are on.

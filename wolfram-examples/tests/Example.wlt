@@ -204,7 +204,57 @@ $Tests = {
       "Input"  -> {42.0},
       "Output" -> _Failure,
       "Messages" -> {},
-      "TestID" -> "Examples-types_wxf-force_panic"|>
+      "TestID" -> "Examples-types_wxf-force_panic"|>,
+
+    (* ── types_wxf_ffi: scalars ───────────────────────────────────────────────── *)
+
+    <|"Export" -> "types_wxf_ffi::add",
+      "Input"  -> {3.0, 4.0},
+      "Output" -> 7.0,
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-add"|>,
+
+    <|"Export" -> "types_wxf_ffi::dot",
+      "Input"  -> {NumericArray[{1., 2., 3.}, "Real64"], NumericArray[{4., 5., 6.}, "Real64"]},
+      "Output" -> 32.0,
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-dot"|>,
+
+    <|"Export" -> "types_wxf_ffi::scale_array",
+      "Input"  -> {NumericArray[{1., 2., 3.}, "Real64"], 2.0},
+      "Output" -> NumericArray[{2., 4., 6.}, "Real64"],
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-scale_array"|>,
+
+    (* ── types_wxf_ffi: Expr passthrough ─────────────────────────────────────── *)
+
+    <|"Export" -> "types_wxf_ffi::duplicate",
+      "Input"  -> {Hold[1, 2, 3]},
+      "Output" -> Hold[1, 2, 3],
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-duplicate"|>,
+
+    (* ── types_wxf_ffi: typed struct round-trip ──────────────────────────────── *)
+
+    <|"Export" -> "types_wxf_ffi::echo_point",
+      "Input"  -> {<|"x" -> 1.0, "y" -> 2.0|>},
+      "Output" -> <|"x" -> 1., "y" -> 2.|>,
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-echo_point"|>,
+
+    <|"Export" -> "types_wxf_ffi::summarize",
+      "Input"  -> {<|"name" -> "test", "blob" -> ByteArray[{1, 2, 3}], "values" -> NumericArray[{1., 2., 3.}, "Real64"]|>},
+      "Output" -> _String,
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-summarize"|>,
+
+    (* ── types_wxf_ffi: panic surfaces as Failure ────────────────────────────── *)
+
+    <|"Export" -> "types_wxf_ffi::force_panic",
+      "Input"  -> {42.0},
+      "Output" -> _Failure,
+      "Messages" -> {},
+      "TestID" -> "Examples-types_wxf_ffi-force_panic"|>
 
 };
 
