@@ -159,6 +159,30 @@ fn display_of_new_variants_is_non_empty() {
     assert!(format!("{}", pa).starts_with("BinaryDeserialize[ByteArray[\""));
 }
 #[test]
+fn display_uses_wl_surface_syntax() {
+    // Known heads (System`-qualified or context-less) render with their WL
+    // surface syntax instead of `Head[…]`.
+    assert_eq!(expr!(System::List[1, 2, 3]).to_string(), "{1, 2, 3}");
+    assert_eq!(expr!(::List[1, 2]).to_string(), "{1, 2}");
+    assert_eq!(expr!(System::Rule[1, 2]).to_string(), "1 -> 2");
+    assert_eq!(expr!(System::RuleDelayed[1, 2]).to_string(), "1 :> 2");
+    assert_eq!(expr!(System::Set[1, 2]).to_string(), "1 = 2");
+
+    // Slots: positional → `#n`, named → bare `#foo` (not `#"foo"`).
+    assert_eq!(expr!(System::Slot[1]).to_string(), "#1");
+    assert_eq!(expr!(::Slot["foo"]).to_string(), "#foo");
+    assert_eq!(expr!(System::SlotSequence[1]).to_string(), "##1");
+    assert_eq!(expr!(::SlotSequence["bar"]).to_string(), "##bar");
+
+    // Unknown heads, known heads with a non-infix arity, and slots whose
+    // argument is neither a number nor a string all fall back to `head[…]`.
+    assert_eq!(expr!(System::Foo[1, 2]).to_string(), "System`Foo[1, 2]");
+    assert_eq!(expr!(System::Set[1, 2, 3]).to_string(), "System`Set[1, 2, 3]");
+    assert_eq!(expr!(System::Slot[System::x]).to_string(), "System`Slot[System`x]");
+    assert_eq!(expr!(System::Slot[1, 2]).to_string(), "System`Slot[1, 2]");
+}
+
+#[test]
 fn big_integer_variant_roundtrip() {
     use crate::BigInteger;
     let huge = BigInteger("999999999999999999999999999999".into());
@@ -243,7 +267,7 @@ fn expr_macro_contextless_symbols_nest() {
     // Same forms must also work as association values.
     let assoc = expr!({"a" -> ::Inner["v"], "b" -> ::Bare});
     let ExprKind::Association(entries) = assoc.kind() else {
-        panic!("expected Association, got {assoc}");
+        panic!("expected Association, got {}", assoc);
     };
     let mut it = entries.iter();
     assert_eq!(it.next().unwrap().value, no_ctx("Inner", vec![Expr::from("v")]));

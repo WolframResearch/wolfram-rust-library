@@ -10,15 +10,18 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::{Expr, ExprKind, Normal, Number};
+use crate::{expr, Expr, ExprKind, Normal, Number};
 
 /// Serialize `expr` to WXF bytes and format as `BinaryDeserialize[ByteArray["<base64>"]]`.
-fn wxf_display(f: &mut fmt::Formatter, expr: &Expr) -> fmt::Result {
+/// Built with `expr!` and rendered through `fmt_kind` so the bracketing and
+/// string escaping come from the same place as everything else.
+fn wxf_display(f: &mut fmt::Formatter, expr: &Expr, indent: usize) -> fmt::Result {
     use base64::Engine;
     match wolfram_wxf::to_wxf(expr, None) {
         Ok(bytes) => {
             let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-            write!(f, "BinaryDeserialize[ByteArray[\"{b64}\"]]")
+            let e = expr!(::BinaryDeserialize[::ByteArray[(b64)]]);
+            fmt_kind(f, e.kind(), indent)
         },
         Err(_) => write!(f, "Failure[\"BinarySerializeError\"]"),
     }
@@ -76,15 +79,91 @@ where
     f.write_str(close)
 }
 
-/// Render a `Normal` (`head[a, b, …]`) at nesting depth `indent`. Shared by
-/// `fmt_kind` and `Display for Normal` so neither needs to wrap/clone the other.
+/// Render a `Normal` by dispatching on its head: a `System``-qualified or
+/// context-less symbol with a known WL surface syntax gets it (`List` → `{…}`,
+/// `Rule`/`RuleDelayed`/`Set` → infix, `Slot`/`SlotSequence` → `#`/`##`);
+/// anything else renders as `head[…]`. Shared by `fmt_kind` and `Display for
+/// Normal` so neither needs to wrap/clone the other.
 fn fmt_normal(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
+    let ExprKind::Symbol(sym) = n.head.kind() else {
+        return fmt_call(f, n, indent);
+    };
+    match sym.as_str() {
+        "System`List" | "List" => fmt_list(f, n, indent),
+        "System`Rule" | "Rule" => fmt_infix(f, n, indent, "->"),
+        "System`RuleDelayed" | "RuleDelayed" => fmt_infix(f, n, indent, ":>"),
+        "System`Set" | "Set" => fmt_infix(f, n, indent, "="),
+        "System`Slot" | "Slot" => fmt_slot(f, n, indent, "#"),
+        "System`SlotSequence" | "SlotSequence" => fmt_slot(f, n, indent, "##"),
+        _ => fmt_call(f, n, indent),
+    }
+}
+
+/// `open … item, item … close`, breaking under `{:#}` when a child is nested.
+fn fmt_delimited(
+    f: &mut fmt::Formatter,
+    n: &Normal,
+    indent: usize,
+    open: &str,
+    close: &str,
+) -> fmt::Result {
     let brk = f.alternate() && n.contents.iter().any(|e| is_nested(e.kind()));
     let inner = if brk { indent + 1 } else { indent };
-    let open = format!("{}[", n.head);
-    fmt_seq(f, indent, &open, "]", n.contents.len(), brk, |f, i| {
+    fmt_seq(f, indent, open, close, n.contents.len(), brk, |f, i| {
         fmt_kind(f, n.contents[i].kind(), inner)
     })
+}
+
+/// Default: `head[a, b, …]`.
+fn fmt_call(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
+    fmt_delimited(f, n, indent, &format!("{}[", n.head), "]")
+}
+
+/// `List[…]` → `{…}`.
+fn fmt_list(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
+    fmt_delimited(f, n, indent, "{", "}")
+}
+
+/// Binary infix `a op b`. Only a 2-argument head is infix; any other arity
+/// falls back to `head[…]`.
+fn fmt_infix(
+    f: &mut fmt::Formatter,
+    n: &Normal,
+    indent: usize,
+    op: &str,
+) -> fmt::Result {
+    if n.contents.len() != 2 {
+        return fmt_call(f, n, indent);
+    }
+    fmt_kind(f, n.contents[0].kind(), indent)?;
+    write!(f, " {op} ")?;
+    fmt_kind(f, n.contents[1].kind(), indent)
+}
+
+/// `prefix` immediately followed by a single positional (`Slot[1]` → `#1`) or
+/// named (`Slot["foo"]` → `#foo`, not `#"foo"`) argument. Anything else — a
+/// non-`Integer`/`String` argument, or any arity but one — falls back to
+/// `head[…]`.
+fn fmt_slot(
+    f: &mut fmt::Formatter,
+    n: &Normal,
+    indent: usize,
+    prefix: &str,
+) -> fmt::Result {
+    match n.contents.as_slice() {
+        [arg] => match arg.kind() {
+            ExprKind::String(name) => {
+                f.write_str(prefix)?;
+                f.write_str(name)
+            },
+            kind @ ExprKind::Integer(_) => {
+                f.write_str(prefix)?;
+                fmt_kind(f, kind, indent)
+            },
+            _ => fmt_call(f, n, indent),
+        },
+        _ => fmt_call(f, n, indent),
+    }
 }
 
 /// The single renderer for every [`ExprKind`] at nesting depth `indent`. `{}`
@@ -115,19 +194,19 @@ fn fmt_kind(f: &mut fmt::Formatter, kind: &ExprKind, indent: usize) -> fmt::Resu
         ExprKind::ByteArray(ba) => {
             use base64::Engine;
             let b64 = base64::engine::general_purpose::STANDARD.encode(ba.as_slice());
-            write!(f, "ByteArray[\"{b64}\"]")
+            fmt_kind(f, expr!(::ByteArray[(b64)]).kind(), indent)
         },
         ExprKind::NumericArray(arr) => {
             let expr = Expr {
                 inner: Arc::new(ExprKind::NumericArray(arr.clone())),
             };
-            wxf_display(f, &expr)
+            wxf_display(f, &expr, indent)
         },
         ExprKind::PackedArray(arr) => {
             let expr = Expr {
                 inner: Arc::new(ExprKind::PackedArray(arr.clone())),
             };
-            wxf_display(f, &expr)
+            wxf_display(f, &expr, indent)
         },
         ExprKind::BigInteger(n) => write!(f, "{}", n.as_str()),
         ExprKind::BigReal(r) => write!(f, "{}", r.as_str()),
