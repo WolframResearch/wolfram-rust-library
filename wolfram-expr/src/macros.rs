@@ -8,7 +8,8 @@
 /// | `expr!(A::B::C[a, b])` | `Normal` with `` A`B`C `` (each `::` → a context backtick) |
 /// | `expr!(var[a, b])` | `Normal` with the variable `var` as head (call over `var`) |
 /// | `expr!(A::B::C)` | the symbol `` A`B`C `` |
-/// | `expr!(::Name)` / `expr!(::Name[…])` | the **context-less** symbol `Name` |
+/// | `expr!(::Name)` / `expr!(::Name[…])` | the **context-less** symbol `Name` (works nested in arg, splice, and association-value positions too) |
+/// | `expr!(::$Name)` / `expr!(::$Name[…])` | the context-less `$`-symbol `$Name` (e.g. `` $Context ``, `` $InputFileName ``) |
 /// | `expr!(k -> v)` | `Rule[k, v]` — usable inline inside `…[...]` |
 /// | `expr!({k -> v, ...})` | `Association` |
 /// | `expr!(true)` / `expr!(false)` | `True` / `False` symbols |
@@ -60,9 +61,26 @@ macro_rules! expr {
         )
     };
 
+    // Context-less `$`-symbol call: ::$Name[args]. `$` is its own token (not an
+    // ident char), so it's captured as a `tt` and pasted back onto the name —
+    // letting WL system symbols like `::$Context[…]` be written directly.
+    (:: $d:tt $name:ident [ $($args:tt)* ]) => {
+        $crate::Expr::normal(
+            $crate::Symbol::new(concat!(stringify!($d), stringify!($name))),
+            $crate::__expr_args![$($args)*],
+        )
+    };
+
     // Context-less symbol value: ::Name -> the bare-name symbol `Name`.
     (:: $name:ident) => {
         $crate::Expr::symbol($crate::Symbol::new(stringify!($name)))
+    };
+
+    // Context-less `$`-symbol value: ::$Name -> the bare-name symbol `$Name`.
+    (:: $d:tt $name:ident) => {
+        $crate::Expr::symbol(
+            $crate::Symbol::new(concat!(stringify!($d), stringify!($name)))
+        )
     };
 
     // Context-qualified call: A::B::C[args] applies the symbol `A`B`C`.
@@ -116,6 +134,46 @@ macro_rules! __expr_args {
     () => { vec![] };
     // Trailing comma only
     (,) => { vec![] };
+    // ::Name[...] context-less call arg, followed by more
+    (:: $name:ident [ $($inner:tt)* ], $($rest:tt)*) => {{
+        let mut __args = vec![$crate::expr!(:: $name [ $($inner)* ])];
+        __args.extend($crate::__expr_args![$($rest)*]);
+        __args
+    }};
+    // ::Name[...] context-less call arg, last
+    (:: $name:ident [ $($inner:tt)* ]) => {
+        vec![$crate::expr!(:: $name [ $($inner)* ])]
+    };
+    // ::Name context-less symbol arg, followed by more
+    (:: $name:ident, $($rest:tt)*) => {{
+        let mut __args = vec![$crate::expr!(:: $name)];
+        __args.extend($crate::__expr_args![$($rest)*]);
+        __args
+    }};
+    // ::Name context-less symbol arg, last
+    (:: $name:ident) => {
+        vec![$crate::expr!(:: $name)]
+    };
+    // ::$Name[...] context-less `$`-symbol call arg, followed by more
+    (:: $d:tt $name:ident [ $($inner:tt)* ], $($rest:tt)*) => {{
+        let mut __args = vec![$crate::expr!(:: $d $name [ $($inner)* ])];
+        __args.extend($crate::__expr_args![$($rest)*]);
+        __args
+    }};
+    // ::$Name[...] context-less `$`-symbol call arg, last
+    (:: $d:tt $name:ident [ $($inner:tt)* ]) => {
+        vec![$crate::expr!(:: $d $name [ $($inner)* ])]
+    };
+    // ::$Name context-less `$`-symbol arg, followed by more
+    (:: $d:tt $name:ident, $($rest:tt)*) => {{
+        let mut __args = vec![$crate::expr!(:: $d $name)];
+        __args.extend($crate::__expr_args![$($rest)*]);
+        __args
+    }};
+    // ::$Name context-less `$`-symbol arg, last
+    (:: $d:tt $name:ident) => {
+        vec![$crate::expr!(:: $d $name)]
+    };
     // Rule arg: k -> v, rest...
     ($k:tt -> $v:tt, $($rest:tt)*) => {{
         let mut __args = vec![$crate::expr!($k -> $v)];
@@ -186,6 +244,35 @@ macro_rules! __expr_args {
 macro_rules! __expr_assoc {
     () => { vec![] };
     (,) => { vec![] };
+    // k -> ::Name[...] context-less call value, rest
+    ($k:tt -> :: $vname:ident [ $($vinner:tt)* ], $($rest:tt)*) => {{
+        let mut __v = vec![$crate::RuleEntry::rule(
+            $crate::expr!($k),
+            $crate::expr!(:: $vname [ $($vinner)* ]),
+        )];
+        __v.extend($crate::__expr_assoc![$($rest)*]);
+        __v
+    }};
+    // k -> ::Name[...] context-less call value, last
+    ($k:tt -> :: $vname:ident [ $($vinner:tt)* ]) => {
+        vec![$crate::RuleEntry::rule(
+            $crate::expr!($k),
+            $crate::expr!(:: $vname [ $($vinner)* ]),
+        )]
+    };
+    // k -> ::Name context-less symbol value, rest
+    ($k:tt -> :: $vname:ident, $($rest:tt)*) => {{
+        let mut __v = vec![$crate::RuleEntry::rule(
+            $crate::expr!($k),
+            $crate::expr!(:: $vname),
+        )];
+        __v.extend($crate::__expr_assoc![$($rest)*]);
+        __v
+    }};
+    // k -> ::Name context-less symbol value, last
+    ($k:tt -> :: $vname:ident) => {
+        vec![$crate::RuleEntry::rule($crate::expr!($k), $crate::expr!(:: $vname))]
+    };
     // k -> A::B::C[...] qualified-head value, rest
     ($k:tt -> $vh:ident $(:: $vseg:ident)+ [ $($vinner:tt)* ], $($rest:tt)*) => {{
         let mut __v = vec![$crate::RuleEntry::rule(

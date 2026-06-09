@@ -21,3 +21,4 @@ unstable_parse = []
 [dependencies]
 ordered-float = "3.4.0"
 wolfram-wxf = { version = "0.5.0", path = "../wolfram-wxf" }
+base64 = "0.22"

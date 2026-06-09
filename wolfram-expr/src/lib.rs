@@ -424,6 +424,18 @@ impl fmt::Debug for Expr {
     }
 }
 
+/// Serialize `expr` to WXF bytes and format as `BinaryDeserialize[ByteArray["<base64>"]]`.
+fn wxf_display(f: &mut fmt::Formatter, expr: &Expr) -> fmt::Result {
+    use base64::Engine;
+    match wolfram_wxf::to_wxf(expr, None) {
+        Ok(bytes) => {
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            write!(f, "BinaryDeserialize[ByteArray[\"{b64}\"]]")
+        },
+        Err(e) => write!(f, "(*wxf-serialize-error: {e:?}*)"),
+    }
+}
+
 /// By default, this should generate a string which can be unambiguously parsed to
 /// reconstruct the `Expr` being displayed. This means symbols will always include their
 /// contexts, special characters in String's will always be properly escaped, and numeric
@@ -450,11 +462,10 @@ impl fmt::Display for ExprKind {
             },
             ExprKind::Symbol(ref symbol) => fmt::Display::fmt(symbol, f),
 
-            // ----- WXF-derived variants. These produce best-effort InputForm-like
-            // strings; for guaranteed-roundtripping textual output use
-            // wolfram-serializer's WlSerializer. -----
             ExprKind::ByteArray(ref ba) => {
-                write!(f, "ByteArray[{:?}]", ba.as_slice())
+                use base64::Engine;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(ba.as_slice());
+                write!(f, "ByteArray[\"{b64}\"]")
             },
             ExprKind::Association(ref assoc) => {
                 write!(f, "<|")?;
@@ -468,22 +479,12 @@ impl fmt::Display for ExprKind {
                 write!(f, "|>")
             },
             ExprKind::NumericArray(ref arr) => {
-                write!(
-                    f,
-                    "NumericArray[<{} elems, {}-byte buffer>, {}]",
-                    crate::array_buf::NumericArrayRead::element_count(arr),
-                    arr.as_bytes().len(),
-                    arr.data_type().name(),
-                )
+                let expr = Expr { inner: std::sync::Arc::new(ExprKind::NumericArray(arr.clone())) };
+                wxf_display(f, &expr)
             },
             ExprKind::PackedArray(ref arr) => {
-                write!(
-                    f,
-                    "PackedArray[<{} elems, {}-byte buffer>, {}]",
-                    arr.element_count(),
-                    arr.as_bytes().len(),
-                    arr.data_type().name(),
-                )
+                let expr = Expr { inner: std::sync::Arc::new(ExprKind::PackedArray(arr.clone())) };
+                wxf_display(f, &expr)
             },
             ExprKind::BigInteger(ref n) => write!(f, "{}", n.as_str()),
             ExprKind::BigReal(ref r) => write!(f, "{}", r.as_str()),

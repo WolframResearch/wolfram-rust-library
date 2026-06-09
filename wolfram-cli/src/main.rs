@@ -1,9 +1,11 @@
 mod build;
 mod commands;
 
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+
+/// CLI-wide result: errors are just human-readable strings printed to stderr.
+pub type Result<T> = std::result::Result<T, String>;
 
 // ── CLI structure ────────────────────────────────────────────────────────────
 

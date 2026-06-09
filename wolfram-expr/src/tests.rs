@@ -151,17 +151,17 @@ fn display_of_new_variants_is_non_empty() {
     };
     let na = Expr::from(NumericArray::from_slice::<u8>(vec![1], &[42]));
     let pa = Expr::from(PackedArray::from_slice::<i32>(vec![1], &[42]));
-    assert!(format!("{}", ba).contains("ByteArray"));
+    assert!(format!("{}", ba).starts_with("ByteArray[\"") && format!("{}", ba).ends_with("\"]"));
     assert!(
         format!("{}", assoc).starts_with("<|") && format!("{}", assoc).ends_with("|>")
     );
-    assert!(format!("{}", na).contains("NumericArray"));
-    assert!(format!("{}", pa).contains("PackedArray"));
+    assert!(format!("{}", na).starts_with("BinaryDeserialize[ByteArray[\""));
+    assert!(format!("{}", pa).starts_with("BinaryDeserialize[ByteArray[\""));
 }
 #[test]
 fn big_integer_variant_roundtrip() {
     use crate::BigInteger;
-    let huge = BigInteger::new("999999999999999999999999999999");
+    let huge = BigInteger("999999999999999999999999999999".into());
     let expr = Expr::from(huge.clone());
     match expr.kind() {
         ExprKind::BigInteger(n) => assert_eq!(n, &huge),
@@ -218,9 +218,42 @@ fn expr_macro_inline_rule() {
 }
 
 #[test]
+fn expr_macro_contextless_symbols_nest() {
+    // `::Name` context-less symbols must work in nested arg and splice
+    // positions — not only at the top level. `::$Name` covers `$`-prefixed
+    // WL system symbols (the `$` is pasted back onto the name).
+    let items = vec![Expr::from(1), Expr::from(2)];
+    let by_macro = expr!(::List[::Inner["x", ::Bare], ::List[..items], ::$Context]);
+
+    let no_ctx = |name: &str, args: Vec<Expr>| {
+        // Symbol::new stores the bare name verbatim — no context prefix.
+        Expr::normal(Symbol::new(name), args)
+    };
+    let by_hand = no_ctx(
+        "List",
+        vec![
+            no_ctx("Inner", vec![Expr::from("x"), Expr::symbol(Symbol::new("Bare"))]),
+            no_ctx("List", vec![Expr::from(1), Expr::from(2)]),
+            Expr::symbol(Symbol::new("$Context")),
+        ],
+    );
+    assert_eq!(by_macro, by_hand);
+    assert_eq!(format!("{}", expr!(::$InputFileName)), "$InputFileName");
+
+    // Same forms must also work as association values.
+    let assoc = expr!({"a" -> ::Inner["v"], "b" -> ::Bare});
+    let ExprKind::Association(entries) = assoc.kind() else {
+        panic!("expected Association, got {assoc}");
+    };
+    let mut it = entries.iter();
+    assert_eq!(it.next().unwrap().value, no_ctx("Inner", vec![Expr::from("v")]));
+    assert_eq!(it.next().unwrap().value, Expr::symbol(Symbol::new("Bare")));
+}
+
+#[test]
 fn big_real_variant_roundtrip() {
     use crate::BigReal;
-    let r = BigReal::new("3.14159265358979323846`50.");
+    let r = BigReal("3.14159265358979323846`50.".into());
     let expr = Expr::from(r.clone());
     match expr.kind() {
         ExprKind::BigReal(s) => assert_eq!(s, &r),

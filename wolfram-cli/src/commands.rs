@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use wolfram_app_discovery::{SystemID, WolframApp};
@@ -7,11 +6,11 @@ use wolfram_expr::{expr, Expr, ExprKind};
 use crate::build::{
     collect_dylib_info, generate_package, resolve_paclet_config, run_cargo_build,
 };
-use crate::{EvaluateArgs, TestArgs};
+use crate::{EvaluateArgs, Result, TestArgs};
 
 pub fn cmd_test(args: TestArgs) -> Result<()> {
     let host_system_id = SystemID::try_current_rust_target()
-        .map_err(|e| anyhow::anyhow!("unsupported host platform: {e}"))?;
+        .map_err(|e| format!("unsupported host platform: {e}"))?;
 
     // Always build with --workspace so running from the workspace root picks
     // up examples from every member package, not just the current one.
@@ -69,20 +68,22 @@ fn run_wl_script(
     lib_dirs: Vec<PathBuf>,
     out: Option<PathBuf>,
 ) -> Result<()> {
-    let app = WolframApp::try_default().context("no Wolfram installation found")?;
+    let app = WolframApp::try_default()
+        .map_err(|e| format!("no Wolfram installation found: {e}"))?;
     let kernel_path = app
         .kernel_executable_path()
-        .context("could not locate WolframKernel")?;
+        .map_err(|e| format!("could not locate WolframKernel: {e}"))?;
 
     eprintln!("launching {}", kernel_path.display());
 
     let mut kernel = wstp::kernel::WolframKernelProcess::launch(&kernel_path)
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        .map_err(|e| format!("{e:?}"))?;
     let link = kernel.link();
 
     drain_packets(link)?;
 
-    let cwd = std::env::current_dir().context("failed to get current directory")?;
+    let cwd = std::env::current_dir()
+        .map_err(|e| format!("failed to get current directory: {e}"))?;
     let abs_files: Vec<String> = files
         .iter()
         .map(|f| {
@@ -92,28 +93,30 @@ fn run_wl_script(
             } else {
                 cwd.join(p)
             };
-            anyhow::ensure!(abs.exists(), "file not found: {}", abs.display());
+            if !abs.exists() {
+                return Err(format!("file not found: {}", abs.display()));
+            }
             abs.to_str()
-                .context("file path is not valid UTF-8")
-                .map(|s| s.to_owned())
+                .map(str::to_owned)
+                .ok_or_else(|| "file path is not valid UTF-8".to_string())
         })
         .collect::<Result<_>>()?;
     let files_list: Vec<Expr> =
         abs_files.iter().map(|f| Expr::string(f.as_str())).collect();
     let cwd_str = cwd
         .to_str()
-        .context("current directory is not valid UTF-8")?;
+        .ok_or("current directory is not valid UTF-8")?;
     let lib_paths_list: Vec<Expr> = lib_dirs
         .iter()
         .map(|p| {
-            p.to_str().map(Expr::string).with_context(|| {
-                format!("lib dir is not valid UTF-8: {}", p.display())
-            })
+            p.to_str()
+                .map(Expr::string)
+                .ok_or_else(|| format!("lib dir is not valid UTF-8: {}", p.display()))
         })
         .collect::<Result<_>>()?;
 
     let out_path = out.unwrap_or_else(temp_wxf_path);
-    let out_str = out_path.to_str().context("out path is not valid UTF-8")?;
+    let out_str = out_path.to_str().ok_or("out path is not valid UTF-8")?;
 
     let content_str = content.trim();
 
@@ -124,12 +127,12 @@ fn run_wl_script(
     }]], "WXF"]);
 
     link.put_eval_packet(&call)
-        .map_err(|e| anyhow::anyhow!("failed to send eval packet: {:?}", e))?;
+        .map_err(|e| format!("failed to send eval packet: {e:?}"))?;
 
     let result = read_return_packet(link)?;
     match result.kind() {
         ExprKind::String(_) => println!("{}", out_path.display()),
-        _ => anyhow::bail!("Export failed: {result}"),
+        _ => return Err(format!("Export failed: {result}")),
     }
 
     Ok(())
@@ -148,9 +151,9 @@ fn temp_wxf_path() -> PathBuf {
 fn drain_packets(link: &mut wstp::Link) -> Result<()> {
     while link.is_ready() {
         link.raw_next_packet()
-            .context("failed to read packet while draining")?;
+            .map_err(|e| format!("failed to read packet while draining: {e}"))?;
         link.new_packet()
-            .context("failed to advance past packet while draining")?;
+            .map_err(|e| format!("failed to advance past packet while draining: {e}"))?;
     }
     Ok(())
 }
@@ -159,26 +162,33 @@ fn read_return_packet(link: &mut wstp::Link) -> Result<Expr> {
     loop {
         let pkt = link
             .raw_next_packet()
-            .context("failed to read packet from kernel")?;
+            .map_err(|e| format!("failed to read packet from kernel: {e}"))?;
         match pkt {
             p if p == wstp::sys::RETURNPKT => {
-                let result = link.get_expr().context("failed to read return value")?;
+                let result = link
+                    .get_expr()
+                    .map_err(|e| format!("failed to read return value: {e}"))?;
                 link.new_packet()
-                    .context("failed to advance past ReturnPacket")?;
+                    .map_err(|e| format!("failed to advance past ReturnPacket: {e}"))?;
                 return Ok(result);
             },
             p if p == wstp::sys::TEXTPKT => {
-                let text = link.get_expr().context("failed to read TextPacket")?;
-                link.new_packet()?;
+                let text = link
+                    .get_expr()
+                    .map_err(|e| format!("failed to read TextPacket: {e}"))?;
+                link.new_packet()
+                    .map_err(|e| format!("failed to advance past TextPacket: {e}"))?;
                 if let ExprKind::String(s) = text.kind() {
                     print!("{s}");
                 }
             },
             p if p == wstp::sys::MESSAGEPKT => {
-                link.new_packet()?;
+                link.new_packet()
+                    .map_err(|e| format!("failed to advance past MessagePacket: {e}"))?;
             },
             _ => {
-                link.new_packet().context("failed to skip packet")?;
+                link.new_packet()
+                    .map_err(|e| format!("failed to skip packet: {e}"))?;
             },
         }
     }
