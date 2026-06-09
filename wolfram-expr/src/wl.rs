@@ -1,11 +1,12 @@
 //! Rendering of expressions as Wolfram Language source text.
 //!
-//! `{}` produces a compact single line that reads back through `ToExpression`;
-//! `{:#}` produces the same syntax, indented recursively. Everything funnels
-//! through [`fmt_kind`], the single renderer, so each variant's textual form —
-//! and the break/inline rule — is defined exactly once. The `Display`/`Debug`
-//! impls for [`Expr`], [`ExprKind`], [`Normal`], and [`Number`] are thin
-//! wrappers over it.
+//! `Display` (`{}`) produces a compact single line that reads back through
+//! `ToExpression`; `Debug` (`{:?}`) produces the same syntax, indented
+//! recursively. The mode rides along in the `indent: Option<usize>` parameter —
+//! `None` stays on one line, `Some(depth)` breaks nested nodes and indents two
+//! spaces per level. Everything funnels through [`fmt_kind`], the single
+//! renderer, so each variant's textual form and the break/inline rule are
+//! defined exactly once.
 
 use std::fmt;
 use std::sync::Arc;
@@ -15,7 +16,7 @@ use crate::{expr, Expr, ExprKind, Normal, Number};
 /// Serialize `expr` to WXF bytes and format as `BinaryDeserialize[ByteArray["<base64>"]]`.
 /// Built with `expr!` and rendered through `fmt_kind` so the bracketing and
 /// string escaping come from the same place as everything else.
-fn wxf_display(f: &mut fmt::Formatter, expr: &Expr, indent: usize) -> fmt::Result {
+fn wxf_display(f: &mut fmt::Formatter, expr: &Expr, indent: Option<usize>) -> fmt::Result {
     use base64::Engine;
     match wolfram_wxf::to_wxf(expr, None) {
         Ok(bytes) => {
@@ -34,8 +35,8 @@ fn is_compound(kind: &ExprKind) -> bool {
 }
 
 /// A compound that itself contains a compound — i.e. it nests two or more
-/// levels deep. A node breaks across lines (under `{:#}`) only when one of its
-/// children is nested; a child that is an atom or a shallow compound like
+/// levels deep. A node breaks across lines (when indenting) only when one of
+/// its children is nested; a child that is an atom or a shallow compound like
 /// `Slot[1]` or `List[a, b]` stays inline.
 fn is_nested(kind: &ExprKind) -> bool {
     match kind {
@@ -45,13 +46,24 @@ fn is_nested(kind: &ExprKind) -> bool {
     }
 }
 
+/// The child indent for a node rendered at `indent`: `Some(d + 1)` when it
+/// breaks (only possible when indenting and a child is nested), else `indent`
+/// unchanged.
+fn child_indent(indent: Option<usize>, breaks: bool) -> Option<usize> {
+    if breaks {
+        indent.map(|d| d + 1)
+    } else {
+        indent
+    }
+}
+
 /// Write a `len`-item sequence between `open`/`close`. When `brk`, each item
-/// goes on its own line indented to `indent + 1` with the close back at
-/// `indent`; otherwise it's one line, items separated by `, `. `item(f, i)`
-/// renders the `i`-th item.
+/// goes on its own line indented to `depth + 1` with the close back at `depth`
+/// (`depth` taken from `indent`); otherwise it's one line, items separated by
+/// `, `. `item(f, i)` renders the `i`-th item.
 fn fmt_seq<F>(
     f: &mut fmt::Formatter,
-    indent: usize,
+    indent: Option<usize>,
     open: &str,
     close: &str,
     len: usize,
@@ -61,10 +73,11 @@ fn fmt_seq<F>(
 where
     F: FnMut(&mut fmt::Formatter, usize) -> fmt::Result,
 {
+    let depth = indent.unwrap_or(0);
     f.write_str(open)?;
     for i in 0..len {
         if brk {
-            write!(f, "\n{}", "  ".repeat(indent + 1))?;
+            write!(f, "\n{}", "  ".repeat(depth + 1))?;
         } else if i > 0 {
             f.write_str(", ")?;
         }
@@ -74,7 +87,7 @@ where
         }
     }
     if brk {
-        write!(f, "\n{}", "  ".repeat(indent))?;
+        write!(f, "\n{}", "  ".repeat(depth))?;
     }
     f.write_str(close)
 }
@@ -84,7 +97,7 @@ where
 /// `Rule`/`RuleDelayed`/`Set` → infix, `Slot`/`SlotSequence` → `#`/`##`);
 /// anything else renders as `head[…]`. Shared by `fmt_kind` and `Display for
 /// Normal` so neither needs to wrap/clone the other.
-fn fmt_normal(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
+fn fmt_normal(f: &mut fmt::Formatter, n: &Normal, indent: Option<usize>) -> fmt::Result {
     let ExprKind::Symbol(sym) = n.head.kind() else {
         return fmt_call(f, n, indent);
     };
@@ -99,28 +112,28 @@ fn fmt_normal(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result 
     }
 }
 
-/// `open … item, item … close`, breaking under `{:#}` when a child is nested.
+/// `open … item, item … close`, breaking (when indenting) if a child is nested.
 fn fmt_delimited(
     f: &mut fmt::Formatter,
     n: &Normal,
-    indent: usize,
+    indent: Option<usize>,
     open: &str,
     close: &str,
 ) -> fmt::Result {
-    let brk = f.alternate() && n.contents.iter().any(|e| is_nested(e.kind()));
-    let inner = if brk { indent + 1 } else { indent };
+    let brk = indent.is_some() && n.contents.iter().any(|e| is_nested(e.kind()));
+    let inner = child_indent(indent, brk);
     fmt_seq(f, indent, open, close, n.contents.len(), brk, |f, i| {
         fmt_kind(f, n.contents[i].kind(), inner)
     })
 }
 
 /// Default: `head[a, b, …]`.
-fn fmt_call(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
+fn fmt_call(f: &mut fmt::Formatter, n: &Normal, indent: Option<usize>) -> fmt::Result {
     fmt_delimited(f, n, indent, &format!("{}[", n.head), "]")
 }
 
 /// `List[…]` → `{…}`.
-fn fmt_list(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
+fn fmt_list(f: &mut fmt::Formatter, n: &Normal, indent: Option<usize>) -> fmt::Result {
     fmt_delimited(f, n, indent, "{", "}")
 }
 
@@ -129,7 +142,7 @@ fn fmt_list(f: &mut fmt::Formatter, n: &Normal, indent: usize) -> fmt::Result {
 fn fmt_infix(
     f: &mut fmt::Formatter,
     n: &Normal,
-    indent: usize,
+    indent: Option<usize>,
     op: &str,
 ) -> fmt::Result {
     if n.contents.len() != 2 {
@@ -147,7 +160,7 @@ fn fmt_infix(
 fn fmt_slot(
     f: &mut fmt::Formatter,
     n: &Normal,
-    indent: usize,
+    indent: Option<usize>,
     prefix: &str,
 ) -> fmt::Result {
     match n.contents.as_slice() {
@@ -166,16 +179,16 @@ fn fmt_slot(
     }
 }
 
-/// The single renderer for every [`ExprKind`] at nesting depth `indent`. `{}`
-/// keeps everything on one line; `{:#}` (via [`fmt::Formatter::alternate`])
-/// breaks `Normal`/`Association` nodes that contain a nested child. The
+/// The single renderer for every [`ExprKind`]. `indent` is `None` for the
+/// compact (`Display`) form and `Some(depth)` for the indented (`Debug`) form,
+/// which breaks `Normal`/`Association` nodes that contain a nested child. The
 /// per-variant formatting — how each leaf prints — is defined here, once.
-fn fmt_kind(f: &mut fmt::Formatter, kind: &ExprKind, indent: usize) -> fmt::Result {
+fn fmt_kind(f: &mut fmt::Formatter, kind: &ExprKind, indent: Option<usize>) -> fmt::Result {
     match kind {
         ExprKind::Normal(n) => fmt_normal(f, n, indent),
         ExprKind::Association(a) => {
-            let brk = f.alternate() && a.iter().any(|e| is_nested(e.value.kind()));
-            let inner = if brk { indent + 1 } else { indent };
+            let brk = indent.is_some() && a.iter().any(|e| is_nested(e.value.kind()));
+            let inner = child_indent(indent, brk);
             fmt_seq(f, indent, "<|", "|>", a.len(), brk, |f, i| {
                 let entry = &a[i];
                 let arrow = if entry.delayed { ":>" } else { "->" };
@@ -215,31 +228,30 @@ fn fmt_kind(f: &mut fmt::Formatter, kind: &ExprKind, indent: usize) -> fmt::Resu
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // `{}` compact, `{:#}` indented — both run through the one renderer.
-        fmt_kind(f, self.kind(), 0)
+        fmt_kind(f, self.kind(), None)
     }
 }
 
 impl fmt::Display for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_kind(f, self, 0)
+        fmt_kind(f, self, None)
     }
 }
 
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_kind(f, self, 0)
+        fmt_kind(f, self, Some(0))
     }
 }
 
 impl fmt::Display for Normal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_normal(f, self, 0)
+        fmt_normal(f, self, None)
     }
 }
 
 impl fmt::Display for Number {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_kind(f, &ExprKind::from(*self), 0)
+        fmt_kind(f, &ExprKind::from(*self), None)
     }
 }
