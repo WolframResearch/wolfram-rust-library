@@ -21,6 +21,28 @@ use uuid::Uuid;
 use wolfram_export::export;
 use wolfram_expr::{expr, Expr, ToWXF};
 
+struct DuckDbError {
+    code: Option<i32>,
+    message: String,
+}
+
+impl From<duckdb::Error> for DuckDbError {
+    fn from(e: duckdb::Error) -> Self {
+        match e {
+            duckdb::Error::DuckDBFailure(ffi_err, msg) => Self {
+                code: Some(ffi_err.extended_code as i32),
+                message: msg.unwrap_or_else(|| {
+                    format!("DuckDB error code {}", ffi_err.extended_code)
+                }),
+            },
+            other => Self {
+                code: None,
+                message: other.to_string(),
+            },
+        }
+    }
+}
+
 /// Every DuckDB operation resolves to one of these. Per-variant `#[wolfram(enum_head)]`
 /// makes the success branches serialize under `System`Success` and the error
 /// branches under the container default `System`Failure`; `CamelCase` keys give
@@ -28,22 +50,20 @@ use wolfram_expr::{expr, Expr, ToWXF};
 #[derive(Debug, ToWXF)]
 #[wolfram(enum_head = "System`Failure", key_processor = "CamelCase")]
 enum DuckDbResult {
-    /// A connection was opened → the handle id **itself** (transparent,
-    /// `enum_head = false`): `db_connect` returns the uuid string directly.
+    /// A connection was opened or closed → the handle id directly (transparent).
     #[wolfram(enum_head = false)]
-    ConnectionOpened(String),
-    /// A query ran → the decoded table `Expr` **itself**. `enum_head = false` is
-    /// transparent: it drops the head *and* the tag, so the query returns
-    /// `ImportByteArray[…, "ArrowIPC"]` directly (no `Success[…]` wrapper).
+    ConnectionResult(String),
+    /// A query ran → the decoded table `Expr` directly (transparent).
     #[wolfram(enum_head = false)]
-    Result(Expr),
-    /// A connection was closed → `Success["ConnectionClosed", id]`.
-    #[wolfram(enum_head = "System`Success")]
-    ConnectionClosed(String),
-    /// Opening / attaching a connection failed → `Failure["ConnectionError", <|"Message" -> …|>]`.
-    ConnectionError { message: String },
-    /// Preparing / executing / serializing a query failed → `Failure["QueryError", <|"Message" -> …|>]`.
-    QueryError { message: String },
+    ExprResult(Expr),
+    /// Opening / attaching a connection failed → `Failure["ConnectionError", <|"Code" -> …, "Message" -> …|>]`.
+    ConnectionError { code: Option<i32>, message: String },
+    /// Preparing a statement failed → `Failure["PrepareError", <|"Code" -> …, "Message" -> …|>]`.
+    PrepareError { code: Option<i32>, message: String },
+    /// Executing a query failed → `Failure["ExecuteError", <|"Code" -> …, "Message" -> …|>]`.
+    ExecuteError { code: Option<i32>, message: String },
+    /// Serializing Arrow batches to IPC failed → `Failure["SerializationError", <|"Code" -> …, "Message" -> …|>]`.
+    SerializationError { code: Option<i32>, message: String },
     /// No open connection has this handle → `Failure["UnknownConnection", <|"Id" -> …|>]`.
     UnknownConnection { id: String },
 }
@@ -91,7 +111,7 @@ fn parse_url(url: &str) -> Target {
 }
 
 /// Open a connection, register it under a fresh uuid handle, and return the id
-/// string directly (transparent `ConnectionOpened`) — or `Failure["ConnectionError", …]`.
+/// string directly (transparent `ConnectionResult`) — or `Failure["ConnectionError", …]`.
 #[export(wxf)]
 fn db_connect(url: String) -> DuckDbResult {
     let conn = match parse_url(&url) {
@@ -104,9 +124,8 @@ fn db_connect(url: String) -> DuckDbResult {
             match opened {
                 Ok(conn) => conn,
                 Err(e) => {
-                    return DuckDbResult::ConnectionError {
-                        message: format!("open connection: {e}"),
-                    }
+                    let DuckDbError { code, message } = e.into();
+                    return DuckDbResult::ConnectionError { code, message };
                 },
             }
         },
@@ -114,22 +133,19 @@ fn db_connect(url: String) -> DuckDbResult {
             let conn = match Connection::open_in_memory() {
                 Ok(conn) => conn,
                 Err(e) => {
-                    return DuckDbResult::ConnectionError {
-                        message: format!("open connection: {e}"),
-                    }
+                    let DuckDbError { code, message } = e.into();
+                    return DuckDbResult::ConnectionError { code, message };
                 },
             };
             if let Err(e) =
                 conn.execute(&format!("ATTACH '{url}' AS remote (TYPE {db_type})"), [])
             {
-                return DuckDbResult::ConnectionError {
-                    message: format!("attach database: {e}"),
-                };
+                let DuckDbError { code, message } = e.into();
+                return DuckDbResult::ConnectionError { code, message };
             }
             if let Err(e) = conn.execute("USE remote", []) {
-                return DuckDbResult::ConnectionError {
-                    message: format!("use database: {e}"),
-                };
+                let DuckDbError { code, message } = e.into();
+                return DuckDbResult::ConnectionError { code, message };
             }
             conn
         },
@@ -137,13 +153,14 @@ fn db_connect(url: String) -> DuckDbResult {
 
     let id = Uuid::new_v4().to_string();
     registry().lock().unwrap().insert(id.clone(), conn);
-    DuckDbResult::ConnectionOpened(id)
+    DuckDbResult::ConnectionResult(id)
 }
 
 /// Run `sql` on connection `id`. On success returns the decoded table
 /// `ImportByteArray[ByteArray[…], "ArrowIPC"]` **directly** (the `Result` variant
 /// is transparent — `enum_head = false`). On failure returns
-/// `Failure["UnknownConnection", …]` (no such handle) or `Failure["QueryError", …]`.
+/// `Failure["UnknownConnection", …]` (no such handle), `Failure["PrepareError", …]`,
+/// `Failure["ExecuteError", …]`, or `Failure["SerializationError", …]`.
 ///
 /// `params` are bound positionally (sorted by key name); use `?` placeholders
 /// in SQL for each param in sorted key order.
@@ -158,9 +175,8 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
     let mut stmt = match conn.prepare(&sql) {
         Ok(stmt) => stmt,
         Err(e) => {
-            return DuckDbResult::QueryError {
-                message: format!("prepare: {e}"),
-            }
+            let DuckDbError { code, message } = e.into();
+            return DuckDbResult::PrepareError { code, message };
         },
     };
 
@@ -173,9 +189,8 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
     let arrow = match stmt.query_arrow(to_sql.as_slice()) {
         Ok(arrow) => arrow,
         Err(e) => {
-            return DuckDbResult::QueryError {
-                message: format!("execute: {e}"),
-            }
+            let DuckDbError { code, message } = e.into();
+            return DuckDbResult::ExecuteError { code, message };
         },
     };
 
@@ -188,23 +203,15 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
         let mut writer = match arrow_ipc::writer::StreamWriter::try_new(&mut buf, &schema)
         {
             Ok(writer) => writer,
-            Err(e) => {
-                return DuckDbResult::QueryError {
-                    message: format!("serialize: {e}"),
-                }
-            },
+            Err(e) => return DuckDbResult::SerializationError { code: None, message: e.to_string() },
         };
         for batch in &batches {
             if let Err(e) = writer.write(batch) {
-                return DuckDbResult::QueryError {
-                    message: format!("serialize: {e}"),
-                };
+                return DuckDbResult::SerializationError { code: None, message: e.to_string() };
             }
         }
         if let Err(e) = writer.finish() {
-            return DuckDbResult::QueryError {
-                message: format!("serialize: {e}"),
-            };
+            return DuckDbResult::SerializationError { code: None, message: e.to_string() };
         }
     }
 
@@ -213,17 +220,17 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
     // internal path Import[…, "ArrowIPC", "Tabular"] uses, skipping the importer.
     // `::` in expr! builds a context-qualified symbol; `byte_array` (no `::`) is
     // the local variable.
-    DuckDbResult::Result(expr!(
+    DuckDbResult::ExprResult(expr!(
         Tabular::Arrow::ToTabular[Tabular::Arrow::ReadArrowIPCByteArray[byte_array]]
     ))
 }
 
-/// Close connection `id`, returning `Success["ConnectionClosed", id]` — or
+/// Close connection `id`, returning `id` directly — or
 /// `Failure["UnknownConnection", …]` if there is no open handle with that id.
 #[export(wxf)]
 fn db_disconnect(id: String) -> DuckDbResult {
     match registry().lock().unwrap().remove(&id) {
-        Some(_) => DuckDbResult::ConnectionClosed(id),
+        Some(_) => DuckDbResult::ConnectionResult(id),
         None => DuckDbResult::UnknownConnection { id },
     }
 }
