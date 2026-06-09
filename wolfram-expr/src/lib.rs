@@ -440,9 +440,78 @@ fn wxf_display(f: &mut fmt::Formatter, expr: &Expr) -> fmt::Result {
 /// reconstruct the `Expr` being displayed. This means symbols will always include their
 /// contexts, special characters in String's will always be properly escaped, and numeric
 /// literals needing precision and accuracy marks will have them.
+/// True for the structural variants (`Normal`, `Association`) — the ones the
+/// pretty-printer may break across lines. Everything else is an atom.
+fn is_compound(expr: &Expr) -> bool {
+    matches!(expr.kind(), ExprKind::Normal(_) | ExprKind::Association(_))
+}
+
+/// A compound that itself contains a compound — i.e. it nests two or more
+/// levels deep. The pretty-printer breaks a node onto multiple lines only when
+/// one of its children is nested; a child that is an atom or a shallow
+/// (single-level) compound like `Slot[1]` or `List[a, b]` stays inline.
+fn is_nested(expr: &Expr) -> bool {
+    match expr.kind() {
+        ExprKind::Normal(n) => n.contents.iter().any(is_compound),
+        ExprKind::Association(a) => a.iter().any(|e| is_compound(&e.value)),
+        _ => false,
+    }
+}
+
+/// Write a `len`-item block between `open`/`close` delimiters, one item per
+/// line indented to `indent + 1`, commas between, and the closing delimiter
+/// back at `indent`. `item(f, i)` renders the `i`-th item.
+fn fmt_block<F>(
+    f: &mut fmt::Formatter,
+    indent: usize,
+    open: &str,
+    close: &str,
+    len: usize,
+    mut item: F,
+) -> fmt::Result
+where
+    F: FnMut(&mut fmt::Formatter, usize) -> fmt::Result,
+{
+    let pad = "  ".repeat(indent + 1);
+    f.write_str(open)?;
+    for i in 0..len {
+        write!(f, "\n{pad}")?;
+        item(f, i)?;
+        if i + 1 < len {
+            f.write_str(",")?;
+        }
+    }
+    write!(f, "\n{}{close}", "  ".repeat(indent))
+}
+
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.inner)
+        // `{}` renders compact. `{:#}` renders the recursive, indented form:
+        // the current nesting depth rides along in the formatter's own `width`
+        // field, so every child is re-emitted with `{:#depth$}` and the
+        // recursion runs entirely through `Display` — no separate walker.
+        if !f.alternate() {
+            return write!(f, "{}", self.inner);
+        }
+        let indent = f.width().unwrap_or(0);
+        let child = indent + 1;
+        match self.kind() {
+            ExprKind::Normal(n) if n.contents.iter().any(is_nested) => {
+                let open = format!("{}[", n.head);
+                fmt_block(f, indent, &open, "]", n.contents.len(), |f, i| {
+                    write!(f, "{:#child$}", n.contents[i])
+                })
+            },
+            ExprKind::Association(a) if a.iter().any(|e| is_nested(&e.value)) => {
+                fmt_block(f, indent, "<|", "|>", a.len(), |f, i| {
+                    let entry = &a[i];
+                    let arrow = if entry.delayed { ":>" } else { "->" };
+                    write!(f, "{} {arrow} {:#child$}", entry.key, entry.value)
+                })
+            },
+            // Atoms and shallow compounds: compact, on one line.
+            _ => write!(f, "{}", self.inner),
+        }
     }
 }
 
