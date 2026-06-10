@@ -2,8 +2,8 @@
 
 use wolfram_expr::{expr, from_wxf, to_wxf, CompressionLevel};
 use wolfram_expr::{
-    Association, ByteArray, Complex32, Complex64, Expr, NumericArray, NumericArrayEnum,
-    PackedArray, PackedArrayEnum, RuleEntry,
+    Association, ByteArray, Complex32, Complex64, Expr, ExprKind, NumericArray,
+    NumericArrayEnum, PackedArray, PackedArrayEnum, RuleEntry,
 };
 
 fn roundtrip(expr: Expr) {
@@ -129,23 +129,19 @@ fn empty_function() {
 fn vec_u8_serializes_as_byte_array() {
     let bytes = wolfram_expr::to_wxf(&vec![1u8, 2, 3, 0xff], None).unwrap();
     let parsed: Expr = wolfram_expr::from_wxf(&bytes).unwrap();
-    assert!(matches!(
-        parsed.kind(),
-        wolfram_expr::ExprKind::ByteArray(_)
-    ));
-    assert_eq!(
-        parsed.try_as_byte_array().unwrap().as_slice(),
-        &[1u8, 2, 3, 0xff]
-    );
+    let ExprKind::ByteArray(ba) = parsed.kind() else {
+        panic!("expected ByteArray, got {:?}", parsed);
+    };
+    assert_eq!(ba.as_slice(), &[1u8, 2, 3, 0xff]);
 }
 
 #[test]
 fn vec_i32_serializes_as_numeric_array() {
     let bytes = wolfram_expr::to_wxf(&vec![10i32, 20, 30, 40], None).unwrap();
     let parsed: Expr = wolfram_expr::from_wxf(&bytes).unwrap();
-    let arr = parsed
-        .try_as_numeric_array()
-        .expect("expected NumericArray");
+    let ExprKind::NumericArray(arr) = parsed.kind() else {
+        panic!("expected NumericArray, got {:?}", parsed);
+    };
     assert_eq!(arr.data_type(), NumericArrayEnum::Integer32);
     assert_eq!(arr.dimensions(), &[4]);
     assert_eq!(arr.try_as_slice::<i32>(), Some([10, 20, 30, 40].as_slice()));
@@ -155,9 +151,9 @@ fn vec_i32_serializes_as_numeric_array() {
 fn vec_f64_serializes_as_numeric_array() {
     let bytes = wolfram_expr::to_wxf(&vec![1.5f64, 2.5, 3.5], None).unwrap();
     let parsed: Expr = wolfram_expr::from_wxf(&bytes).unwrap();
-    let arr = parsed
-        .try_as_numeric_array()
-        .expect("expected NumericArray");
+    let ExprKind::NumericArray(arr) = parsed.kind() else {
+        panic!("expected NumericArray, got {:?}", parsed);
+    };
     assert_eq!(arr.data_type(), NumericArrayEnum::Real64);
     assert_eq!(arr.try_as_slice::<f64>(), Some([1.5, 2.5, 3.5].as_slice()));
 }

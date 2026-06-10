@@ -52,9 +52,11 @@ fn string_join(link: &mut Link) {
 fn total(args: Vec<Expr>) -> Expr {
     let mut total = Number::Integer(0);
     for (i, arg) in args.into_iter().enumerate() {
-        let number = arg
-            .try_as_number()
-            .unwrap_or_else(|| panic!("expected number at position {}", i + 1));
+        let number = match arg.kind() {
+            ExprKind::Integer(int) => Number::Integer(*int),
+            ExprKind::Real(real) => Number::Real(*real),
+            _ => panic!("expected number at position {}", i + 1),
+        };
         use Number::{Integer, Real};
         total = match (total, number) {
             (Integer(a), Integer(b)) => Integer(a + b),
@@ -184,7 +186,9 @@ fn link_expr_identity(link: &mut Link) {
 #[wll::export(wstp)]
 fn expr_string_join(link: &mut Link) {
     let expr = link.get_expr().unwrap();
-    let list = expr.try_as_normal().unwrap();
+    let ExprKind::Normal(list) = expr.kind() else {
+        panic!("expected a List, got: {:?}", expr);
+    };
     assert!(list.has_head(&Symbol::new("System`List")));
     let mut buf = String::new();
     for elem in list.elements() {

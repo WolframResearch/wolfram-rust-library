@@ -1,16 +1,16 @@
 //! `expr!` symbol syntax: symbols are always fully qualified via `::` (each `::`
 //! becomes a context backtick); a bare ident is always a Rust variable.
 
-use wolfram_expr::{expr, Expr, Symbol};
+use wolfram_expr::{expr, Expr, ExprKind, Symbol};
 
 fn head(e: &Expr) -> String {
-    e.try_as_normal()
-        .unwrap()
-        .head()
-        .try_as_symbol()
-        .unwrap()
-        .as_str()
-        .to_string()
+    let ExprKind::Normal(n) = e.kind() else {
+        panic!("expected Normal, got {:?}", e);
+    };
+    let ExprKind::Symbol(s) = n.head().kind() else {
+        panic!("expected Symbol head, got {:?}", n.head());
+    };
+    s.as_str().to_string()
 }
 
 #[test]
@@ -24,7 +24,8 @@ fn context_qualified_head() {
 fn system_qualified_head() {
     let e = expr!(System::List[1, 2, 3]);
     assert_eq!(head(&e), "System`List");
-    assert_eq!(e.try_as_normal().unwrap().elements().len(), 3);
+    let ExprKind::Normal(n) = e.kind() else { panic!("expected Normal") };
+    assert_eq!(n.elements().len(), 3);
 }
 
 #[test]
@@ -38,19 +39,22 @@ fn bare_ident_head_is_a_variable() {
 #[test]
 fn bare_symbol_value() {
     let e = expr!(System::InputForm);
-    assert_eq!(e.try_as_symbol().unwrap().as_str(), "System`InputForm");
+    let ExprKind::Symbol(s) = e.kind() else { panic!("expected Symbol") };
+    assert_eq!(s.as_str(), "System`InputForm");
 }
 
 #[test]
 fn context_less_symbol_via_leading_colons() {
     // `::Name` is the context-less symbol `Name` (no context prefix).
     let e = expr!(::Plus);
-    assert_eq!(e.try_as_symbol().unwrap().as_str(), "Plus");
+    let ExprKind::Symbol(s) = e.kind() else { panic!("expected Symbol") };
+    assert_eq!(s.as_str(), "Plus");
 
     // …and as a head: `::List[1, 2]` -> the bare `List` applied to args.
     let call = expr!(::List[1, 2]);
     assert_eq!(head(&call), "List");
-    assert_eq!(call.try_as_normal().unwrap().elements().len(), 2);
+    let ExprKind::Normal(n) = call.kind() else { panic!("expected Normal") };
+    assert_eq!(n.elements().len(), 2);
 }
 
 #[test]
@@ -63,14 +67,12 @@ fn nested_qualified_call_mixed_with_variable_and_string() {
     ]);
 
     assert_eq!(head(&e), "Tabular`Arrow`ToTabular");
-    let outer = e.try_as_normal().unwrap();
+    let ExprKind::Normal(outer) = e.kind() else { panic!("expected Normal") };
 
     let inner = &outer.elements()[0];
     assert_eq!(head(inner), "Tabular`Arrow`ReadArrowIPCByteArray");
-    assert_eq!(
-        inner.try_as_normal().unwrap().elements()[0],
-        Expr::from(42i64)
-    );
+    let ExprKind::Normal(inner_n) = inner.kind() else { panic!("expected Normal") };
+    assert_eq!(inner_n.elements()[0], Expr::from(42i64));
 
     assert_eq!(outer.elements()[1], Expr::from("STRING"));
 }
@@ -78,8 +80,8 @@ fn nested_qualified_call_mixed_with_variable_and_string() {
 #[test]
 fn qualified_symbol_as_argument() {
     let e = expr!(System::Head[System::All, 1]);
-    let n = e.try_as_normal().unwrap();
-    assert_eq!(n.head().try_as_symbol().unwrap().as_str(), "System`Head");
+    let ExprKind::Normal(n) = e.kind() else { panic!("expected Normal") };
+    assert_eq!(head(&e), "System`Head");
     assert_eq!(n.elements()[0], Expr::symbol(Symbol::new("System`All")));
     assert_eq!(n.elements()[1], Expr::from(1i64));
 }

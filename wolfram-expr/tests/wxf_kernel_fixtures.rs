@@ -13,7 +13,7 @@
 //! you add a test case or want to refresh against a newer kernel.
 
 use wolfram_expr::{expr, from_wxf, to_wxf};
-use wolfram_expr::{Association, ByteArray, Expr, NumericArray, RuleEntry};
+use wolfram_expr::{Association, ByteArray, Expr, ExprKind, NumericArray, RuleEntry};
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;
@@ -153,9 +153,9 @@ fn compressed_range_100() {
     // compression handling and packed-array decoding.
     let parsed: Expr =
         from_wxf(fix::COMPRESSED_RANGE_100).expect("deserialize compressed kernel WXF");
-    let arr = parsed
-        .try_as_packed_array()
-        .expect("Range[100] should land as a PackedArray");
+    let ExprKind::PackedArray(arr) = parsed.kind() else {
+        panic!("Range[100] should land as a PackedArray, got {:?}", parsed);
+    };
     assert_eq!(arr.dimensions(), &[100]);
     assert_eq!(
         arr.try_as_slice::<i8>(),

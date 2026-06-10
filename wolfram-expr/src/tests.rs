@@ -62,11 +62,10 @@ pub fn test_symbol_like_parsing() {
 fn byte_array_variant_roundtrip() {
     let ba = ByteArray::from(vec![0x01, 0x02, 0x03, 0xff]);
     let expr = Expr::from(ba.clone());
-    assert!(matches!(expr.kind(), ExprKind::ByteArray(_)));
-    assert_eq!(expr.try_as_byte_array(), Some(&ba));
-    // Other try_as_ methods return None on this variant:
-    assert_eq!(expr.try_as_numeric_array(), None);
-    assert_eq!(expr.try_as_number(), None);
+    match expr.kind() {
+        ExprKind::ByteArray(got) => assert_eq!(got, &ba),
+        other => panic!("expected ByteArray, got {:?}", other),
+    }
     assert!(expr.tag().is_none());
 }
 
@@ -78,9 +77,10 @@ fn association_variant_roundtrip() {
         RuleEntry::rule_delayed(Expr::from("k2"), Expr::from(2)),
     ];
     let expr = Expr::from(a.clone());
-    assert!(matches!(expr.kind(), ExprKind::Association(_)));
-    assert_eq!(expr.try_as_association(), Some(&a));
-    let extracted = expr.try_as_association().unwrap();
+    let ExprKind::Association(extracted) = expr.kind() else {
+        panic!("expected Association, got {:?}", expr.kind());
+    };
+    assert_eq!(extracted, &a);
     let mut it = extracted.iter();
     let e0 = it.next().unwrap();
     assert_eq!(e0.key, Expr::from("k1"));
@@ -97,8 +97,9 @@ fn association_variant_roundtrip() {
 fn numeric_array_variant_roundtrip() {
     let arr = NumericArray::from_slice::<i32>(vec![2, 2], &[10, 20, 30, 40]);
     let expr = Expr::from(arr.clone());
-    assert!(matches!(expr.kind(), ExprKind::NumericArray(_)));
-    let got = expr.try_as_numeric_array().unwrap();
+    let ExprKind::NumericArray(got) = expr.kind() else {
+        panic!("expected NumericArray, got {:?}", expr.kind());
+    };
     assert_eq!(got.dimensions(), &[2, 2]);
     assert_eq!(got.data_type(), NumericArrayEnum::Integer32);
     assert_eq!(got.try_as_slice::<i32>(), Some([10, 20, 30, 40].as_slice()));
@@ -108,8 +109,9 @@ fn numeric_array_variant_roundtrip() {
 fn packed_array_variant_roundtrip() {
     let arr = PackedArray::from_slice::<f64>(vec![3], &[1.0, 2.0, 3.0]);
     let expr = Expr::from(arr.clone());
-    assert!(matches!(expr.kind(), ExprKind::PackedArray(_)));
-    let got = expr.try_as_packed_array().unwrap();
+    let ExprKind::PackedArray(got) = expr.kind() else {
+        panic!("expected PackedArray, got {:?}", expr.kind());
+    };
     assert_eq!(got.dimensions(), &[3]);
     assert_eq!(got.data_type(), PackedArrayEnum::Real64);
     assert_eq!(got.try_as_slice::<f64>(), Some([1.0, 2.0, 3.0].as_slice()));

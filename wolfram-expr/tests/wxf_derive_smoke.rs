@@ -4,7 +4,7 @@
 //! also lands.
 
 use wolfram_expr::{from_wxf, to_wxf, FromWXF, ToWXF};
-use wolfram_expr::{Association, Expr};
+use wolfram_expr::{Association, Expr, ExprKind};
 
 /// Linear-scan helper for tests. `Association` itself exposes no lookup —
 /// tests iterate to find an entry.
@@ -68,29 +68,35 @@ fn frame_roundtrips_with_correct_wire_shapes() {
     };
     let bytes = to_wxf(&f, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
-    let assoc = expr
-        .try_as_association()
-        .expect("Frame should be Association");
+    let ExprKind::Association(assoc) = expr.kind() else {
+        panic!("Frame should be Association, got {:?}", expr);
+    };
 
     // payload → ByteArray
     assert!(
-        find(assoc, "payload").try_as_byte_array().is_some(),
+        matches!(find(assoc, "payload").kind(), ExprKind::ByteArray(_)),
         "payload should be ByteArray"
     );
 
     // samples → 1-D NumericArray<Integer32>
-    let na = find(assoc, "samples")
-        .try_as_numeric_array()
-        .expect("samples should be NumericArray");
+    let ExprKind::NumericArray(na) = find(assoc, "samples").kind() else {
+        panic!("samples should be NumericArray");
+    };
     assert_eq!(na.data_type(), wolfram_expr::NumericArrayEnum::Integer32);
     assert_eq!(na.dimensions(), &[3]);
 
     // tag → Option is an enum: Some(7) ⇒ {"Some", 7} (List head, variant first)
-    let tag = find(assoc, "tag")
-        .try_as_normal()
-        .expect("tag (Some) should be a List function");
-    assert_eq!(tag.head().try_as_symbol().unwrap().as_str(), "System`List");
-    assert_eq!(tag.elements()[0].try_as_str().unwrap(), "Some");
+    let ExprKind::Normal(tag) = find(assoc, "tag").kind() else {
+        panic!("tag (Some) should be a List function");
+    };
+    let ExprKind::Symbol(tag_head) = tag.head().kind() else {
+        panic!("expected Symbol head");
+    };
+    assert_eq!(tag_head.as_str(), "System`List");
+    let ExprKind::String(variant) = tag.elements()[0].kind() else {
+        panic!("expected String variant name");
+    };
+    assert_eq!(variant.as_str(), "Some");
 
     // typed round-trip
     let back: Frame = from_wxf(&bytes).unwrap();
@@ -102,11 +108,15 @@ fn point_tuple_struct_emits_function() {
     let p = Point(1.5, 2.5);
     let bytes = to_wxf(&p, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
-    let normal = expr.try_as_normal().expect("Point should be Function[…]");
+    let ExprKind::Normal(normal) = expr.kind() else {
+        panic!("Point should be Function[…], got {:?}", expr);
+    };
     // Tuple structs share the head `System`List` — they're identified by
     // their positional data, not by name.
-    let head = normal.head().try_as_symbol().unwrap().as_str();
-    assert_eq!(head, "System`List");
+    let ExprKind::Symbol(head) = normal.head().kind() else {
+        panic!("expected Symbol head");
+    };
+    assert_eq!(head.as_str(), "System`List");
     assert_eq!(normal.elements().len(), 2);
 }
 
@@ -115,7 +125,9 @@ fn marker_unit_struct_emits_symbol() {
     let m = Marker;
     let bytes = to_wxf(&m, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
-    let s = expr.try_as_symbol().expect("Marker should be Symbol");
+    let ExprKind::Symbol(s) = expr.kind() else {
+        panic!("Marker should be Symbol, got {:?}", expr);
+    };
     // The bare ident name, verbatim — no context is imposed by the derive.
     assert_eq!(s.as_str(), "Marker");
 }
@@ -131,33 +143,40 @@ fn tensor_fields_become_numeric_arrays() {
     };
     let bytes = to_wxf(&t, None).unwrap();
     let expr: Expr = from_wxf(&bytes).unwrap();
-    let assoc = expr.try_as_association().unwrap();
+    let ExprKind::Association(assoc) = expr.kind() else {
+        panic!("expected Association, got {:?}", expr);
+    };
 
-    let na = find(assoc, "fixed")
-        .try_as_numeric_array()
-        .expect("fixed → NumericArray");
+    let ExprKind::NumericArray(na) = find(assoc, "fixed").kind() else {
+        panic!("fixed → NumericArray");
+    };
     assert_eq!(na.dimensions(), &[4]);
 
-    let na = find(assoc, "nested")
-        .try_as_numeric_array()
-        .expect("nested → 2D NumericArray");
+    let ExprKind::NumericArray(na) = find(assoc, "nested").kind() else {
+        panic!("nested → 2D NumericArray");
+    };
     assert_eq!(na.dimensions(), &[2, 3]);
 
-    let na = find(assoc, "tup")
-        .try_as_numeric_array()
-        .expect("tup → 1D NumericArray");
+    let ExprKind::NumericArray(na) = find(assoc, "tup").kind() else {
+        panic!("tup → 1D NumericArray");
+    };
     assert_eq!(na.dimensions(), &[3]);
 
-    let na = find(assoc, "nested_tup")
-        .try_as_numeric_array()
-        .expect("nested_tup → 2D NumericArray");
+    let ExprKind::NumericArray(na) = find(assoc, "nested_tup").kind() else {
+        panic!("nested_tup → 2D NumericArray");
+    };
     assert_eq!(na.dimensions(), &[2, 2]);
 
     // hetero (i64, String) should NOT be a NumericArray; should be a List.
     let hetero = find(assoc, "hetero");
-    assert!(hetero.try_as_numeric_array().is_none());
-    let n = hetero.try_as_normal().expect("hetero → Function[List, …]");
-    assert_eq!(n.head().try_as_symbol().unwrap().as_str(), "System`List");
+    assert!(!matches!(hetero.kind(), ExprKind::NumericArray(_)));
+    let ExprKind::Normal(n) = hetero.kind() else {
+        panic!("hetero → Function[List, …]");
+    };
+    let ExprKind::Symbol(h) = n.head().kind() else {
+        panic!("expected Symbol head");
+    };
+    assert_eq!(h.as_str(), "System`List");
     assert_eq!(n.elements().len(), 2);
 }
 
@@ -236,9 +255,17 @@ fn enum_variants_emit_proper_shapes() {
     // Helper: assert the parsed Expr is a List{"VariantName", ...} and return
     // the elements after the variant name.
     fn assert_enum_list<'a>(expr: &'a Expr, expected_variant: &str) -> &'a [Expr] {
-        let list = expr.try_as_normal().expect("List function");
-        assert_eq!(list.head().try_as_symbol().unwrap().as_str(), "System`List");
-        assert_eq!(list.elements()[0].try_as_str().unwrap(), expected_variant);
+        let ExprKind::Normal(list) = expr.kind() else {
+            panic!("List function, got {:?}", expr);
+        };
+        let ExprKind::Symbol(h) = list.head().kind() else {
+            panic!("expected Symbol head");
+        };
+        assert_eq!(h.as_str(), "System`List");
+        let ExprKind::String(variant) = list.elements()[0].kind() else {
+            panic!("expected String variant name");
+        };
+        assert_eq!(variant.as_str(), expected_variant);
         &list.elements()[1..]
     }
 
@@ -264,7 +291,9 @@ fn enum_variants_emit_proper_shapes() {
     let bytes = to_wxf(&Shape::Circle { radius: 3.0 }, None).unwrap();
     let s: Expr = from_wxf(&bytes).unwrap();
     let tail = assert_enum_list(&s, "Circle");
-    let inner = tail[0].try_as_association().expect("inner Association");
+    let ExprKind::Association(inner) = tail[0].kind() else {
+        panic!("inner Association, got {:?}", tail[0]);
+    };
     assert!(inner.iter().any(|e| e.key == Expr::from("radius")));
 }
 

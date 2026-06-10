@@ -176,7 +176,9 @@ fn link_expr_identity(link: &mut Link) {
 fn expr_string_join(link: &mut Link) {
     let expr = link.get_expr().unwrap();
 
-    let list = expr.try_as_normal().unwrap();
+    let ExprKind::Normal(list) = expr.kind() else {
+        panic!("expected a List, got: {:?}", expr);
+    };
     assert!(list.has_head(&Symbol::new("System`List")));
 
     let mut buffer = String::new();
@@ -203,9 +205,10 @@ fn total(args: Vec<Expr>) -> Expr {
     let mut total = Number::Integer(0);
 
     for (index, arg) in args.into_iter().enumerate() {
-        let number = match arg.try_as_number() {
-            Some(number) => number,
-            None => panic!(
+        let number = match arg.kind() {
+            ExprKind::Integer(int) => Number::Integer(*int),
+            ExprKind::Real(real) => Number::Real(*real),
+            _ => panic!(
                 "expected argument at position {} to be a number, got {}",
                 // Add +1 to display using WL 1-based indexing.
                 index + 1,

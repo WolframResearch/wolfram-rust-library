@@ -86,12 +86,16 @@ impl From<wstp::Error> for LibraryError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expr::expr;
+    use crate::expr::{expr, ExprKind};
 
     fn failure_tag(e: &Expr) -> &str {
-        e.try_as_normal().unwrap().elements()[0]
-            .try_as_str()
-            .unwrap()
+        let ExprKind::Normal(n) = e.kind() else {
+            panic!("expected Normal, got {:?}", e);
+        };
+        let ExprKind::String(s) = n.elements()[0].kind() else {
+            panic!("expected String tag, got {:?}", n.elements()[0]);
+        };
+        s.as_str()
     }
 
     #[test]
@@ -103,13 +107,20 @@ mod tests {
             backtrace: backtrace.clone(),
         };
         let e = Expr::from(&err);
-        let normal = e.try_as_normal().expect("Failure[...]");
-        assert_eq!(
-            normal.head().try_as_symbol().unwrap().as_str(),
-            "System`Failure"
-        );
-        assert_eq!(normal.elements()[0].try_as_str().unwrap(), "RustPanic");
-        let assoc = normal.elements()[1].try_as_association().unwrap();
+        let ExprKind::Normal(normal) = e.kind() else {
+            panic!("expected Failure[...], got {:?}", e);
+        };
+        let ExprKind::Symbol(head) = normal.head().kind() else {
+            panic!("expected Symbol head");
+        };
+        assert_eq!(head.as_str(), "System`Failure");
+        let ExprKind::String(tag) = normal.elements()[0].kind() else {
+            panic!("expected String tag");
+        };
+        assert_eq!(tag.as_str(), "RustPanic");
+        let ExprKind::Association(assoc) = normal.elements()[1].kind() else {
+            panic!("expected Association");
+        };
         let find = |k: &str| {
             assoc
                 .iter()
@@ -141,11 +152,13 @@ mod tests {
         for v in &variants {
             // The conversion is always a Failure[tag, <|…|>] — never field-less.
             let e = Expr::from(v);
-            let normal = e.try_as_normal().expect("Failure[...]");
-            assert_eq!(
-                normal.head().try_as_symbol().unwrap().as_str(),
-                "System`Failure"
-            );
+            let ExprKind::Normal(normal) = e.kind() else {
+                panic!("expected Failure[...], got {:?}", e);
+            };
+            let ExprKind::Symbol(head) = normal.head().kind() else {
+                panic!("expected Symbol head");
+            };
+            assert_eq!(head.as_str(), "System`Failure");
             assert!(!failure_tag(&e).is_empty());
             assert_eq!(normal.elements().len(), 2, "must carry an association");
         }

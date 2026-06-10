@@ -1,7 +1,11 @@
 use super::*;
 
 impl Expr {
+    // These accessors are deprecated: match on [`Expr::kind`] ([`ExprKind`])
+    // directly instead. None of them are used inside this crate.
+
     /// If this is a [`Normal`] expression, return that. Otherwise return None.
+    #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_normal(&self) -> Option<&Normal> {
         match self.kind() {
             ExprKind::Normal(ref normal) => Some(normal),
@@ -9,7 +13,19 @@ impl Expr {
         }
     }
 
+    /// If this is the `True` or `False` symbol, return that. Otherwise None.
+    #[deprecated(note = "match on `Expr::kind()` instead")]
+    #[allow(deprecated)]
+    pub fn try_as_bool(&self) -> Option<bool> {
+        match self.try_as_symbol()?.as_str() {
+            "System`True" => Some(true),
+            "System`False" => Some(false),
+            _ => None,
+        }
+    }
+
     /// If this is an [`ExprKind::String`] expression, return that. Otherwise return None.
+    #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_str(&self) -> Option<&str> {
         match self.kind() {
             ExprKind::String(ref string) => Some(string.as_str()),
@@ -18,6 +34,7 @@ impl Expr {
     }
 
     /// If this is a [`Symbol`] expression, return that. Otherwise return None.
+    #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_symbol(&self) -> Option<&Symbol> {
         match self.kind() {
             ExprKind::Symbol(ref symbol) => Some(symbol),
@@ -26,6 +43,7 @@ impl Expr {
     }
 
     /// If this is a [`Number`] expression, return that. Otherwise return None.
+    #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_number(&self) -> Option<Number> {
         match self.kind() {
             ExprKind::Integer(int) => Some(Number::Integer(*int)),
@@ -34,56 +52,24 @@ impl Expr {
         }
     }
 
-    /// If this is a [`ByteArray`] expression, return that. Otherwise return None.
-    pub fn try_as_byte_array(&self) -> Option<&ByteArray> {
-        match self.kind() {
-            ExprKind::ByteArray(ref ba) => Some(ba),
-            _ => None,
-        }
-    }
-
-    /// If this is an [`Association`] expression, return that. Otherwise return None.
-    pub fn try_as_association(&self) -> Option<&Association> {
-        match self.kind() {
-            ExprKind::Association(ref a) => Some(a),
-            _ => None,
-        }
-    }
-
-    /// If this is a [`NumericArray`] expression, return that. Otherwise return None.
-    pub fn try_as_numeric_array(&self) -> Option<&NumericArray> {
-        match self.kind() {
-            ExprKind::NumericArray(ref a) => Some(a),
-            _ => None,
-        }
-    }
-
-    /// If this is a [`PackedArray`] expression, return that. Otherwise return None.
-    pub fn try_as_packed_array(&self) -> Option<&PackedArray> {
-        match self.kind() {
-            ExprKind::PackedArray(ref a) => Some(a),
-            _ => None,
-        }
-    }
-
     //---------------------------------------------------------------------------
     // SEMVER: These methods have been replaced; remove them in a future version.
     //---------------------------------------------------------------------------
 
-    #[deprecated(note = "Use Expr::try_as_normal() instead")]
-    #[allow(missing_docs)]
+    #[deprecated(note = "match on `Expr::kind()` instead")]
+    #[allow(missing_docs, deprecated)]
     pub fn try_normal(&self) -> Option<&Normal> {
         self.try_as_normal()
     }
 
-    #[deprecated(note = "Use Expr::try_as_symbol() instead")]
-    #[allow(missing_docs)]
+    #[deprecated(note = "match on `Expr::kind()` instead")]
+    #[allow(missing_docs, deprecated)]
     pub fn try_symbol(&self) -> Option<&Symbol> {
         self.try_as_symbol()
     }
 
-    #[deprecated(note = "Use Expr::try_as_number() instead")]
-    #[allow(missing_docs)]
+    #[deprecated(note = "match on `Expr::kind()` instead")]
+    #[allow(missing_docs, deprecated)]
     pub fn try_number(&self) -> Option<Number> {
         self.try_as_number()
     }
