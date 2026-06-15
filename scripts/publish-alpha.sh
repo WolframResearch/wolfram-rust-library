@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish all 7 publishable crates to crates.io at the version pinned in
+# Publish all 11 publishable crates to crates.io at the version pinned in
 # RELEASE_VERSION below.
 #
 # Versions and repository URLs are already set in each Cargo.toml — this script
@@ -26,17 +26,26 @@ set -euo pipefail
 # The single version every publishable crate is pinned to in Cargo.toml.
 # Bump here AND in every Cargo.toml if you need to re-publish — versions on
 # crates.io cannot be reused once published, only yanked.
-RELEASE_VERSION="0.5.0"
+#
+# Alpha versions are NOT picked up by normal `^x.y.z` requirements, so existing
+# downstream users won't auto-resolve to this release. Internal deps inside the
+# workspace use `=0.6.0-alpha.1` exact-pin (required for alpha pre-releases).
+RELEASE_VERSION="0.6.0-alpha.1"
 
 # Publish order = topological by dep graph (leaves first).
+# 11 publishable crates after the wxf/export refactor on feature/wxf.
 ORDER=(
-  wolfram-expr                  # no internal deps
-  wolfram-library-link-macros   # no internal deps
   wolfram-app-discovery         # no internal deps
-  wstp-sys                      # build-dep: wolfram-app-discovery
-  wolfram-library-link-sys      # build-dep: wolfram-app-discovery
-  wstp                          # deps: wstp-sys, wolfram-expr
-  wolfram-library-link          # deps: -macros, -sys, wstp, wolfram-expr
+  wolfram-wxf-macros            # no internal deps (proc-macro)
+  wolfram-export-macros         # no internal deps (proc-macro)
+  wolfram-wxf                   # deps: wxf-macros
+  wolfram-expr                  # deps: wxf
+  wolfram-export-core           # deps: expr, wxf
+  wstp-sys                      # build-dep: app-discovery
+  wolfram-library-link-sys      # build-dep: app-discovery, expr
+  wstp                          # deps: expr, wxf (dev-dep: app-discovery)
+  wolfram-library-link          # deps: export-core, export-macros, expr, lib-link-sys, wstp (optional)
+  wolfram-export                # deps: export-core, export-macros, expr, lib-link, lib-link-sys, wxf, wstp
 )
 
 MODE="dry-run"
@@ -74,7 +83,7 @@ for crate in "${ORDER[@]}"; do
     die "$crate/Cargo.toml version is '$actual', expected '$RELEASE_VERSION'"
   fi
 done
-ok "all 7 crates pinned to $RELEASE_VERSION"
+ok "all 11 crates pinned to $RELEASE_VERSION"
 
 # Confirm repository URL points at the monorepo for every publishable crate.
 for crate in "${ORDER[@]}"; do
@@ -82,7 +91,7 @@ for crate in "${ORDER[@]}"; do
     die "$crate/Cargo.toml repository URL is not WolframResearch/wolfram-rust-library"
   fi
 done
-ok "all 7 crates point repository → WolframResearch/wolfram-rust-library"
+ok "all 11 crates point repository → WolframResearch/wolfram-rust-library"
 
 if [[ "$MODE" == "publish" ]]; then
   if ! git diff --quiet || ! git diff --cached --quiet; then
