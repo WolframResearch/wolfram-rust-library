@@ -29,23 +29,25 @@ set -euo pipefail
 #
 # Alpha versions are NOT picked up by normal `^x.y.z` requirements, so existing
 # downstream users won't auto-resolve to this release. Internal deps inside the
-# workspace use `=0.6.0-alpha.1` exact-pin (required for alpha pre-releases).
-RELEASE_VERSION="0.6.0-alpha.1"
+# workspace use `=X.Y.Z-alpha.N` exact-pin (required for alpha pre-releases).
+RELEASE_VERSION="0.6.0-alpha.2"
 
 # Publish order = topological by dep graph (leaves first).
 # 11 publishable crates after the wxf/export refactor on feature/wxf.
+# wolfram-wxf and wolfram-wxf-macros renamed to wolfram-serialize* in alpha.2
+# because `wolfram-wxf` was already taken on crates.io by an unrelated project.
 ORDER=(
-  wolfram-app-discovery         # no internal deps
-  wolfram-wxf-macros            # no internal deps (proc-macro)
-  wolfram-export-macros         # no internal deps (proc-macro)
-  wolfram-wxf                   # deps: wxf-macros
-  wolfram-expr                  # deps: wxf
-  wolfram-export-core           # deps: expr, wxf
-  wstp-sys                      # build-dep: app-discovery
-  wolfram-library-link-sys      # build-dep: app-discovery, expr
-  wstp                          # deps: expr, wxf (dev-dep: app-discovery)
-  wolfram-library-link          # deps: export-core, export-macros, expr, lib-link-sys, wstp (optional)
-  wolfram-export                # deps: export-core, export-macros, expr, lib-link, lib-link-sys, wxf, wstp
+  wolfram-app-discovery       # no internal deps
+  wolfram-serialize-macros    # no internal deps (proc-macro)
+  wolfram-export-macros       # no internal deps (proc-macro)
+  wolfram-serialize           # deps: serialize-macros
+  wolfram-expr                # deps: serialize
+  wolfram-export-core         # deps: expr, serialize
+  wstp-sys                    # build-dep: app-discovery
+  wolfram-library-link-sys    # build-dep: app-discovery, expr
+  wstp                        # deps: expr, serialize (dev-dep: app-discovery)
+  wolfram-library-link        # deps: export-core, export-macros, expr, lib-link-sys, wstp (optional)
+  wolfram-export              # deps: export-core, export-macros, expr, lib-link, lib-link-sys, serialize, wstp
 )
 
 MODE="dry-run"

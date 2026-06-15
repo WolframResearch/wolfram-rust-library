@@ -993,7 +993,7 @@ impl Link {
             | ExprKind::BigReal(_)
             | ExprKind::PackedArray(_)
             | ExprKind::NumericArray(_) => {
-                let wxf = wolfram_wxf::to_wxf(expr, None).map_err(|e| {
+                let wxf = wolfram_serialize::to_wxf(expr, None).map_err(|e| {
                     Error::custom(format!("put_expr: WXF serialization failed: {e:?}"))
                 })?;
                 self.put_raw_type(i32::from(sys::WSTKFUNC))?;

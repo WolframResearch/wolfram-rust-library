@@ -45,8 +45,8 @@ pub use self::packed_array::PackedArray;
 pub use self::wxf::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 
 // WXF serialization — the traits, derives, and entry points live in the
-// dependency-free `wolfram-wxf` crate; re-exported here for ergonomics.
-pub use wolfram_wxf::{
+// dependency-free `wolfram-serialize` crate; re-exported here for ergonomics.
+pub use wolfram_serialize::{
     from_wxf, from_wxf_ref, read_wxf, to_wxf, CompressionLevel, Failure, FromWXF, Reader,
     ToWXF,
 };

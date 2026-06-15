@@ -1,7 +1,7 @@
 //! WXF wrapper runtime: the proc-macro emits an inline `fn(NumericArray<u8>)
 //! -> NumericArray<u8>` shim around the user's typed function. That shim
 //! reads the bytes off the input NumericArray, calls
-//! `wolfram_wxf::deserialize::<A>()` to get the typed argument,
+//! `wolfram_serialize::deserialize::<A>()` to get the typed argument,
 //! invokes the user function, and `serialize`s the result back into a fresh
 //! UInt8 NumericArray.
 //!
@@ -16,9 +16,9 @@ use wolfram_expr::Expr;
 use wolfram_library_link::macro_utils::call_and_catch_as_expr;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::{NativeFunction, NumericArray};
-use wolfram_wxf::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
+use wolfram_serialize::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
 // Re-exported so the `#[export(wxf)]` proc-macro can name them by path.
-pub use wolfram_wxf::{FromWXF, ToWXF};
+pub use wolfram_serialize::{FromWXF, ToWXF};
 
 /// (arg types, return type) signature for every `#[export(wxf)]` function:
 /// one ByteArray in, one ByteArray out.
@@ -39,19 +39,19 @@ pub fn decode_args<R, F>(
     input: &NumericArray<u8>,
     n_expected: u64,
     read: F,
-) -> Result<R, wolfram_wxf::Error>
+) -> Result<R, wolfram_serialize::Error>
 where
-    F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_wxf::Error>,
+    F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_serialize::Error>,
 {
-    wolfram_wxf::read_wxf(input.as_slice(), |r| {
+    wolfram_serialize::read_wxf(input.as_slice(), |r| {
         let tok = r.read_expr_token()?;
         if tok != ExpressionEnum::Function {
-            return Err(wolfram_wxf::Error::unexpected_token(&["Function"], tok));
+            return Err(wolfram_serialize::Error::unexpected_token(&["Function"], tok));
         }
         let n = r.read_varint()?;
         r.skip()?; // discard head — any shape ok
         if n != n_expected {
-            return Err(wolfram_wxf::Error::ArgCountMismatch {
+            return Err(wolfram_serialize::Error::ArgCountMismatch {
                 expected: n_expected,
                 got: n,
             });
@@ -67,10 +67,10 @@ pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
     NumericArray::<u8>::from_slice(&bytes)
 }
 
-/// Encode an argument-decode failure for the kernel. A `wolfram_wxf::Error` is
+/// Encode an argument-decode failure for the kernel. A `wolfram_serialize::Error` is
 /// not itself a `Failure[…]`; we build one explicitly with `expr!`, carrying
 /// the error's `Debug` detail under `"Message"`, then serialize it.
-pub fn encode_arg_error(e: wolfram_wxf::Error) -> NumericArray<u8> {
+pub fn encode_arg_error(e: wolfram_serialize::Error) -> NumericArray<u8> {
     encode(&wolfram_expr::expr!(
         System::Failure["ArgumentError", { "Message" -> (format!("{e:?}")) }]
     ))
@@ -79,7 +79,7 @@ pub fn encode_arg_error(e: wolfram_wxf::Error) -> NumericArray<u8> {
 /// Serialize a result to owned WXF bytes. The bridge calls this *inside* the
 /// arg-reading closure so the (owned) `Vec<u8>` can escape while borrowed
 /// arguments stay confined to the closure.
-pub fn to_wxf_bytes<R: ToWXF>(value: &R) -> Result<Vec<u8>, wolfram_wxf::Error> {
+pub fn to_wxf_bytes<R: ToWXF>(value: &R) -> Result<Vec<u8>, wolfram_serialize::Error> {
     to_wxf(value, None)
 }
 

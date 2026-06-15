@@ -1,5 +1,5 @@
 use wolfram_expr::Expr;
-use wolfram_wxf_macros::{FromWXF, ToWXF};
+use wolfram_serialize_macros::{FromWXF, ToWXF};
 
 // ── Shared computation helpers ────────────────────────────────────────────────
 

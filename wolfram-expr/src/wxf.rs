@@ -1,13 +1,13 @@
-//! WXF wire-format enums, re-exported from [`wolfram_wxf`], plus the
+//! WXF wire-format enums, re-exported from [`wolfram_serialize`], plus the
 //! [`ArrayElement`] impls that map Rust primitives to element-type tags.
 //!
-//! The enum definitions live in the dependency-free `wolfram-wxf` crate; they
+//! The enum definitions live in the dependency-free `wolfram-serialize` crate; they
 //! are re-exported here so existing paths (`wolfram_expr::wxf::ExpressionEnum`,
 //! `wolfram_expr::NumericArrayEnum`, …) keep resolving.
 
 #![allow(missing_docs)]
 
-pub use wolfram_wxf::constants::{
+pub use wolfram_serialize::constants::{
     ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum,
 };
 

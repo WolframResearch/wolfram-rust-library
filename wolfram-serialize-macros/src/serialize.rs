@@ -2,7 +2,7 @@
 //!
 //! Streaming: each container writes a header
 //! (`write_association` / `write_function` / `write_symbol`) then writes its
-//! children directly to the [`WxfWriter`][wolfram_wxf::WxfWriter] — no
+//! children directly to the [`WxfWriter`][wolfram_serialize::WxfWriter] — no
 //! intermediate `Vec`, no `&dyn`. Field types are classified via [`ty_classify`]
 //! so `Vec<u8>` → ByteArray, `Vec<numeric>` / numeric tensors → NumericArray,
 //! and everything else delegates through `ToWXF`.
@@ -45,18 +45,18 @@ pub(crate) fn expand_with_attrs(
 
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics ::wolfram_wxf::ToWXF for #name #ty_generics #where_clause {
-            fn to_wxf<__W: ::wolfram_wxf::Writer>(
+        impl #impl_generics ::wolfram_serialize::ToWXF for #name #ty_generics #where_clause {
+            fn to_wxf<__W: ::wolfram_serialize::Writer>(
                 &self,
-                __w: &mut ::wolfram_wxf::WxfWriter<__W>,
-            ) -> ::core::result::Result<(), ::wolfram_wxf::Error> {
+                __w: &mut ::wolfram_serialize::WxfWriter<__W>,
+            ) -> ::core::result::Result<(), ::wolfram_serialize::Error> {
                 #body
                 ::core::result::Result::Ok(())
             }
         }
 
         #[automatically_derived]
-        impl #impl_generics ::wolfram_wxf::WxfStruct for #name #ty_generics #where_clause {}
+        impl #impl_generics ::wolfram_serialize::WxfStruct for #name #ty_generics #where_clause {}
     })
 }
 
@@ -155,7 +155,7 @@ fn emit_write_field(accessor: &TokenStream, ty: &syn::Type, span: Span) -> Token
             __w.write_function((#accessor).len())?;
             __w.write_symbol("System`List")?;
             for __e in (#accessor).iter() {
-                ::wolfram_wxf::ToWXF::to_wxf(__e, __w)?;
+                ::wolfram_serialize::ToWXF::to_wxf(__e, __w)?;
             }
         }},
         FieldKind::NumericTensor {
@@ -223,7 +223,7 @@ fn emit_write_field(accessor: &TokenStream, ty: &syn::Type, span: Span) -> Token
             }}
         },
         FieldKind::Other => quote_spanned! { span =>
-            ::wolfram_wxf::ToWXF::to_wxf(&(#accessor), __w)?;
+            ::wolfram_serialize::ToWXF::to_wxf(&(#accessor), __w)?;
         },
     }
 }
@@ -307,7 +307,7 @@ fn expand_enum(
             Fields::Unit => {
                 arms.push(quote! {
                     #name :: #v_name => {
-                        ::wolfram_wxf::strategy::write_unit_variant(__w, #head, #v_str)?;
+                        ::wolfram_serialize::strategy::write_unit_variant(__w, #head, #v_str)?;
                     }
                 });
             },
@@ -321,7 +321,7 @@ fn expand_enum(
                     });
                 arms.push(quote! {
                     #name :: #v_name ( #(#bindings),* ) => {
-                        ::wolfram_wxf::strategy::begin_data_variant(__w, #head, #v_str, #arity)?;
+                        ::wolfram_serialize::strategy::begin_data_variant(__w, #head, #v_str, #arity)?;
                         #(#elem_writes)*
                     }
                 });
@@ -340,7 +340,7 @@ fn expand_enum(
                 )?;
                 arms.push(quote! {
                     #name :: #v_name { #(#bindings),* } => {
-                        ::wolfram_wxf::strategy::begin_data_variant(__w, #head, #v_str, 1)?;
+                        ::wolfram_serialize::strategy::begin_data_variant(__w, #head, #v_str, 1)?;
                         __w.write_association(#arity)?;
                         #(#entry_writes)*
                     }

@@ -346,7 +346,7 @@ fn optional_field_missing_key_yields_none() {
     let err =
         from_wxf::<TwoOrThree>(missing_required).expect_err("missing `b` should error");
     let msg = format!("{:?}", err);
-    // `wolfram_wxf::Error` carries only `Debug`; assert it names the path
+    // `wolfram_serialize::Error` carries only `Debug`; assert it names the path
     // of the missing key (`TwoOrThree.b`).
     assert!(
         msg.contains("TwoOrThree.b"),

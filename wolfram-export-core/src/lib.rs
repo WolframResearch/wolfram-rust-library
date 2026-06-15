@@ -17,11 +17,11 @@
 pub use inventory;
 
 use wolfram_expr::{Expr, Symbol};
-use wolfram_wxf::{FromWXF, ToWXF};
+use wolfram_serialize::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
 /// via [`__wolfram_manifest_data__`]. Defined here so the CLI can share the
-/// type and deserialize directly with [`wolfram_wxf::deserialize`].
+/// type and deserialize directly with [`wolfram_serialize::deserialize`].
 #[derive(ToWXF, FromWXF, Debug)]
 #[allow(missing_docs)]
 pub struct FunctionEntry {
@@ -92,7 +92,7 @@ inventory::collect!(ExportEntry);
 pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
     let assoc: Expr = exported_library_functions_association(None);
     let bytes: Vec<u8> =
-        wolfram_wxf::to_wxf(&assoc, None).expect("manifest WXF serialization");
+        wolfram_serialize::to_wxf(&assoc, None).expect("manifest WXF serialization");
     // Leak the buffer so the pointer remains valid after this function returns.
     // The manifest is small and the caller (cargo-wolfram-manifest) only calls
     // this once per build.
@@ -112,7 +112,7 @@ pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
 /// Deserialize with:
 /// ```ignore
 /// let len = u64::from_le_bytes(buf[..8].try_into().unwrap()) as usize;
-/// wolfram_wxf::deserialize::<Vec<FunctionEntry>>(&buf[8..8+len], None)
+/// wolfram_serialize::deserialize::<Vec<FunctionEntry>>(&buf[8..8+len], None)
 /// ```
 #[cfg(feature = "automate-function-loading-boilerplate")]
 #[no_mangle]
@@ -145,7 +145,7 @@ pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
         .collect();
 
     let wxf =
-        wolfram_wxf::to_wxf(&entries, None).expect("manifest WXF serialization failed");
+        wolfram_serialize::to_wxf(&entries, None).expect("manifest WXF serialization failed");
     // Prepend the payload length as 8 little-endian bytes so the caller needs
     // no out-parameter — one zero-arg call, read [0..8] for the length, [8..] for WXF.
     let mut buf = Vec::with_capacity(8 + wxf.len());

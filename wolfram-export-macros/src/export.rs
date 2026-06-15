@@ -352,7 +352,7 @@ fn export_wxf_function(
                             #p::macro_utils::NumericArray::<u8>::from_slice(&__bytes)
                         }
                         // Arg decoding failed: build a `Failure["ArgumentError", …]`
-                        // from the `wolfram_wxf::Error` (it isn't a Failure itself).
+                        // from the `wolfram_serialize::Error` (it isn't a Failure itself).
                         ::core::result::Result::Err(__err) => {
                             #p::macro_utils::encode_arg_error(__err)
                         }

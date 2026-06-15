@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-examples"
-version = "0.6.0-alpha.1"
+version = "0.6.0-alpha.2"
 edition = "2021"
 publish = false
 
@@ -12,11 +12,11 @@ namespace-exports = true
 named-exports = false
 
 [dependencies]
-wolfram-library-link = { version = "=0.6.0-alpha.1", path = "../wolfram-library-link" }
-wolfram-expr = { version = "=0.6.0-alpha.1", path = "../wolfram-expr" }
-wolfram-export = { version = "=0.6.0-alpha.1", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
-wolfram-wxf = { version = "=0.6.0-alpha.1", path = "../wolfram-wxf" }
-wolfram-wxf-macros = { version = "=0.6.0-alpha.1", path = "../wolfram-wxf-macros" }
+wolfram-library-link = { version = "=0.6.0-alpha.2", path = "../wolfram-library-link" }
+wolfram-expr = { version = "=0.6.0-alpha.2", path = "../wolfram-expr" }
+wolfram-export = { version = "=0.6.0-alpha.2", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
+wolfram-serialize = { version = "=0.6.0-alpha.2", path = "../wolfram-serialize" }
+wolfram-serialize-macros = { version = "=0.6.0-alpha.2", path = "../wolfram-serialize-macros" }
 
 # Heavy, example-specific deps — only compiled when the `duckdb` feature is on.
 # DuckDB is statically compiled in via `bundled`; `vtab-arrow` enables native

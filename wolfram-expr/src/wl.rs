@@ -18,7 +18,7 @@ use crate::{expr, Expr, ExprKind, Normal, Number};
 /// string escaping come from the same place as everything else.
 fn wxf_display(f: &mut fmt::Formatter, expr: &Expr, indent: Option<usize>) -> fmt::Result {
     use base64::Engine;
-    match wolfram_wxf::to_wxf(expr, None) {
+    match wolfram_serialize::to_wxf(expr, None) {
         Ok(bytes) => {
             let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
             let e = expr!(::BinaryDeserialize[::ByteArray[(b64)]]);

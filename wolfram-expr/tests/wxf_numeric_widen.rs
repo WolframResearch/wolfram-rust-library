@@ -1,5 +1,5 @@
 //! Numeric-widening tests for WXF Vec<T> deserialization (relocated from the
-//! wolfram-wxf crate, which no longer depends on wolfram-expr).
+//! wolfram-serialize crate, which no longer depends on wolfram-expr).
 
 use wolfram_expr::{from_wxf, to_wxf, Expr, NumericArray, ToWXF};
 

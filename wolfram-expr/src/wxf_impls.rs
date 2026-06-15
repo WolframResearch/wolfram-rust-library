@@ -1,14 +1,14 @@
 //! [`ToWXF`]/[`FromWXF`] impls for the `wolfram-expr` value types.
 //!
 //! The traits, token cursor, and primitive/std impls live in the
-//! dependency-free [`wolfram_wxf`] crate; the impls here build `wolfram-expr`'s
+//! dependency-free [`wolfram_serialize`] crate; the impls here build `wolfram-expr`'s
 //! own types (`Expr`, `Symbol`, `Association`, `NumericArray`, `PackedArray`,
 //! `BigInteger`, `BigReal`) on top of the raw reader/writer.
 
 use std::convert::TryFrom;
 
-use wolfram_wxf::Error;
-use wolfram_wxf::{
+use wolfram_serialize::Error;
+use wolfram_serialize::{
     ExpressionEnum, FromWXF, NumericArrayEnum, PackedArrayEnum, Reader, ToWXF, Writer,
     WxfReader, WxfWriter,
 };
