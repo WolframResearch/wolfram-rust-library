@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-library-link"
-version = "0.5.0"
+version = "0.6.0-alpha.1"
 authors = ["Connor Gray <code@connorgray.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
@@ -20,16 +20,16 @@ include = [
 ]
 
 [dependencies]
-wolfram-export-macros          = { version = "0.5.0", path = "../wolfram-export-macros" }
+wolfram-export-macros          = { version = "=0.6.0-alpha.1", path = "../wolfram-export-macros" }
 
-wolfram-library-link-sys       = { version = "0.5.0", path = "../wolfram-library-link-sys" }
-wolfram-export-core            = { version = "0.5.0", path = "../wolfram-export-core" }
+wolfram-library-link-sys       = { version = "=0.6.0-alpha.1", path = "../wolfram-library-link-sys" }
+wolfram-export-core            = { version = "=0.6.0-alpha.1", path = "../wolfram-export-core" }
 
 # `wstp` is an optional dep. Gating it behind a feature lets `wolfram-export-wxf`
 # (and any future consumer wanting MArgument-only support) depend on
 # `wolfram-library-link` without pulling the WSTP transport stack.
-wstp         = { version = "0.5.0", path = "../wstp", optional = true }
-wolfram-expr = { version = "0.5.0", path = "../wolfram-expr" }
+wstp         = { version = "=0.6.0-alpha.1", path = "../wstp", optional = true }
+wolfram-expr = { version = "=0.6.0-alpha.1", path = "../wolfram-expr" }
 
 once_cell = "1.8.0"
 static_assertions = "1.1.0"
