@@ -62,8 +62,9 @@ enum DuckDbResult {
     PrepareError { code: Option<i32>, message: String },
     /// Executing a query failed → `Failure["ExecuteError", <|"Code" -> …, "Message" -> …|>]`.
     ExecuteError { code: Option<i32>, message: String },
-    /// Serializing Arrow batches to IPC failed → `Failure["SerializationError", <|"Code" -> …, "Message" -> …|>]`.
-    SerializationError { code: Option<i32>, message: String },
+    /// Serializing Arrow batches to IPC failed → `Failure["SerializationError", <|"Message" -> …|>]`.
+    /// Arrow IPC errors carry no numeric code, so there's no `Code` key here.
+    SerializationError { message: String },
     /// No open connection has this handle → `Failure["UnknownConnection", <|"Id" -> …|>]`.
     UnknownConnection { id: String },
 }
@@ -203,15 +204,15 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
         let mut writer = match arrow_ipc::writer::StreamWriter::try_new(&mut buf, &schema)
         {
             Ok(writer) => writer,
-            Err(e) => return DuckDbResult::SerializationError { code: None, message: e.to_string() },
+            Err(e) => return DuckDbResult::SerializationError { message: e.to_string() },
         };
         for batch in &batches {
             if let Err(e) = writer.write(batch) {
-                return DuckDbResult::SerializationError { code: None, message: e.to_string() };
+                return DuckDbResult::SerializationError { message: e.to_string() };
             }
         }
         if let Err(e) = writer.finish() {
-            return DuckDbResult::SerializationError { code: None, message: e.to_string() };
+            return DuckDbResult::SerializationError { message: e.to_string() };
         }
     }
 
