@@ -473,7 +473,7 @@ fn entry_load(e: &FunctionEntry, libvar: Symbol, key: &str) -> Option<RuleEntry>
             libvar,
             name,
             ::List[::List[::ByteArray, "Constant"]],
-            ::List[::ByteArray, "Constant"]
+            ::ByteArray
         ]]),
         _ => return None,
     };
