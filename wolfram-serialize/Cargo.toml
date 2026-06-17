@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-serialize"
-version = "0.6.0-alpha.2"
+version = "0.6.0-alpha.3"
 authors = ["Wolfram Research"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,6 +10,6 @@ keywords = ["wolfram", "wxf", "wolfram-language", "serialization", "mathematica"
 categories = ["encoding"]
 
 [dependencies]
-wolfram-serialize-macros = { version = "=0.6.0-alpha.2", path = "../wolfram-serialize-macros" }
+wolfram-serialize-macros = { version = "=0.6.0-alpha.3", path = "../wolfram-serialize-macros" }
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
 num_enum = "0.7"

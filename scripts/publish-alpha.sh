@@ -1,53 +1,42 @@
 #!/usr/bin/env bash
-# Publish all 11 publishable crates to crates.io at the version pinned in
-# RELEASE_VERSION below.
+# Publish the workspace's publishable crates to crates.io.
 #
-# Versions and repository URLs are already set in each Cargo.toml — this script
-# only validates and publishes; it does NOT mutate Cargo.toml. To re-publish
-# bump RELEASE_VERSION here AND every Cargo.toml first.
+# The version lives in each crate's Cargo.toml — this script never edits it and
+# has no copy of its own. cargo enforces version consistency at publish time via
+# the `=X.Y.Z` internal-dep pins, so there is nothing here to keep in sync.
 #
 # Modes:
-#   bash scripts/publish-alpha.sh                   # dry-run: cargo publish --dry-run
-#   bash scripts/publish-alpha.sh --publish         # really publish to crates.io
-#   bash scripts/publish-alpha.sh --check-only      # only run `cargo check --workspace`
-#   bash scripts/publish-alpha.sh --resume <crate>  # restart publish from <crate>
+#   bash scripts/publish-alpha.sh                   # dry-run (default)
+#   bash scripts/publish-alpha.sh --publish         # publish to crates.io + tag
+#   bash scripts/publish-alpha.sh --check-only      # just `cargo check --workspace`
+#   bash scripts/publish-alpha.sh --resume <crate>  # publish from <crate> onward
 #
 # Prerequisites:
-#   - cargo present
-#   - Run from a Wolfram-equipped machine — the -sys crates need Wolfram C
-#     headers (discovered via wolfram-app-discovery) at `cargo package` time.
-#   - `cargo login` done with a crates.io token that has publish rights on every
-#     crate listed in ORDER. Your manager must add you as an owner first:
-#       cargo owner --add riccardodivirgilio <crate>
-#   - For --publish: clean working tree (script bails otherwise).
+#   - cargo present.
+#   - Run on a Wolfram-equipped machine: the -sys crates need the Wolfram C
+#     headers (found via wolfram-app-discovery) when cargo packages them.
+#   - `cargo login` with a token that owns every crate in PUBLISH. New crates
+#     need an owner added first: cargo owner --add <user> <crate>
+#   - For --publish: a clean working tree (the script bails otherwise).
 
 set -euo pipefail
 
-# The single version every publishable crate is pinned to in Cargo.toml.
-# Bump here AND in every Cargo.toml if you need to re-publish — versions on
-# crates.io cannot be reused once published, only yanked.
-#
-# Alpha versions are NOT picked up by normal `^x.y.z` requirements, so existing
-# downstream users won't auto-resolve to this release. Internal deps inside the
-# workspace use `=X.Y.Z-alpha.N` exact-pin (required for alpha pre-releases).
-RELEASE_VERSION="0.6.0-alpha.2"
-
-# Publish order = topological by dep graph (leaves first).
-# 11 publishable crates after the wxf/export refactor on feature/wxf.
-# wolfram-wxf and wolfram-wxf-macros renamed to wolfram-serialize* in alpha.2
-# because `wolfram-wxf` was already taken on crates.io by an unrelated project.
-ORDER=(
-  wolfram-app-discovery       # no internal deps
-  wolfram-serialize-macros    # no internal deps (proc-macro)
-  wolfram-export-macros       # no internal deps (proc-macro)
-  wolfram-serialize           # deps: serialize-macros
-  wolfram-expr                # deps: serialize
-  wolfram-export-core         # deps: expr, serialize
-  wstp-sys                    # build-dep: app-discovery
-  wolfram-library-link-sys    # build-dep: app-discovery, expr
-  wstp                        # deps: expr, serialize (dev-dep: app-discovery)
-  wolfram-library-link        # deps: export-core, export-macros, expr, lib-link-sys, wstp (optional)
-  wolfram-export              # deps: export-core, export-macros, expr, lib-link, lib-link-sys, serialize, wstp
+# The publishable crates. cargo figures out the topological publish order itself
+# and resolves their inter-dependencies locally, so a single `cargo publish`
+# over the whole set validates even though the new versions aren't on crates.io
+# yet. (The other workspace members — examples, cli, xtask — are not published.)
+PUBLISH=(
+  wolfram-app-discovery
+  wolfram-serialize-macros
+  wolfram-export-macros
+  wolfram-serialize
+  wolfram-expr
+  wolfram-export-core
+  wstp-sys
+  wolfram-library-link-sys
+  wstp
+  wolfram-library-link
+  wolfram-export
 )
 
 MODE="dry-run"
@@ -63,96 +52,70 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$REPO_ROOT"
+cd "$(dirname "$0")/.."
 
 say()  { printf '\n\033[1;34m== %s ==\033[0m\n' "$*"; }
 ok()   { printf '\033[32m  ✓ %s\033[0m\n' "$*"; }
-warn() { printf '\033[33m  ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[31m  ✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- pre-flight
-say "Pre-flight checks"
+say "Pre-flight"
 command -v cargo >/dev/null || die "cargo not found in PATH"
-ok "cargo present: $(cargo --version)"
-ok "release version: $RELEASE_VERSION"
+ok "cargo: $(cargo --version)"
 
-# Sanity-check that every crate in ORDER actually has the expected version in
-# its Cargo.toml — protects against publishing a stale tree.
-for crate in "${ORDER[@]}"; do
-  actual=$(grep -E '^version\s*=' "$crate/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-  if [[ "$actual" != "$RELEASE_VERSION" ]]; then
-    die "$crate/Cargo.toml version is '$actual', expected '$RELEASE_VERSION'"
-  fi
-done
-ok "all 11 crates pinned to $RELEASE_VERSION"
-
-# Confirm repository URL points at the monorepo for every publishable crate.
-for crate in "${ORDER[@]}"; do
-  if ! grep -q 'WolframResearch/wolfram-rust-library' "$crate/Cargo.toml"; then
-    die "$crate/Cargo.toml repository URL is not WolframResearch/wolfram-rust-library"
-  fi
-done
-ok "all 11 crates point repository → WolframResearch/wolfram-rust-library"
+# All publishable crates share one version; read it from the first for the tag.
+VERSION=$(grep -E '^version\s*=' "${PUBLISH[0]}/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+[[ -n "$VERSION" ]] || die "could not read version from ${PUBLISH[0]}/Cargo.toml"
+ok "version: $VERSION"
 
 if [[ "$MODE" == "publish" ]]; then
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    die "working tree not clean — commit or stash first"
-  fi
+  git diff --quiet && git diff --cached --quiet || die "working tree not clean — commit or stash first"
   ok "working tree clean (branch: $(git rev-parse --abbrev-ref HEAD))"
 fi
 
 # ---------------------------------------------------------------- validate
-say "Validating with cargo check --workspace"
+say "cargo check --workspace"
 cargo check --workspace
-ok "workspace builds at $RELEASE_VERSION"
+ok "workspace builds"
 
 if [[ "$MODE" == "check" ]]; then
-  say "--check-only: stopping here"
+  say "--check-only: done"
   exit 0
 fi
 
 # ---------------------------------------------------------------- publish
-PUBLISH_FLAGS=()
+# Build the package set, dropping anything before --resume <crate>.
+PKG_ARGS=()
+skipping=false
+[[ -n "$RESUME_FROM" ]] && skipping=true
+for crate in "${PUBLISH[@]}"; do
+  if $skipping; then
+    [[ "$crate" == "$RESUME_FROM" ]] && skipping=false || { echo "  (skip $crate)"; continue; }
+  fi
+  PKG_ARGS+=(-p "$crate")
+done
+[[ ${#PKG_ARGS[@]} -gt 0 ]] || die "no crates selected (unknown --resume target '$RESUME_FROM'?)"
+
 if [[ "$MODE" == "dry-run" ]]; then
-  PUBLISH_FLAGS+=(--dry-run --allow-dirty)
-  say "DRY RUN — nothing will be pushed to crates.io"
-else
-  say "REAL PUBLISH — pushing to crates.io"
+  say "Dry-run $VERSION — nothing is pushed to crates.io"
+  cargo publish --dry-run --allow-dirty "${PKG_ARGS[@]}"
+  ok "dry-run OK"
+  exit 0
 fi
 
-skipping=true
-[[ -z "$RESUME_FROM" ]] && skipping=false
+say "Publishing $VERSION to crates.io"
+cargo publish "${PKG_ARGS[@]}"
+ok "published $VERSION"
 
-for crate in "${ORDER[@]}"; do
-  if $skipping; then
-    if [[ "$crate" == "$RESUME_FROM" ]]; then
-      skipping=false
-    else
-      echo "  (skip $crate — resuming from $RESUME_FROM)"
-      continue
-    fi
-  fi
-
-  say "Publishing $crate $RELEASE_VERSION"
-  (
-    cd "$crate"
-    cargo publish ${PUBLISH_FLAGS[@]+"${PUBLISH_FLAGS[@]}"}
-  )
-  if [[ "$MODE" == "publish" ]]; then
-    ok "$crate $RELEASE_VERSION published"
-    # Cargo ≥1.66 waits for the crate to land in the sparse index before
-    # returning, so the next crate sees this one. If you hit "not found"
-    # errors on older cargo versions, uncomment:
-    # sleep 20
-  else
-    ok "$crate $RELEASE_VERSION dry-run OK"
-  fi
-done
+# ---------------------------------------------------------------- tag
+TAG="v$VERSION"
+say "Tagging $TAG"
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  ok "tag $TAG already exists — skipping"
+else
+  git tag -a "$TAG" -m "Release $TAG across all crates"
+  git push origin "$TAG"
+  ok "tagged and pushed $TAG"
+fi
 
 say "Done"
-if [[ "$MODE" == "publish" ]]; then
-  echo "Suggested next step:"
-  echo "  git tag -a v$RELEASE_VERSION -m 'Release v$RELEASE_VERSION across all crates'"
-  echo "  git push origin v$RELEASE_VERSION"
-fi

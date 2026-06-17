@@ -4,8 +4,10 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use wolfram_app_discovery::SystemID;
-use wolfram_export_core::FunctionEntry;
-use wolfram_expr::{expr, Association, Expr, RuleEntry, Symbol};
+use wolfram_export_core::{
+    export_key, library_function_rule, with_callers, ExportKind, FunctionEntry,
+};
+use wolfram_expr::{expr, Association, Expr, Symbol};
 
 use crate::{BuildArgs, Result};
 
@@ -319,11 +321,14 @@ pub fn generate_package(
         .map(|(info, dest)| (*info, dest.as_str()))
         .collect();
 
-    // `With[{NativeCaller = …, WSTPCaller = …, WXFCaller = …, libN = …}, <|entries|>]`
-    let mut bindings = caller_bindings();
+    // `With[{NativeCaller = …, WSTPCaller = …, WXFCaller = …, libN = …}, <|entries|>]`.
+    // `with_callers` prepends the shared `NativeCaller`/`WSTPCaller`/`WXFCaller`
+    // bindings; here we only build the per-library `libN = FileNameJoin[...]`
+    // path bindings (one per dylib).
+    let mut lib_bindings = Vec::new();
     for (i, (_, dest)) in active.iter().enumerate() {
         let libvar = Symbol::new(&format!("lib{}", i + 1));
-        bindings.push(expr!(::Set[
+        lib_bindings.push(expr!(::Set[
             libvar,
             ::FileNameJoin[::List[::DirectoryName[::$InputFileName], (*dest)]]
         ]));
@@ -333,24 +338,31 @@ pub fn generate_package(
         .iter()
         .enumerate()
         .flat_map(|(i, (info, _))| {
-            let libvar = Symbol::new(&format!("lib{}", i + 1));
+            let libvar = Expr::from(Symbol::new(&format!("lib{}", i + 1)));
             let ns = config.namespace_exports;
             let info_name = info.name.clone();
             info.entries
                 .iter()
                 .filter_map(move |e| {
-                    let key = if ns {
-                        format!("{}::{}", info_name, e.name)
-                    } else {
-                        e.name.clone()
+                    let kind = ExportKind::from_kind_str(&e.kind)?;
+                    let key = export_key(ns.then(|| info_name.as_str()), &e.name);
+                    let native_sig = match kind {
+                        ExportKind::Native => Some((e.params.clone(), e.ret.clone())),
+                        _ => None,
                     };
-                    entry_load(e, libvar.clone(), &key)
+                    Some(library_function_rule(
+                        kind,
+                        &e.name,
+                        &key,
+                        libvar.clone(),
+                        native_sig,
+                    ))
                 })
                 .collect::<Vec<_>>()
         })
         .collect();
 
-    let functions = expr!(::With[bindings, entries]);
+    let functions = with_callers(lib_bindings, entries);
     write_wl(lib_dir.join("Functions.wl"), &functions)?;
 
     Ok(lib_dir)
@@ -385,14 +397,9 @@ fn artifact_assoc(info: &DylibInfo, dest: &str) -> Expr {
 /// kinds carry typed `"Params"`/`"Return"` specs; an unknown kind reports
 /// `Missing[]` for both.
 fn signature_assoc(e: &FunctionEntry) -> Expr {
-    // Type specs are stored pre-rendered (the manifest's `Expr::to_string()`),
-    // so re-inject each verbatim as a bare symbol.
-    let sym = |s: &str| Expr::from(Symbol::new(s));
     let (params, ret) = match e.kind.as_str() {
-        "Native" => {
-            let params: Vec<Expr> = e.params.iter().map(|p| sym(p)).collect();
-            (expr!(params), sym(&e.ret))
-        },
+        // Native carries the real argument/return type Exprs from the manifest.
+        "Native" => (Expr::from(e.params.clone()), e.ret.clone()),
         "Wstp" => (
             expr!(::List[::LinkObject, ::LinkObject]),
             expr!(::LinkObject),
@@ -412,72 +419,6 @@ fn signature_assoc(e: &FunctionEntry) -> Expr {
         "Params"   -> params,
         "Return"   -> ret
     })
-}
-
-/// The fixed caller bindings shared by every `Functions.wl`:
-/// `NativeCaller`, `WSTPCaller`, `WXFCaller`.
-fn caller_bindings() -> Vec<Expr> {
-    vec![
-        expr!(::Set[::NativeCaller, ::Identity]),
-        expr!(::Set[
-            ::WSTPCaller,
-            ::Function[::With[
-                ::List[::Set[::f, ::Slot[1]]],
-                ::Function[::Block[
-                    ::List[
-                        ::Set[::$Context, "RustLinkWSTPPrivateContext`"],
-                        ::Set[::$ContextPath, ::List[]]
-                    ],
-                    ::f[::SlotSequence[1]]
-                ]]
-            ]]
-        ]),
-        expr!(::Set[
-            ::WXFCaller,
-            ::Function[::Composition[
-                ::BinaryDeserialize,
-                ::Slot[1],
-                ::BinarySerialize,
-                ::List
-            ]]
-        ]),
-    ]
-}
-
-/// One `"key" -> Caller @ LibraryFunctionLoad[…]` entry for `Functions.wl`,
-/// or `None` for an unrecognized export kind.
-fn entry_load(e: &FunctionEntry, libvar: Symbol, key: &str) -> Option<RuleEntry> {
-    let sym = |s: &str| Expr::from(Symbol::new(s));
-    let name = e.name.as_str();
-    let rhs = match e.kind.as_str() {
-        "Native" => {
-            let params: Vec<Expr> = e.params.iter().map(|p| sym(p)).collect();
-            let ret = sym(&e.ret);
-            expr!(::NativeCaller[::LibraryFunctionLoad[
-                libvar,
-                name,
-                params,
-                ret
-            ]])
-        },
-        "Wstp" => expr!(::WSTPCaller[::LibraryFunctionLoad[
-            libvar,
-            name,
-            ::LinkObject,
-            ::LinkObject
-        ]]),
-        // `{ByteArray, "Constant"}` arg: like `&NumericArray<T>`, "Constant" is
-        // the no-mutate promise that lets the kernel skip a deep copy of the
-        // serialized input.
-        "Wxf" => expr!(::WXFCaller[::LibraryFunctionLoad[
-            libvar,
-            name,
-            ::List[::List[::ByteArray, "Constant"]],
-            ::ByteArray
-        ]]),
-        _ => return None,
-    };
-    Some(RuleEntry::rule(Expr::from(key), rhs))
 }
 
 pub fn copy_cross_dylibs(

@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-library-link-sys"
-version = "0.6.0-alpha.2"
+version = "0.6.0-alpha.3"
 authors = ["Connor Gray <code@connorgray.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -16,9 +16,9 @@ categories = ["external-ffi-bindings", "development-tools::ffi"]
 [dependencies]
 # `mcomplex` is re-exported from `wolfram-expr::Complex64` instead of being
 # bindgen-generated, so the same complex type is available across all crates.
-wolfram-expr = { version = "=0.6.0-alpha.2", path = "../wolfram-expr" }
+wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
 
 [build-dependencies]
 env_logger = "0.10.0"
 
-wolfram-app-discovery = { version = "=0.6.0-alpha.2", path = "../wolfram-app-discovery" }
+wolfram-app-discovery = { version = "=0.6.0-alpha.3", path = "../wolfram-app-discovery" }
