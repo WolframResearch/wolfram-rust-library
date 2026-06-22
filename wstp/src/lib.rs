@@ -882,25 +882,26 @@ impl Link {
                 }
             },
             TokenType::Real => {
-                // Read as the WL textual representation. A WL-side `N[Pi, 50]`
-                // arrives with a precision marker (backtick) in its string
-                // form — preserve it as ExprKind::BigReal so precision isn't
-                // silently lost. Plain reals parse via f64.
-                let s = self.get_number_as_string()?;
-                if s.contains('`') {
-                    Expr::new(ExprKind::BigReal(BigReal(s)))
-                } else {
-                    match s.parse::<f64>() {
-                        Ok(v) => {
-                            let real = wolfram_expr::F64::new(v).map_err(|_| {
-                                Error::custom(format!(
-                                    "NaN value passed on WSLINK cannot be used to construct an Expr"
-                                ))
-                            })?;
-                            Expr::number(Number::Real(real))
-                        },
-                        Err(_) => Expr::new(ExprKind::BigReal(BigReal(s))),
-                    }
+                // Fast path: WSGetReal64 covers all machine-precision reals.
+                // Note: WSGetReal64 silently truncates arbitrary-precision
+                // BigReal values — unlike WSGetInteger64 there is no overflow
+                // error. Fall back to the string representation only if the
+                // fast path fails (e.g. NaN from the kernel side).
+                match self.get_f64() {
+                    Ok(v) => {
+                        let real = wolfram_expr::F64::new(v).map_err(|_| {
+                            Error::custom(
+                                "NaN value passed on WSLINK cannot be used to construct an Expr"
+                                    .to_owned(),
+                            )
+                        })?;
+                        Expr::number(Number::Real(real))
+                    },
+                    Err(_) => {
+                        self.clear_error();
+                        let s = self.get_number_as_string()?;
+                        Expr::new(ExprKind::BigReal(BigReal(s)))
+                    },
                 }
             },
             TokenType::String => Expr::string(self.get_string_ref()?.as_str()),
