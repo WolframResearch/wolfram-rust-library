@@ -1,8 +1,8 @@
 //! WXF wire-format constants and enums.
 //!
-//! Mirrors `wolframclient/serializers/wxfencoder/constants.py`.
-
-#![allow(missing_docs)]
+//! Mirrors `wolframclient/serializers/wxfencoder/constants.py`. Each public enum
+//! is `#[repr(u8)]` with discriminants equal to the byte that tags the value on
+//! the wire, so `value as u8` is the wire byte and `TryFrom<u8>` decodes one.
 
 use std::convert::TryFrom;
 
@@ -105,8 +105,12 @@ fn token_to_name(byte: u8) -> &'static str {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum HeaderEnum {
+    /// Version marker (`8`) — the first byte of every WXF stream.
     Version = WXF_VERSION,
+    /// Header/body separator (`:`).
     Separator = WXF_HEADER_SEPARATOR,
+    /// Compression flag (`C`) — present between version and separator when the
+    /// body is zlib-compressed.
     Compress = WXF_HEADER_COMPRESS,
 }
 
@@ -118,25 +122,44 @@ pub enum HeaderEnum {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum ExpressionEnum {
+    /// General expression `head[args…]`, written as a length-prefixed head plus
+    /// elements (`f`).
     Function = WXF_FUNCTION,
+    /// A symbol such as `` System`Plus `` (`s`).
     Symbol = WXF_SYMBOL,
+    /// A UTF-8 string (`S`).
     String = WXF_STRING,
+    /// A raw byte buffer / `ByteArray` (`B`).
     ByteArray = WXF_BYTE_ARRAY,
+    /// Machine integer that fits in 8 bits (`C`).
     Integer8 = WXF_INTEGER8,
+    /// Machine integer that fits in 16 bits (`j`).
     Integer16 = WXF_INTEGER16,
+    /// Machine integer that fits in 32 bits (`i`).
     Integer32 = WXF_INTEGER32,
+    /// Machine integer that fits in 64 bits (`L`).
     Integer64 = WXF_INTEGER64,
+    /// IEEE 754 double-precision real (`r`).
     Real64 = WXF_REAL64,
+    /// Arbitrary-precision integer, encoded as its decimal digit string (`I`).
     BigInteger = WXF_BIG_INTEGER,
+    /// Arbitrary-precision real, encoded as its textual representation (`R`).
     BigReal = WXF_BIG_REAL,
+    /// A `PackedArray` of machine numbers (`0xC1`).
     PackedArray = WXF_PACKED_ARRAY,
+    /// A `NumericArray` of fixed-width numbers (`0xC2`).
     NumericArray = WXF_NUMERIC_ARRAY,
+    /// An `Association` of rules (`A`).
     Association = WXF_ASSOCIATION,
+    /// A `Rule` (`->`) entry inside an association (`-`).
     Rule = WXF_RULE,
+    /// A `RuleDelayed` (`:>`) entry inside an association (`:`).
     RuleDelayed = WXF_RULE_DELAYED,
 }
 
 impl ExpressionEnum {
+    /// The Wolfram Language head this token decodes to (e.g. `"Integer"`,
+    /// `"Real"`, `"List"`), as used in error and diagnostic messages.
     pub fn name(self) -> &'static str {
         token_to_name(self as u8)
     }
@@ -159,25 +182,40 @@ impl ExpressionEnum {
 )]
 #[repr(u8)]
 pub enum NumericArrayEnum {
+    /// Signed 8-bit integer elements (`i8`).
     Integer8 = WXF_ARRAY_INTEGER8,
+    /// Signed 16-bit integer elements (`i16`).
     Integer16 = WXF_ARRAY_INTEGER16,
+    /// Signed 32-bit integer elements (`i32`).
     Integer32 = WXF_ARRAY_INTEGER32,
+    /// Signed 64-bit integer elements (`i64`).
     Integer64 = WXF_ARRAY_INTEGER64,
+    /// Unsigned 8-bit integer elements (`u8`).
     UnsignedInteger8 = WXF_ARRAY_UNSIGNED_INTEGER8,
+    /// Unsigned 16-bit integer elements (`u16`).
     UnsignedInteger16 = WXF_ARRAY_UNSIGNED_INTEGER16,
+    /// Unsigned 32-bit integer elements (`u32`).
     UnsignedInteger32 = WXF_ARRAY_UNSIGNED_INTEGER32,
+    /// Unsigned 64-bit integer elements (`u64`).
     UnsignedInteger64 = WXF_ARRAY_UNSIGNED_INTEGER64,
+    /// 32-bit IEEE 754 float elements (`f32`).
     Real32 = WXF_ARRAY_REAL32,
+    /// 64-bit IEEE 754 float elements (`f64`).
     Real64 = WXF_ARRAY_REAL64,
+    /// Complex elements with 32-bit float real/imaginary parts.
     ComplexReal32 = WXF_ARRAY_COMPLEX_REAL32,
+    /// Complex elements with 64-bit float real/imaginary parts.
     ComplexReal64 = WXF_ARRAY_COMPLEX_REAL64,
 }
 
 impl NumericArrayEnum {
+    /// Size in bytes of a single element of this type (e.g. 1 for `Integer8`,
+    /// 16 for `ComplexReal64`).
     pub fn size_in_bytes(self) -> usize {
         token_to_size_in_bytes(self as u8)
     }
 
+    /// The element type's Wolfram Language name (e.g. `"Integer8"`, `"Real64"`).
     pub fn name(self) -> &'static str {
         token_to_name(self as u8)
     }
@@ -202,21 +240,32 @@ impl NumericArrayEnum {
 )]
 #[repr(u8)]
 pub enum PackedArrayEnum {
+    /// Signed 8-bit integer elements (`i8`).
     Integer8 = WXF_ARRAY_INTEGER8,
+    /// Signed 16-bit integer elements (`i16`).
     Integer16 = WXF_ARRAY_INTEGER16,
+    /// Signed 32-bit integer elements (`i32`).
     Integer32 = WXF_ARRAY_INTEGER32,
+    /// Signed 64-bit integer elements (`i64`).
     Integer64 = WXF_ARRAY_INTEGER64,
+    /// 32-bit IEEE 754 float elements (`f32`).
     Real32 = WXF_ARRAY_REAL32,
+    /// 64-bit IEEE 754 float elements (`f64`).
     Real64 = WXF_ARRAY_REAL64,
+    /// Complex elements with 32-bit float real/imaginary parts.
     ComplexReal32 = WXF_ARRAY_COMPLEX_REAL32,
+    /// Complex elements with 64-bit float real/imaginary parts.
     ComplexReal64 = WXF_ARRAY_COMPLEX_REAL64,
 }
 
 impl PackedArrayEnum {
+    /// Size in bytes of a single element of this type (e.g. 8 for `Integer64`,
+    /// 8 for `Real64`).
     pub fn size_in_bytes(self) -> usize {
         token_to_size_in_bytes(self as u8)
     }
 
+    /// The element type's Wolfram Language name (e.g. `"Integer64"`, `"Real64"`).
     pub fn name(self) -> &'static str {
         token_to_name(self as u8)
     }

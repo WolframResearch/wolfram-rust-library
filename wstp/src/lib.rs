@@ -163,7 +163,7 @@ use std::ffi::{c_char, CStr, CString};
 use std::fmt::{self, Display};
 use std::net;
 
-use wolfram_expr::{BigInteger, BigReal, Expr, ExprKind, Number, Symbol};
+use wolfram_expr::{BigInteger, BigReal, Expr, ExprKind, Symbol};
 use wstp_sys::{WSErrorMessage, WSReady, WSReleaseErrorMessage, WSLINK};
 
 //-----------------------------------
@@ -895,7 +895,7 @@ impl Link {
                                     .to_owned(),
                             )
                         })?;
-                        Expr::number(Number::Real(real))
+                        Expr::from(real.into_inner())
                     },
                     Err(_) => {
                         self.clear_error();

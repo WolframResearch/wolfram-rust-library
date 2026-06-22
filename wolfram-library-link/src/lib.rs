@@ -891,7 +891,7 @@ fn bool_from_mbool(boole: sys::mbool) -> bool {
 ///
 ///     let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 ///
-///     expr!(System::Quantity[duration.as_secs_f64(), "Seconds"])
+///     expr!(System::Quantity[(duration.as_secs_f64()), "Seconds"])
 /// }
 /// # }
 /// ```

@@ -13,6 +13,9 @@
 
 #![warn(missing_docs)]
 
+/// The `inventory` crate, re-exported so the `wolfram-export-*` runtime crates
+/// and the macros they drive can register entries through a single shared
+/// dependency.
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use inventory;
 
@@ -28,11 +31,14 @@ use wolfram_serialize::{FromWXF, ToWXF};
 /// Storing real `Expr`s — not stringified ones — keeps compound type specs like
 /// `List[LibraryDataType["NumericArray", "Integer8"], "Constant"]` intact.
 #[derive(ToWXF, FromWXF, Debug)]
-#[allow(missing_docs)]
 pub struct FunctionEntry {
+    /// Exported function name (the key used in the generated WL loader).
     pub name: String,
+    /// Transport mode as a string: `"Native"`, `"Wstp"`, or `"Wxf"`.
     pub kind: String,
+    /// Parameter type specs as `Expr`s (native mode only; empty otherwise).
     pub params: Vec<Expr>,
+    /// Return type spec as an `Expr` (native mode only; a placeholder otherwise).
     pub ret: Expr,
 }
 

@@ -328,21 +328,31 @@ impl Expr {
 /// Marked `#[non_exhaustive]` so that future variant additions (for new WXF wire types,
 /// etc.) are non-breaking. Downstream `match` expressions over `ExprKind` from outside
 /// this crate must include a `_ => …` arm.
-#[allow(missing_docs)]
 #[non_exhaustive]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ExprKind<E = Expr> {
+    /// A machine (64-bit) integer.
     Integer(i64),
+    /// A machine (64-bit) real, guaranteed non-NaN.
     Real(F64),
+    /// A string.
     String(String),
+    /// A symbol such as `` System`Plus ``.
     Symbol(Symbol),
+    /// A normal expression `head[args…]` — see [`Normal`].
     Normal(Normal<E>),
     // WXF-derived variants:
+    /// A `ByteArray` — a flat buffer of bytes.
     ByteArray(ByteArray),
+    /// An `Association` of key/value rules.
     Association(Association),
+    /// A `NumericArray` — a packed array of fixed-width numbers.
     NumericArray(NumericArray),
+    /// A `PackedArray` — a packed rectangular array of machine numbers.
     PackedArray(PackedArray),
+    /// An arbitrary-precision integer.
     BigInteger(BigInteger),
+    /// An arbitrary-precision real.
     BigReal(BigReal),
 }
 

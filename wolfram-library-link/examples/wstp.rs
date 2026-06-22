@@ -3,7 +3,7 @@
 
 use wolfram_library_link::{
     self as wll,
-    expr::{Expr, ExprKind, Number, Symbol},
+    expr::{Expr, ExprKind, Symbol},
     wstp::Link,
 };
 
@@ -202,33 +202,17 @@ fn expr_string_join(link: &mut Link) {
 
 #[wll::export(wstp)]
 fn total(args: Vec<Expr>) -> Expr {
-    let mut total = Number::Integer(0);
-
+    let mut total = 0.0f64;
     for (index, arg) in args.into_iter().enumerate() {
-        let number = match arg.kind() {
-            ExprKind::Integer(int) => Number::Integer(*int),
-            ExprKind::Real(real) => Number::Real(*real),
+        total += match arg.kind() {
+            ExprKind::Integer(n) => *n as f64,
+            ExprKind::Real(f) => f64::from(*f),
             _ => panic!(
                 "expected argument at position {} to be a number, got {}",
-                // Add +1 to display using WL 1-based indexing.
                 index + 1,
                 arg
             ),
         };
-
-        use Number::{Integer, Real};
-
-        total = match (total, number) {
-            // If the sum and new term are integers, use integers.
-            (Integer(total), Integer(term)) => Integer(total + term),
-            // Otherwise, if the either the total or new term are machine real numbers,
-            // use floating point numbers.
-            (Integer(int), Real(real)) | (Real(real), Integer(int)) => {
-                Number::real(int as f64 + *real)
-            },
-            (Real(total), Real(term)) => Real(total + term),
-        }
     }
-
-    Expr::number(total)
+    Expr::from(total)
 }

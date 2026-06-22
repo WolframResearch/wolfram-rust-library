@@ -23,7 +23,7 @@ use crate::Error;
 /// `#[derive(FromWXF)]` for structs and enums:
 ///
 /// ```
-/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf, CompressionLevel};
+/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf};
 ///
 /// #[derive(ToWXF, FromWXF, PartialEq, Debug)]
 /// struct Point {
@@ -32,7 +32,7 @@ use crate::Error;
 /// }
 ///
 /// let original = Point { x: 1.0, y: 2.0 };
-/// let bytes = to_wxf(&original, CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&original, None).unwrap();
 /// let roundtrip: Point = from_wxf(&bytes).unwrap();
 /// assert_eq!(original, roundtrip);
 /// ```
@@ -41,7 +41,7 @@ use crate::Error;
 /// input buffer (zero-copy):
 ///
 /// ```
-/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf_ref, CompressionLevel};
+/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf_ref};
 ///
 /// // Owned counterpart used for encoding
 /// #[derive(ToWXF)]
@@ -58,7 +58,7 @@ use crate::Error;
 /// }
 ///
 /// let ds = Dataset { name: "test".into(), values: vec![1.0, 2.0] };
-/// let bytes = to_wxf(&ds, CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&ds, None).unwrap();
 /// let ds_ref: DatasetRef<'_> = from_wxf_ref(&bytes).unwrap();
 /// assert_eq!(ds_ref.name, "test");  // borrowed, no alloc
 /// ```

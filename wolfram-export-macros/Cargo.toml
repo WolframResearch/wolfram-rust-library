@@ -26,6 +26,15 @@ quote = "1.0.14"
 # resolves through the right host crate path.
 proc-macro-crate = "3"
 
+# Doc-example only: the rustdoc examples expand `#[export]` into code that names
+# `::wolfram_export::*` (resolved via `proc-macro-crate`), so the runtime crates
+# must be present to compile them. These crates depend back on this one, but
+# Cargo permits dev-dependency cycles.
+[dev-dependencies]
+wolfram-export = { version = "=0.6.0-alpha.3", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
+wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
+wolfram-serialize = { version = "=0.6.0-alpha.3", path = "../wolfram-serialize" }
+
 [features]
 default = []
 automate-function-loading-boilerplate = []

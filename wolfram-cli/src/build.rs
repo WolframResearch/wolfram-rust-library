@@ -11,21 +11,38 @@ use wolfram_expr::{expr, Association, Expr, Symbol};
 
 use crate::{BuildArgs, Result};
 
+/// A compiled `cdylib` plus the LibraryLink functions it exports, as read from
+/// its `__wolfram_manifest__` symbol.
 pub struct DylibInfo {
+    /// Path to the freshly built dynamic library on disk.
     pub src: PathBuf,
+    /// The library file stem, e.g. `libmy_lib` (still carrying the `lib` prefix).
     pub filename: String,
+    /// The crate/library name with any leading `lib` prefix stripped.
     pub name: String,
+    /// SHA-256 of the library's bytes, used as the content-addressed file name
+    /// unless `named_exports` is set.
     pub hash: String,
+    /// The functions this library exports, decoded from its embedded manifest.
     pub entries: Vec<FunctionEntry>,
 }
 
+/// Fully resolved packaging settings, merged from CLI flags, the crate's
+/// `[package.metadata.wl.pacletinfo]` table, and built-in defaults.
 pub struct PacletConfig {
+    /// Paclet / library name used in the output directory and loader keys.
     pub name: String,
+    /// Paclet version string.
     pub version: String,
+    /// Destination directory for the generated package, if overridden.
     pub output: Option<PathBuf>,
+    /// Empty the destination directory before writing.
     pub cleanup: bool,
+    /// Copy each dylib under its original name instead of its content hash.
     pub named_exports: bool,
+    /// Prefix every function key with the library name (`"libname::fnname"`).
     pub namespace_exports: bool,
+    /// Extra `SystemID`s to cross-compile for in addition to the host.
     pub system_ids: Vec<SystemID>,
 }
 
@@ -124,6 +141,9 @@ pub fn resolve_paclet_config(
     }
 }
 
+/// Implements `cargo wl build`: builds the host `cdylib`s, generates the WL
+/// loader package, then cross-builds and copies binaries for any additional
+/// `SystemID`s. Prints the generated package directory to stdout.
 pub fn cmd_build(args: BuildArgs) -> Result<()> {
     let parsed = parse_forwarded_args(args.cargo_args)?;
     let host_system_id = SystemID::try_current_rust_target()
@@ -184,6 +204,9 @@ pub fn cmd_build(args: BuildArgs) -> Result<()> {
     Ok(())
 }
 
+/// Run `cargo build` (optionally for `rust_target`), streaming its JSON output
+/// to collect the paths of every emitted `cdylib` artifact. Exits the process
+/// with Cargo's status code if the build fails.
 pub fn run_cargo_build(
     cargo_args: &[String],
     rust_target: Option<&str>,
@@ -240,6 +263,8 @@ pub fn run_cargo_build(
     Ok(dylibs)
 }
 
+/// Read a built dylib, hash its bytes, derive its library name, and load the
+/// exported-function manifest embedded in it into a [`DylibInfo`].
 pub fn collect_dylib_info(dylib: &Path) -> Result<DylibInfo> {
     let bytes = std::fs::read(dylib)
         .map_err(|e| format!("failed to read {}: {e}", dylib.display()))?;
@@ -421,6 +446,9 @@ fn signature_assoc(e: &FunctionEntry) -> Expr {
     })
 }
 
+/// Place cross-compiled dylibs for `system_id` into the package, reusing the
+/// host build's manifest and file-naming (matched by library file stem) so the
+/// loader keys stay identical across platforms.
 pub fn copy_cross_dylibs(
     host_infos: &[DylibInfo],
     cross_dylibs: &[PathBuf],

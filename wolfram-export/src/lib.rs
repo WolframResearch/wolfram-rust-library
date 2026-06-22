@@ -23,7 +23,7 @@
 //! `__wolfram_manifest__` C symbol are always on (they're tiny and how the
 //! `cargo wl build` tool discovers exports).
 
-#![allow(missing_docs)]
+#![warn(missing_docs)]
 
 //==============================================================================
 // Always-on: shared inventory + manifest plumbing. The actual definitions live
@@ -44,12 +44,18 @@ pub use ::wolfram_export_core::inventory;
 // Mode-gated submodules.
 //==============================================================================
 
+/// Runtime support for native-mode exports (`#[export]` / `#[export_native]`),
+/// which are called over the raw `MArgument` C ABI.
 #[cfg(feature = "native")]
 pub mod native;
 
+/// Runtime support for WSTP-mode exports (`#[export(wstp)]` / `#[export_wstp]`),
+/// which are called over a WSTP `Link`.
 #[cfg(feature = "wstp")]
 pub mod wstp;
 
+/// Runtime support for WXF-mode exports (`#[export(wxf)]` / `#[export_wxf]`),
+/// which exchange typed values as a WXF `ByteArray`.
 #[cfg(feature = "wxf")]
 pub mod wxf;
 
@@ -58,6 +64,8 @@ pub mod wxf;
 // a separate `wolfram-export-macros` dep.
 //==============================================================================
 
+/// The `#[export]` family of attribute macros, re-exported so user code only
+/// needs a dependency on `wolfram-export`. See [`export`][macro@export].
 pub use wolfram_export_macros::{export, export_native, export_wstp, export_wxf, init};
 
 //==============================================================================

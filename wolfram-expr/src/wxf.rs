@@ -5,8 +5,6 @@
 //! are re-exported here so existing paths (`wolfram_expr::wxf::ExpressionEnum`,
 //! `wolfram_expr::NumericArrayEnum`, …) keep resolving.
 
-#![allow(missing_docs)]
-
 pub use wolfram_serialize::constants::{
     ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum,
 };

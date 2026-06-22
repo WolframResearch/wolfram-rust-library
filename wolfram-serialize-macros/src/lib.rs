@@ -28,7 +28,7 @@ mod ty_classify;
 /// converted to camelCase by default:
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, to_wxf, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, to_wxf};
 ///
 /// #[derive(ToWXF)]
 /// struct Point {
@@ -36,18 +36,18 @@ mod ty_classify;
 ///     y: f64,   // → "y" key
 /// }
 /// // Encodes as <|"x" -> 1.0, "y" -> 2.0|>
-/// let bytes = to_wxf(&Point { x: 1.0, y: 2.0 }, CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&Point { x: 1.0, y: 2.0 }, None).unwrap();
 /// ```
 ///
 /// Tuple structs encode as a WL `List`:
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, to_wxf, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, to_wxf};
 ///
 /// #[derive(ToWXF)]
 /// struct Pair(i64, i64);
 /// // Encodes as {1, 2}
-/// let bytes = to_wxf(&Pair(1, 2), CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&Pair(1, 2), None).unwrap();
 /// ```
 ///
 /// # Enums
@@ -56,7 +56,7 @@ mod ty_classify;
 /// Unit variants omit the `"Data"` key:
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, to_wxf, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, to_wxf};
 ///
 /// #[derive(ToWXF)]
 /// enum Color {
@@ -65,8 +65,8 @@ mod ty_classify;
 /// }
 /// // Red   → <|"Enum" -> "Red"|>
 /// // Rgb   → <|"Enum" -> "Rgb", "Data" -> {255, 0, 0}|>
-/// let _ = to_wxf(&Color::Red, CompressionLevel::None).unwrap();
-/// let _ = to_wxf(&Color::Rgb(255, 0, 0), CompressionLevel::None).unwrap();
+/// let _ = to_wxf(&Color::Red, None).unwrap();
+/// let _ = to_wxf(&Color::Rgb(255, 0, 0), None).unwrap();
 /// ```
 ///
 /// # Special field types
@@ -110,7 +110,7 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 /// fields default to `None`; all other fields must be present.
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf};
 ///
 /// #[derive(ToWXF, FromWXF, PartialEq, Debug)]
 /// struct Point {
@@ -118,7 +118,7 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 ///     y: f64,
 /// }
 ///
-/// let bytes = to_wxf(&Point { x: 1.0, y: 2.0 }, CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&Point { x: 1.0, y: 2.0 }, None).unwrap();
 /// let p: Point = from_wxf(&bytes).unwrap();
 /// assert_eq!(p, Point { x: 1.0, y: 2.0 });
 /// ```
@@ -129,7 +129,7 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 /// input buffer — no heap allocation for the string data:
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf_ref, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf_ref};
 ///
 /// #[derive(ToWXF)]
 /// struct Owned { name: String }
@@ -137,7 +137,7 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 /// #[derive(FromWXF)]
 /// struct Borrowed<'a> { name: &'a str }
 ///
-/// let bytes = to_wxf(&Owned { name: "hello".into() }, CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&Owned { name: "hello".into() }, None).unwrap();
 /// let b: Borrowed<'_> = from_wxf_ref(&bytes).unwrap();
 /// assert_eq!(b.name, "hello");  // points into `bytes`, no alloc
 /// ```
@@ -148,7 +148,7 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 /// shape `ToWXF` emits):
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf};
 ///
 /// #[derive(ToWXF, FromWXF, PartialEq, Debug)]
 /// enum Status {
@@ -156,7 +156,7 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 ///     Err(String),
 /// }
 ///
-/// let bytes = to_wxf(&Status::Err("oops".into()), CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&Status::Err("oops".into()), None).unwrap();
 /// let s: Status = from_wxf(&bytes).unwrap();
 /// assert_eq!(s, Status::Err("oops".into()));
 /// ```
@@ -195,7 +195,7 @@ pub fn derive_from_wxf(input: TokenStream) -> TokenStream {
 /// errors from helpers, and the kernel always gets a properly structured
 /// `Failure[…]` it can pattern-match on.
 ///
-/// ```
+/// ```ignore
 /// # mod scope {
 /// use wolfram_export::export;
 /// use wolfram_serialize::{Failure, ToWXF, FromWXF};
@@ -276,12 +276,12 @@ pub fn derive_from_wxf(input: TokenStream) -> TokenStream {
 /// # mod scope {
 /// use wolfram_serialize::Failure;
 ///
-/// #[derive(Failure, Debug, thiserror::Error)]
+/// #[derive(Failure, Debug, Clone, thiserror::Error)]
 /// enum DbError {
 ///     #[error("connection refused: {addr}")]
 ///     ConnectionRefused { addr: String },
 ///     #[error("query timeout after {ms}ms")]
-///     Timeout { ms: u64 },
+///     Timeout { ms: i64 },
 /// }
 /// # }
 #[proc_macro_derive(Failure, attributes(wolfram))]

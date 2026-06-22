@@ -17,7 +17,8 @@ use wolfram_library_link::call_and_catch_panic;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::{NativeFunction, NumericArray};
 use wolfram_serialize::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
-// Re-exported so the `#[export(wxf)]` proc-macro can name them by path.
+/// The WXF (de)serialization traits, re-exported so the `#[export(wxf)]`
+/// proc-macro can name them by path in generated code.
 pub use wolfram_serialize::{FromWXF, ToWXF};
 
 /// (arg types, return type) signature for every `#[export(wxf)]` function:

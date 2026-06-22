@@ -8,6 +8,9 @@ use crate::build::{
 };
 use crate::{EvaluateArgs, Result, TestArgs};
 
+/// Implements `cargo wl test`: builds every workspace `cdylib` example,
+/// packages them, then runs the given `.wlt` files (or all discovered ones)
+/// through a Wolfram kernel via `TestReport`.
 pub fn cmd_test(args: TestArgs) -> Result<()> {
     let host_system_id = SystemID::try_current_rust_target()
         .map_err(|e| format!("unsupported host platform: {e}"))?;
@@ -53,6 +56,8 @@ pub fn cmd_test(args: TestArgs) -> Result<()> {
     )
 }
 
+/// Implements `cargo wl evaluate`: evaluates each given file in a Wolfram
+/// kernel via `Get` and writes the resulting expression as WXF.
 pub fn cmd_evaluate(args: EvaluateArgs) -> Result<()> {
     run_wl_script(
         include_str!("../commands/evaluate.wl"),

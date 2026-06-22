@@ -13,7 +13,7 @@ use crate::Error;
 /// `#[derive(ToWXF)]` for structs and enums:
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, to_wxf, CompressionLevel};
+/// use wolfram_serialize::{ToWXF, to_wxf};
 ///
 /// #[derive(ToWXF)]
 /// struct Point {
@@ -22,22 +22,22 @@ use crate::Error;
 /// }
 ///
 /// let p = Point { x: 1.0, y: 2.0 };
-/// let bytes = to_wxf(&p, CompressionLevel::None).unwrap();
+/// let bytes = to_wxf(&p, None).unwrap();
 /// // `bytes` is a WXF-encoded <|"x" -> 1.0, "y" -> 2.0|>
 /// ```
 ///
 /// Primitive types and common collections have built-in implementations:
 ///
 /// ```
-/// use wolfram_serialize::{to_wxf, CompressionLevel};
+/// use wolfram_serialize::{to_wxf};
 ///
-/// let _ = to_wxf(&42_i64, CompressionLevel::None).unwrap();
-/// let _ = to_wxf(&3.14_f64, CompressionLevel::None).unwrap();
-/// let _ = to_wxf("hello", CompressionLevel::None).unwrap();
+/// let _ = to_wxf(&42_i64, None).unwrap();
+/// let _ = to_wxf(&3.14_f64, None).unwrap();
+/// let _ = to_wxf("hello", None).unwrap();
 /// // Vec<f64> encodes as NumericArray["Real64"]
-/// let _ = to_wxf(&vec![1.0_f64, 2.0, 3.0], CompressionLevel::None).unwrap();
+/// let _ = to_wxf(&vec![1.0_f64, 2.0, 3.0], None).unwrap();
 /// // Vec<u8> encodes as ByteArray
-/// let _ = to_wxf(&vec![0u8, 1, 2], CompressionLevel::None).unwrap();
+/// let _ = to_wxf(&vec![0u8, 1, 2], None).unwrap();
 /// ```
 pub trait ToWXF {
     /// Write `self` to `w` as a complete WXF value (tag + payload).

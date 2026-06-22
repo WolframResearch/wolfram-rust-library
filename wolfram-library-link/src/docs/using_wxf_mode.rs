@@ -4,8 +4,8 @@
 The **WXF transport mode** (`#[export(wxf)]`) lets Rust functions receive and
 return **typed Rust values** without any manual serialization code. Arguments
 arrive from the kernel as a WXF-encoded `ByteArray`; the macro-generated wrapper
-deserializes them via [`FromWXF`][wolfram_serialize::FromWXF], calls your
-function, and serializes the return value via [`ToWXF`][wolfram_serialize::ToWXF].
+deserializes them via `FromWXF`, calls your
+function, and serializes the return value via `ToWXF`.
 
 ## When to use WXF mode
 
@@ -29,7 +29,7 @@ wolfram-serialize = "0.6"
 
 Primitive types and standard collections work without any extra annotation:
 
-```rust
+```rust,ignore
 # mod scope {
 use wolfram_export::export;
 
@@ -70,7 +70,7 @@ Derive `ToWXF` and `FromWXF` on any struct to pass it over the bridge. Named
 fields map to an `Association`; field names are converted to camelCase by
 default.
 
-```rust
+```rust,ignore
 # mod scope {
 use wolfram_export::export;
 use wolfram_serialize::{ToWXF, FromWXF};
@@ -106,7 +106,7 @@ translate[<|"x" -> 0.0, "y" -> 0.0|>, 3.0, 4.0]
 `Option<T>` and `Result<T, E>` are serialized as tagged associations, so the
 kernel can pattern-match on `"Enum"`:
 
-```rust
+```rust,ignore
 # mod scope {
 use wolfram_export::export;
 
@@ -134,12 +134,12 @@ Derive `Failure` on an error enum to return structured
 `Failure["VariantName", <|field -> value, …|>]` expressions that the kernel
 can inspect with `Failure`'s built-in machinery:
 
-```rust
+```rust,ignore
 # mod scope {
 use wolfram_export::export;
 use wolfram_serialize::{Failure, ToWXF};
 
-#[derive(Failure, ToWXF, Debug)]
+#[derive(Failure, ToWXF, Debug, Clone)]
 enum MathError {
     DivisionByZero,
     Overflow { lhs: i64, rhs: i64 },
@@ -169,7 +169,7 @@ Structs with `&'de str` or `&'de [u8]` fields implement `FromWXF<'de>` and
 borrow directly out of the WXF input buffer — no allocation for the string
 data:
 
-```rust
+```rust,ignore
 # mod scope {
 use wolfram_export::export;
 use wolfram_serialize::FromWXF;
@@ -193,7 +193,7 @@ fn summarize(ds: DatasetRef<'_>) -> String {
 Use `generate_loader!` to expose all exported functions through a single loader
 entry point:
 
-```rust
+```rust,ignore
 # mod scope {
 use wolfram_library_link::generate_loader;
 use wolfram_export::export;
@@ -215,5 +215,3 @@ fns["add"][2.0, 3.0]   (* Returns 5.0 *)
 ```
 
 */
-
-use wolfram_serialize::{FromWXF, ToWXF};

@@ -1,3 +1,31 @@
+//! `cargo wl` — a Cargo subcommand for building and packaging Wolfram
+//! LibraryLink crates written in Rust.
+//!
+//! The binary is named `cargo-wl`, so once it is on `PATH` (e.g. via
+//! `cargo install --path wolfram-cli`) Cargo invokes it as `cargo wl …`.
+//!
+//! # Subcommands
+//!
+//! - **`cargo wl build`** — compile the crate's `cdylib` targets and generate a
+//!   Wolfram Language loader package (`Functions.wl`, `Artifacts.wl`,
+//!   `PacletInfo.wl`) alongside each binary. Exported functions are discovered
+//!   from the `__wolfram_manifest__` symbol emitted by `#[export]`, so no
+//!   hand-written WL glue is required. Can optionally cross-compile for several
+//!   Wolfram `SystemID`s in one invocation.
+//! - **`cargo wl test`** — build every workspace `cdylib` example, package them,
+//!   then run `.wlt` test files through a Wolfram kernel using `TestReport`.
+//! - **`cargo wl evaluate`** — evaluate `.wl` files in a Wolfram kernel using
+//!   `Get`, with the built package on the `LibraryPath`.
+//!
+//! Paclet metadata (name, version, output dir, SystemIDs, …) is read from the
+//! crate's `[package.metadata.wl.pacletinfo]` table; CLI flags override it. See
+//! [`build::resolve_paclet_config`] for the precedence rules.
+//!
+//! On success `build` prints the generated package directory to stdout (one
+//! path per line); Cargo and kernel diagnostics go to stderr.
+
+#![warn(missing_docs)]
+
 mod build;
 mod commands;
 
@@ -40,6 +68,7 @@ enum WlScriptCmd {
     Evaluate(EvaluateArgs),
 }
 
+/// Arguments for `cargo wl build`.
 #[derive(Parser)]
 pub struct BuildArgs {
     /// Destination folder for the package (default: <dylib_dir>/wl-package/)
@@ -63,6 +92,7 @@ pub struct BuildArgs {
     pub cargo_args: Vec<String>,
 }
 
+/// Arguments for `cargo wl test`.
 #[derive(Parser)]
 pub struct TestArgs {
     /// Where to write the result expression as WXF (default: temp dir)
@@ -75,6 +105,7 @@ pub struct TestArgs {
     pub files: Vec<String>,
 }
 
+/// Arguments for `cargo wl evaluate`.
 #[derive(Parser)]
 pub struct EvaluateArgs {
     /// Where to write the result expression as WXF (default: temp dir)

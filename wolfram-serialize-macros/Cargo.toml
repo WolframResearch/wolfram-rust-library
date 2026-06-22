@@ -21,3 +21,11 @@ proc-macro = true
 proc-macro2 = "1.0.36"
 syn = { version = "1.0.85", features = ["full", "extra-traits"] }
 quote = "1.0.14"
+
+# Doc-example only: the derives emit `::wolfram_serialize::*` paths, so the
+# rustdoc examples need the runtime crate present to compile. `wolfram-serialize`
+# depends back on this crate, but Cargo permits dev-dependency cycles.
+[dev-dependencies]
+wolfram-serialize = { version = "=0.6.0-alpha.3", path = "../wolfram-serialize" }
+wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
+thiserror = "2"

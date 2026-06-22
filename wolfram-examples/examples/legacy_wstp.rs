@@ -1,6 +1,6 @@
 use wolfram_library_link::{
     self as wll,
-    expr::{ByteArray, Expr, ExprKind, Number, NumericArray, NumericArrayEnum, Symbol},
+    expr::{ByteArray, Expr, ExprKind, NumericArray, NumericArrayEnum, Symbol},
     wstp::Link,
 };
 
@@ -50,23 +50,15 @@ fn string_join(link: &mut Link) {
 
 #[wll::export(wstp)]
 fn total(args: Vec<Expr>) -> Expr {
-    let mut total = Number::Integer(0);
+    let mut total = 0.0f64;
     for (i, arg) in args.into_iter().enumerate() {
-        let number = match arg.kind() {
-            ExprKind::Integer(int) => Number::Integer(*int),
-            ExprKind::Real(real) => Number::Real(*real),
+        total += match arg.kind() {
+            ExprKind::Integer(n) => *n as f64,
+            ExprKind::Real(f) => f64::from(*f),
             _ => panic!("expected number at position {}", i + 1),
         };
-        use Number::{Integer, Real};
-        total = match (total, number) {
-            (Integer(a), Integer(b)) => Integer(a + b),
-            (Integer(int), Real(real)) | (Real(real), Integer(int)) => {
-                Number::real(int as f64 + *real)
-            },
-            (Real(a), Real(b)) => Real(a + b),
-        };
     }
-    Expr::number(total)
+    Expr::from(total)
 }
 
 // ── Expression round-trips ────────────────────────────────────────────────────
