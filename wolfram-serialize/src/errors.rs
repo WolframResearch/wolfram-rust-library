@@ -15,7 +15,7 @@
 
 use crate::constants::ExpressionEnum;
 
-/// Errors returned by [`to_wxf`][crate::to_wxf] / [`from_wxf`][crate::from_wxf] and every
+/// Errors returned by [`to_wxf`][fn@crate::to_wxf] / [`from_wxf`][fn@crate::from_wxf] and every
 /// [`ToWXF`][crate::ToWXF] / [`FromWXF`][crate::FromWXF] impl.
 #[derive(Debug)]
 pub enum Error {

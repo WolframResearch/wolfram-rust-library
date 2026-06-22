@@ -95,6 +95,7 @@ impl Expr {
     /// }
     /// ```
     #[deprecated(note = "match on `Expr::kind()` instead")]
+    #[allow(deprecated)]
     pub fn try_as_number(&self) -> Option<Number> {
         match self.kind() {
             ExprKind::Integer(int) => Some(Number::Integer(*int)),
@@ -215,7 +216,7 @@ impl From<i32> for Expr {
 
 impl From<i64> for Expr {
     fn from(int: i64) -> Expr {
-        Expr::number(Number::Integer(int))
+        Expr::new(ExprKind::Integer(int))
     }
 }
 
@@ -237,6 +238,7 @@ impl From<f64> for Expr {
 //     }
 // }
 
+#[allow(deprecated)]
 impl From<Number> for ExprKind {
     fn from(number: Number) -> ExprKind {
         match number {

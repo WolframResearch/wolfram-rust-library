@@ -4,7 +4,7 @@
 //! `write_bytes`. A blanket impl covers every [`std::io::Write`] sink — so
 //! `Vec<u8>`, `File`, `TcpStream`, `ZlibEncoder`, `BufWriter`, etc. all work
 //! without any extra code. Streaming compression is therefore free: pass a
-//! `ZlibEncoder<Vec<u8>>` as the inner sink of a [`WxfWriter`] and the token
+//! `ZlibEncoder<Vec<u8>>` as the inner sink of a `WxfWriter` and the token
 //! stream is compressed on the fly, with no intermediate allocation.
 
 use crate::Error;

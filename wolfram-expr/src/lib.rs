@@ -151,9 +151,27 @@ impl Expr {
     }
 
     /// Construct a new expression from a [`Number`].
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::{Expr, ExprKind, F64};
+    /// // Expr::number(Number::Integer(42))
+    /// let _int = Expr::from(42_i64);
+    ///
+    /// // Expr::number(Number::real(3.14))
+    /// let _real = Expr::from(3.14_f64);  // or Expr::real(3.14)
+    ///
+    /// // Expr::number(Number::Real(f))  — when you already have an F64
+    /// let f = F64::new(3.14).unwrap();
+    /// let _real = Expr::new(ExprKind::Real(f));
+    /// ```
+    #[deprecated(since = "0.6.0-alpha.3", note = "use `Expr::from(i64)` or `Expr::from(f64)` instead")]
+    #[allow(deprecated)]
     pub fn number(num: Number) -> Expr {
-        Expr {
-            inner: Arc::new(ExprKind::from(num)),
+        match num {
+            Number::Integer(i) => Expr::from(i),
+            Number::Real(r)    => Expr::new(ExprKind::Real(r)),
         }
     }
 
@@ -175,7 +193,9 @@ impl Expr {
     ///
     /// This function will panic if `real` is NaN.
     pub fn real(real: f64) -> Expr {
-        Expr::number(Number::real(real))
+        let r = ordered_float::NotNan::new(real)
+            .unwrap_or_else(|_| panic!("Expr::real: got NaN"));
+        Expr::new(ExprKind::Real(r))
     }
 
     /// Returns the outer-most symbol "tag" used in this expression.
@@ -343,14 +363,35 @@ pub struct Normal<E = Expr> {
 }
 
 /// Subset of [`ExprKind`] that covers number-type expression values.
+///
+/// # Migration
+///
+/// Match on [`ExprKind`] directly — no intermediate `Number` needed:
+///
+/// ```
+/// # use wolfram_expr::{Expr, ExprKind, expr};
+/// let expr = expr!(42);
+///
+/// // Before:
+/// // if let Some(n) = expr.try_as_number() {
+/// //     match n { Number::Integer(i) => …, Number::Real(r) => … }
+/// // }
+///
+/// // After:
+/// match expr.kind() {
+///     ExprKind::Integer(i) => println!("integer: {i}"),
+///     ExprKind::Real(r)    => println!("real: {}", r.into_inner()),
+///     _ => {} // non-numeric expression
+/// }
+/// ```
+///
+/// To *construct* a number expression use [`Expr::from`] or [`Expr::real`] — see
+/// [`Expr::number`] for the full mapping.
+#[deprecated(since = "0.6.0-alpha.3", note = "match on `ExprKind::Integer` / `ExprKind::Real` directly")]
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Number {
-    // TODO: Rename this to MachineInteger
     Integer(i64),
-    // TODO: Make an explicit MachineReal type which hides the inner f64, so that other
-    //       code can make use of WL machine reals with a guaranteed type. In
-    //       particular, change wl_compile::mir::Constant to use that type.
     Real(F64),
 }
 
@@ -398,19 +439,25 @@ impl Normal {
     }
 }
 
+#[allow(deprecated)]
 impl Number {
+    /// Construct a `Number::Real` from an `f64`.
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::Expr;
+    /// // Before: Expr::number(Number::real(3.14))
+    /// let _real = Expr::from(3.14_f64);  // or Expr::real(3.14)
+    /// ```
+    ///
     /// # Panics
     ///
-    /// This function will panic if `r` is NaN.
-    ///
-    /// TODO: Change this function to take `NotNan` instead, so the caller doesn't have to
-    ///       worry about panics.
+    /// Panics if `r` is NaN.
+    #[deprecated(since = "0.6.0-alpha.3", note = "use `Expr::from(f64)` or `Expr::real(f64)` instead")]
     pub fn real(r: f64) -> Self {
-        let r = match ordered_float::NotNan::new(r) {
-            Ok(r) => r,
-            Err(_) => panic!("Number::real: got NaN"),
-        };
-        Number::Real(r)
+        let ExprKind::Real(f) = Expr::real(r).to_kind() else { unreachable!() };
+        Number::Real(f)
     }
 }
 

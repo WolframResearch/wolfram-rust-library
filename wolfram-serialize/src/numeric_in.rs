@@ -3,8 +3,8 @@
 //! target `T`. The widening rules are lossless: a source type is accepted
 //! only when every value of its domain is exactly representable in the target.
 //!
-//! Used by the hand-written `Vec<T>` impls in [`crate::from_wolfram`] and by
-//! the field-extract code emitted by the `FromWolfram` derive macro
+//! Used by the hand-written `Vec<T>` impls in [`crate::from_wxf`][fn@crate::from_wxf] and by
+//! the field-extract code emitted by the `FromWXF` derive macro
 //! (`VecOfNumeric` and `NumericTensor` field kinds).
 //!
 //! `ByteArray` on the wire is treated as a 1-D `NumericArray<Integer8>` before

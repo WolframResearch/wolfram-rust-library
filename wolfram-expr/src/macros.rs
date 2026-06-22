@@ -11,7 +11,7 @@
 /// | `expr!(::Name)` / `expr!(::Name[…])` | the **context-less** symbol `Name` (works nested in arg, splice, and association-value positions too) |
 /// | `expr!(::$Name)` / `expr!(::$Name[…])` | the context-less `$`-symbol `$Name` (e.g. `` $Context ``, `` $InputFileName ``) |
 /// | `expr!(k -> v)` | `Rule[k, v]` — usable inline inside `…[...]` |
-/// | `expr!({k -> v, ...})` | `Association` |
+/// | `expr!({k -> v, ...})` | `Association` — every element must be a `->` Rule; bare values are a compile error |
 /// | `expr!(true)` / `expr!(false)` | `True` / `False` symbols |
 /// | `expr!("str")`, `expr!(42)`, `expr!(3.14)` | string / integer / real |
 /// | `expr!(rust_var)`, `expr!((rust_expr))` | `Expr::from(…)` |
@@ -32,11 +32,22 @@
 /// ```
 /// # use wolfram_expr::{Expr, Symbol, expr};
 /// let msg = "something went wrong";
+///
+/// // Failure["RustPanic", <|"MessageTemplate" -> "something went wrong"|>]
+/// // {…} always produces an Association; non-Rule elements are a compile error.
 /// let e = expr!(System::Failure["RustPanic", {"MessageTemplate" -> msg}]);
+///
+/// // {1, 2, 3}
 /// let list = expr!(System::List[1, 2, 3]);
+///
+/// // Tabular`Arrow`ToTabular[{1, 2, 3}]
+/// // Each `::` becomes a context backtick; `list` is a Rust variable spliced as-is.
 /// let table = expr!(Tabular::Arrow::ToTabular[list]);
+///
 /// let head = Symbol::new("Global`f");
-/// let call = expr!(head[1, 2]);   // a variable head — a call over `head`
+/// // f[1, 2]  — bare ident in head position is a Rust variable, not a symbol.
+/// // To call a symbol by name write expr!(Global::f[1, 2]) instead.
+/// let call = expr!(head[1, 2]);
 /// ```
 #[macro_export]
 macro_rules! expr {

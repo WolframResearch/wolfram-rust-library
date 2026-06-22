@@ -1,5 +1,5 @@
-//! Complex number primitives suitable as element types of [`NumericArray`] and
-//! [`PackedArray`][crate::PackedArray].
+//! Complex number primitives suitable as element types of `NumericArray` and
+//! `PackedArray`.
 //!
 //! [`Complex64`] is byte-layout-compatible with the C ABI's `_Complex double`
 //! (and thus `wolfram_library_link_sys::mcomplex`, which re-exports this same
@@ -7,8 +7,6 @@
 //!
 //! Both types are `#[repr(C)]` with two interleaved real/imaginary scalar fields,
 //! matching WXF's wire layout for `ComplexReal{32,64}` array elements.
-//!
-//! [`NumericArray`]: crate::NumericArray
 
 /// Generic complex number — pair of identical scalars `(re, im)` with
 /// C-compatible interleaved layout. Use the [`Complex64`] / [`Complex32`]

@@ -11,7 +11,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::{expr, Expr, ExprKind, Normal, Number};
+use crate::{expr, Expr, ExprKind, Normal};
 
 /// Serialize `expr` to WXF bytes and format as `BinaryDeserialize[ByteArray["<base64>"]]`.
 /// Built with `expr!` and rendered through `fmt_kind` so the bracketing and
@@ -250,8 +250,12 @@ impl fmt::Display for Normal {
     }
 }
 
-impl fmt::Display for Number {
+#[allow(deprecated)]
+impl fmt::Display for crate::Number {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_kind(f, &ExprKind::from(*self), None)
+        match self {
+            crate::Number::Integer(i) => fmt_kind(f, &ExprKind::Integer(*i), None),
+            crate::Number::Real(r)    => fmt_kind(f, &ExprKind::Real(*r), None),
+        }
     }
 }

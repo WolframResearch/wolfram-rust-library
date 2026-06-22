@@ -11,7 +11,7 @@
 //!
 //! Per-Rust-type encoding/decoding is [`ToWXF`] / [`FromWXF`], both generic over
 //! the byte layer (monomorphized, no `dyn`, streaming). Top-level entry points:
-//! [`to_wxf`] (compression optional), [`from_wxf`], [`read_wxf`].
+//! [`to_wxf`][fn@to_wxf] (compression optional), [`from_wxf`][fn@from_wxf], [`read_wxf`].
 
 #![warn(missing_docs)]
 
@@ -47,7 +47,7 @@ pub use crate::wxf::writer::WxfWriter;
 // macro / type namespaces.
 pub use wolfram_serialize_macros::{Failure, FromWXF, ToWXF};
 
-/// zlib compression level passed to [`to_wxf`].
+/// zlib compression level passed to [`to_wxf`][fn@to_wxf].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CompressionLevel {
     /// zlib level 1 — fastest, lowest ratio.
@@ -158,7 +158,7 @@ fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
 
 /// Read from a WXF blob (`8:` / `8C:` auto-detected) via a [`WxfReader`]. The
 /// closure can pull one or more top-level values — e.g. a `Function[List, …]`
-/// wrapper around several arguments. For a single value, prefer [`from_wxf`].
+/// wrapper around several arguments. For a single value, prefer [`from_wxf`][fn@from_wxf].
 pub fn read_wxf<T>(
     bytes: &[u8],
     f: impl for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<T, Error>,
@@ -180,7 +180,7 @@ pub fn from_wxf<T: for<'de> FromWXF<'de>>(bytes: &[u8]) -> Result<T, Error> {
 /// Deserialize `bytes` into a **borrowed** `T` whose `&str` / `&[u8]` fields
 /// point straight into `bytes` (zero-copy). The result borrows `bytes`, so the
 /// input must be **uncompressed** (`8:`) — a `8C:` payload would have to be
-/// decompressed into a temporary the borrow couldn't outlive (use [`from_wxf`]
+/// decompressed into a temporary the borrow couldn't outlive (use [`from_wxf`][fn@from_wxf]
 /// for the owned form, or [`read_wxf`] to borrow within a closure).
 pub fn from_wxf_ref<'de, T: FromWXF<'de>>(bytes: &'de [u8]) -> Result<T, Error> {
     use crate::constants::HeaderEnum;

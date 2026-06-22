@@ -31,7 +31,7 @@ mod sealed {
 /// Connects a Rust primitive to its element-type discriminant. Implemented
 /// once per `(type, tag)` pair: e.g. `i32: ArrayElement<NumericArrayEnum>`
 /// (with `TAG = Integer32`) and `i32: ArrayElement<PackedArrayEnum>` (with
-/// `TAG = Integer32`). Sealed — only the primitives in [`sealed`] above can
+/// `TAG = Integer32`). Sealed — only the primitives listed above can
 /// satisfy the `Sealed` super-bound.
 pub trait ArrayElement<Tag: Copy + PartialEq>: Copy + 'static + sealed::Sealed {
     /// The element-type tag for `Self` under this array kind.

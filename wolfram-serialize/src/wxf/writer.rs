@@ -16,7 +16,7 @@ pub struct WxfWriter<W> {
 
 impl<W: Writer> WxfWriter<W> {
     /// Wrap a raw writer. The writer emits only the WXF token stream — the
-    /// `8:` / `8C:` header is framing, written by [`crate::to_wxf`].
+    /// `8:` / `8C:` header is framing, written by [`crate::to_wxf`][fn@crate::to_wxf].
     pub fn new(inner: W) -> Self {
         WxfWriter { inner }
     }

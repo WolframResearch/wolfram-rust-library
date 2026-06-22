@@ -19,7 +19,7 @@ pub struct WxfReader<R> {
 
 impl<'de, R: Reader<'de>> WxfReader<R> {
     /// Wrap a raw reader. The reader is assumed to be positioned at the start of
-    /// the WXF payload (header already consumed — see [`crate::from_wxf`]).
+    /// the WXF payload (header already consumed — see [`crate::from_wxf`][fn@crate::from_wxf]).
     pub fn new(inner: R) -> Self {
         WxfReader { inner }
     }
