@@ -5,6 +5,14 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
 description = "Procedural macros (#[derive(ToWXF, FromWXF)]) for wolfram-serialize"
+keywords = ["wolfram", "wxf", "wolfram-language", "serialization", "macros"]
+categories = ["encoding"]
+readme = "README.md"
+
+include = [
+    "/src",
+    "/docs",
+]
 
 [lib]
 proc-macro = true

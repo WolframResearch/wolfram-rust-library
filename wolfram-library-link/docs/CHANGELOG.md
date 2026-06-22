@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.3] — 2026-06-19
+
+### Added
+
+* Added `#[derive(Failure)]` proc macro. Annotating an error enum with
+  `#[derive(Failure)]` automatically derives `From<YourEnum> for Expr`, mapping
+  each variant to a structured `Failure["VariantName", <|...|>]` WL expression
+  that the kernel can inspect.
+
+* Added new `LibraryError` type that covers all bridge failure modes — ABI
+  error codes, argument extraction failures, WSTP link errors, and loader
+  errors — in one unified enum. All `#[export]`-decorated functions now return
+  `LibraryError` on failure.
+
+* Added `#[export(wxf)]` via `wolfram-export`, enabling typed WXF `ByteArray`
+  transport as a third calling convention alongside native `MArgument` and WSTP.
+
+### Changed
+
+* `#[export]` and `#[init]` are now sourced from `wolfram-export-macros` and
+  re-exported here for backwards compatibility. The behaviour is identical for
+  the `native` and `wstp` modes.
+
+* `LibraryError` no longer has `NotInitialized`, `InvalidArgCount`, or
+  `return_code()`. The C-ABI error constants are used directly.
+
+* Panics from Rust functions are now caught and returned as structured
+  `Failure["RustPanic", <|...|>]` expressions rather than crashing the kernel
+  process.
+
+### Removed
+
+* Removed the `failure!` helper macro (superseded by `#[derive(Failure)]`).
+
+* Removed `CaughtPanic::to_pretty_expr` (logic is now internal to the panic
+  handler).
+
 
 ## [0.2.10] – 2023-08-28
 

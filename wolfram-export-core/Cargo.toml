@@ -5,6 +5,14 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
 description = "Shared inventory + manifest plumbing for the wolfram-export-* crates"
+keywords = ["wolfram", "wolfram-library-link", "librarylink", "wstp", "wxf"]
+categories = ["external-ffi-bindings", "development-tools::ffi"]
+readme = "README.md"
+
+include = [
+    "/src",
+    "/docs",
+]
 
 [dependencies]
 wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }

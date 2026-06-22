@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.3] — 2026-06-19
+
+### Added
+
+* Added `Link::get_number_as_string()` for reading any numeric token (integer or
+  real, arbitrary precision) as its decimal string representation. Used
+  internally by `get_expr` to recover `BigInteger` / `BigReal` values whose
+  precision exceeds `i64` / `f64`.
+
+* `put_expr` now supports `Association`, `ByteArray`, `BigInteger`, `BigReal`,
+  `NumericArray`, and `PackedArray` `ExprKind` variants. `Association` and
+  `ByteArray` are encoded directly via WSTP; the numeric/big types round-trip
+  through WXF (`BinaryDeserialize[ByteArray[…]]`).
+
+* `get_expr` now handles `BigInteger` and `BigReal` correctly: values that
+  overflow `i64` / `f64` fall back to `get_number_as_string()` and are wrapped
+  as `ExprKind::BigInteger` / `ExprKind::BigReal`. Reals with a WL precision
+  marker (`` ` ``) are preserved as `BigReal` rather than silently truncated.
+
 
 ## [0.2.9] — 2023-10-07
 

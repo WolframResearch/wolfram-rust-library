@@ -5,6 +5,14 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
 description = "Procedural macros for #[export_native], #[export_wstp], #[export_wxf]"
+keywords = ["wolfram", "wolfram-library-link", "librarylink", "wstp", "macros"]
+categories = ["external-ffi-bindings", "development-tools::ffi"]
+readme = "README.md"
+
+include = [
+    "/src",
+    "/docs",
+]
 
 [lib]
 proc-macro = true

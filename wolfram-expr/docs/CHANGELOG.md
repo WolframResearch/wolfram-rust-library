@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.3] — 2026-06-19
+
+### Added
+
+* Added the `expr!` declarative macro for building `Expr` values with WL-like
+  syntax. Supports context-qualified symbols (`System::Times[a, b]`), bare-ident
+  Rust variable heads (`head[a, b]`), context-less symbols (`::Name`),
+  `Rule`/`Association` literals (`{k -> v}`), splice args (`..iter`), boolean
+  shorthands (`true`/`false`), and nested expressions to any depth.
+
+* Extended `ExprKind` with new wire-level variants: `ByteArray`, `Association`,
+  `NumericArray`, `PackedArray`, `BigInteger`, and `BigReal`.
+
+* Added `From<Vec<Expr>> for Expr` (builds a `System`List[…]` Normal).
+
+* `Complex32` / `Complex64` unified with the `wolfram-serialize` complex type.
+
+### Changed
+
+* `Symbol::new` no longer validates the context path at runtime. Callers are
+  responsible for passing a valid `` Context`Name `` string.
+
+* `Association` is now a `BTreeMap<Expr, RuleEntry>` type alias; the previous
+  `Vec`-backed implementation is replaced.
+
+* `BigInteger` and `BigReal` are now `String` newtypes (no `num-bigint`
+  dependency).
+
 
 
 ## [0.1.4] – 2023-02-03

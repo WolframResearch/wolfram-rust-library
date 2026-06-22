@@ -5,6 +5,14 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
 description = "Unified #[export] runtime for Wolfram LibraryLink: native MArgument, WSTP Link, and typed WXF ByteArray modes — pick the modes you need via feature flags."
+keywords = ["wolfram", "wolfram-library-link", "librarylink", "wstp", "wxf"]
+categories = ["external-ffi-bindings", "development-tools::ffi"]
+readme = "README.md"
+
+include = [
+    "/src",
+    "/docs",
+]
 
 [dependencies]
 wolfram-export-macros = { version = "=0.6.0-alpha.3", path = "../wolfram-export-macros" }
