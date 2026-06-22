@@ -229,7 +229,7 @@
 
 mod args;
 mod async_tasks;
-pub mod catch_panic;
+pub(crate) mod catch_panic;
 mod data_store;
 mod errors;
 mod image;
@@ -271,6 +271,7 @@ pub use self::{
     args::{FromArg, IntoArg, NativeFunction},
     async_tasks::AsyncTaskObject,
     data_store::{DataStore, DataStoreNode, DataStoreNodeValue, Nodes},
+    catch_panic::call_and_catch_panic,
     errors::{LibraryError, FAILED_TO_INIT, FAILED_WITH_PANIC},
     image::{ColorSpace, Image, ImageData, ImageType, Pixel, UninitImage},
     library_data::{get_library_data, initialize, WolframLibraryData},
@@ -283,15 +284,6 @@ pub use self::{
 #[cfg(feature = "wstp")]
 pub use self::args::WstpFunction;
 
-// Re-export the new `wolfram-expr` portable value types under aliases that don't
-// shadow the existing wll types. Users wanting the WXF-portable forms can reach
-// them from this crate's namespace without an extra `use wolfram_expr` line.
-pub use wolfram_expr::NumericArray as OwnedNumericArray;
-pub use wolfram_expr::{
-    Association, ByteArray, NumericArrayEnum, NumericArrayRead, PackedArray,
-    PackedArrayEnum,
-};
-pub use wolfram_expr::{BigInteger, BigReal};
 
 use wolfram_library_link_sys::mint;
 #[cfg(feature = "wstp")]

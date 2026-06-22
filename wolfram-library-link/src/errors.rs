@@ -18,9 +18,9 @@ use crate::expr::{Expr, Failure};
 // C-ABI return codes for macro-generated wrapper code. `OFFSET` avoids clashing
 // with `sys::LIBRARY_FUNCTION_ERROR` and related kernel codes.
 const OFFSET: c_int = 1000;
-/// Returned when [`initialize()`][crate::initialize] failed.
+#[doc(hidden)]
 pub const FAILED_TO_INIT: c_int = OFFSET + 1;
-/// Returned when library code panicked and the Failure couldn't be communicated.
+#[doc(hidden)]
 pub const FAILED_WITH_PANIC: c_int = OFFSET + 2;
 
 /// An error raised at the LibraryLink boundary.

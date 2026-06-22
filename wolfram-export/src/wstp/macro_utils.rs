@@ -10,7 +10,7 @@
 use std::os::raw::c_int;
 use std::panic::AssertUnwindSafe;
 
-use wolfram_library_link::catch_panic::call_and_catch_panic;
+use wolfram_library_link::call_and_catch_panic;
 use wolfram_library_link::sys::{self, LIBRARY_NO_ERROR};
 use wolfram_library_link::WstpFunction;
 use wstp::Link;

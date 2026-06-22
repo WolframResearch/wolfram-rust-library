@@ -87,10 +87,6 @@ impl<Tag: Copy + PartialEq> ArrayBuf<Tag> {
         self.dimensions.iter().product()
     }
 
-    /// Total byte length of the buffer.
-    pub(crate) fn byte_count(&self) -> usize {
-        self.bytes.len()
-    }
 
     /// Construct from a typed slice. Dimensions must satisfy
     /// `prod(dimensions) == slice.len()`.
