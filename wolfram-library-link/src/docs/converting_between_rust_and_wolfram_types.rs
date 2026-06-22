@@ -49,11 +49,15 @@ transfering the expression using [WSTP](https://crates.io/crates/wstp), via the
 /*!
 ```
 
-### Method #2: Convert to [`Expr`]
+### Method #2: Build an [`Expr`] with the [`expr!`][crate::expr::expr] macro
 
 In this method, instead of passing our `Point[{x, y}]` expression incrementally using
 individual WSTP function calls, the `Point` expression is constructed using the [`Expr`]
-type.
+type and the [`expr!`][crate::expr::expr] macro.
+
+The `expr!` macro lets you write WL-like syntax directly in Rust. Symbols use `::` as the
+context separator (`System::Point`), bare identifiers are Rust variables, and nesting works
+to any depth:
 
 **Rust**
 

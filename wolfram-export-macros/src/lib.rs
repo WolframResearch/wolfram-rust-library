@@ -110,6 +110,21 @@ pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Annotate a function for export via the native (MArgument-based) Wolfram
 /// LibraryLink ABI. Re-exported by `wolfram-export-native` as `export`.
+///
+/// Supported parameter and return types: `bool`, `i64`, `f64`, `String`,
+/// [`NumericArray`][wolfram_library_link::NumericArray], and references thereof.
+///
+/// ```rust
+/// # mod scope {
+/// use wolfram_export::export;
+///
+/// #[export]
+/// fn add(a: i64, b: i64) -> i64 { a + b }
+///
+/// #[export]
+/// fn greet(name: String) -> String { format!("Hello, {name}!") }
+/// # }
+/// ```
 #[proc_macro_attribute]
 pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
@@ -125,6 +140,29 @@ pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Annotate a function for export via the WSTP `LinkObject` ABI. Re-exported
 /// by `wolfram-export-wstp` as `export`.
+///
+/// The function receives a `Vec<Expr>` (all arguments as a list) and returns an
+/// `Expr`, or takes a `&mut Link` for low-level control. Use the
+/// [`expr!`][wolfram_expr::expr] macro to build return values.
+///
+/// ```rust
+/// # mod scope {
+/// use wolfram_export::export;
+/// use wolfram_expr::{expr, Expr, ExprKind};
+///
+/// // High-level: Vec<Expr> in, Expr out.
+/// #[export(wstp)]
+/// fn reverse(args: Vec<Expr>) -> Expr {
+///     let list = args.into_iter().next().expect("expected 1 arg");
+///     if let ExprKind::Normal(n) = list.kind() {
+///         let head = n.head().clone();
+///         expr!(head[..n.elements().iter().rev().cloned()])
+///     } else {
+///         list
+///     }
+/// }
+/// # }
+/// ```
 #[proc_macro_attribute]
 pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
@@ -138,11 +176,50 @@ pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
 // #[export_wxf]
 //======================================
 
-/// Annotate a function for export via the WXF (typed-arg) ABI. The wrapper
-/// reads a `ByteArray` MArgument containing a WXF-encoded payload,
-/// deserializes via `FromWolfram`, calls the user function, serializes the
-/// return value, and writes a `ByteArray` MArgument back. Re-exported by
-/// `wolfram-export-wxf` as `export`.
+/// Annotate a function for export via the WXF typed-arg ABI.
+///
+/// The generated wrapper reads a WXF-encoded `ByteArray` MArgument, deserializes
+/// all arguments via [`FromWXF`][wolfram_serialize::FromWXF], calls your
+/// function, and serializes the return value via [`ToWXF`][wolfram_serialize::ToWXF]
+/// back into a `ByteArray`. Panics are caught and returned as structured
+/// `Failure["RustPanic", …]` expressions.
+///
+/// Requires `wolfram-export` with `features = ["wxf"]`.
+///
+/// ```rust
+/// # mod scope {
+/// use wolfram_export::export;
+/// use wolfram_serialize::{ToWXF, FromWXF};
+///
+/// // Primitives and Vec<T> work out of the box.
+/// #[export(wxf)]
+/// fn scale(values: Vec<f64>, factor: f64) -> Vec<f64> {
+///     values.into_iter().map(|v| v * factor).collect()
+/// }
+///
+/// // Structs need #[derive(ToWXF, FromWXF)].
+/// #[derive(ToWXF, FromWXF)]
+/// struct Point { x: f64, y: f64 }
+///
+/// #[export(wxf)]
+/// fn midpoint(a: Point, b: Point) -> Point {
+///     Point { x: (a.x + b.x) / 2.0, y: (a.y + b.y) / 2.0 }
+/// }
+///
+/// // Option<T> and Result<T,E> are supported too.
+/// #[export(wxf)]
+/// fn safe_div(a: f64, b: f64) -> Option<f64> {
+///     if b == 0.0 { None } else { Some(a / b) }
+/// }
+/// # }
+/// ```
+///
+/// On the Wolfram side the struct maps to an `Association`:
+///
+/// ```wolfram
+/// midpoint[<|"x" -> 0.0, "y" -> 0.0|>, <|"x" -> 2.0, "y" -> 4.0|>]
+/// (* Returns <|"x" -> 1.0, "y" -> 2.0|> *)
+/// ```
 #[proc_macro_attribute]
 pub fn export_wxf(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);

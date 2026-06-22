@@ -19,13 +19,52 @@ use crate::Error;
 
 /// Deserialize a typed value by pulling tokens from a [`WxfReader`].
 ///
-/// Implemented by hand for scalars / std types and the `wolfram-expr` value
-/// types, and derivable via `#[derive(FromWXF)]`. Implementors usually provide
-/// only [`from_wxf_with_tag`][FromWXF::from_wxf_with_tag]; the default
-/// [`from_wxf`][FromWXF::from_wxf] reads the leading token and delegates.
+/// Implement this trait manually for fine-grained control, or derive it with
+/// `#[derive(FromWXF)]` for structs and enums:
 ///
-/// `'de` is the lifetime of the input buffer. Owned types are generic over it;
-/// borrowed types (e.g. `&'de str`) name it in `Self`.
+/// ```
+/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf, CompressionLevel};
+///
+/// #[derive(ToWXF, FromWXF, PartialEq, Debug)]
+/// struct Point {
+///     x: f64,
+///     y: f64,
+/// }
+///
+/// let original = Point { x: 1.0, y: 2.0 };
+/// let bytes = to_wxf(&original, CompressionLevel::None).unwrap();
+/// let roundtrip: Point = from_wxf(&bytes).unwrap();
+/// assert_eq!(original, roundtrip);
+/// ```
+///
+/// Structs with `&'de str` or `&'de [u8]` fields borrow directly from the
+/// input buffer (zero-copy):
+///
+/// ```
+/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf_ref, CompressionLevel};
+///
+/// // Owned counterpart used for encoding
+/// #[derive(ToWXF)]
+/// struct Dataset {
+///     name: String,
+///     values: Vec<f64>,
+/// }
+///
+/// // Borrowed counterpart — borrows `name` from the input buffer
+/// #[derive(FromWXF)]
+/// struct DatasetRef<'a> {
+///     name: &'a str,
+///     values: Vec<f64>,
+/// }
+///
+/// let ds = Dataset { name: "test".into(), values: vec![1.0, 2.0] };
+/// let bytes = to_wxf(&ds, CompressionLevel::None).unwrap();
+/// let ds_ref: DatasetRef<'_> = from_wxf_ref(&bytes).unwrap();
+/// assert_eq!(ds_ref.name, "test");  // borrowed, no alloc
+/// ```
+///
+/// `'de` is the lifetime of the input buffer. Owned types implement
+/// `FromWXF<'de>` for every `'de`; borrowed types name it in `Self`.
 pub trait FromWXF<'de>: Sized {
     /// Read a complete value: its expression token, then its body.
     fn from_wxf<R: Reader<'de>>(r: &mut WxfReader<R>) -> Result<Self, Error> {

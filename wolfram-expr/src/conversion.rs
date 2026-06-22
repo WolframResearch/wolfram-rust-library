@@ -5,6 +5,16 @@ impl Expr {
     // directly instead. None of them are used inside this crate.
 
     /// If this is a [`Normal`] expression, return that. Otherwise return None.
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::{Expr, ExprKind, expr};
+    /// # let expr = expr!(System::List[1, 2, 3]);
+    /// if let ExprKind::Normal(normal) = expr.kind() {
+    ///     // use `normal`
+    /// }
+    /// ```
     #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_normal(&self) -> Option<&Normal> {
         match self.kind() {
@@ -14,6 +24,15 @@ impl Expr {
     }
 
     /// If this is the `True` or `False` symbol, return that. Otherwise None.
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::{Expr, ExprKind, expr};
+    /// # let expr = expr!(System::True);
+    /// let is_true = matches!(expr.kind(), ExprKind::Symbol(s) if s.as_str() == "System`True");
+    /// let is_false = matches!(expr.kind(), ExprKind::Symbol(s) if s.as_str() == "System`False");
+    /// ```
     #[deprecated(note = "match on `Expr::kind()` instead")]
     #[allow(deprecated)]
     pub fn try_as_bool(&self) -> Option<bool> {
@@ -25,6 +44,16 @@ impl Expr {
     }
 
     /// If this is an [`ExprKind::String`] expression, return that. Otherwise return None.
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::{Expr, ExprKind, expr};
+    /// # let expr = expr!("hello");
+    /// if let ExprKind::String(s) = expr.kind() {
+    ///     // use `s` as `&str` via `s.as_str()`
+    /// }
+    /// ```
     #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_str(&self) -> Option<&str> {
         match self.kind() {
@@ -34,6 +63,16 @@ impl Expr {
     }
 
     /// If this is a [`Symbol`] expression, return that. Otherwise return None.
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::{Expr, ExprKind, expr};
+    /// # let expr = expr!(System::Pi);
+    /// if let ExprKind::Symbol(sym) = expr.kind() {
+    ///     // use `sym`
+    /// }
+    /// ```
     #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_symbol(&self) -> Option<&Symbol> {
         match self.kind() {
@@ -43,6 +82,18 @@ impl Expr {
     }
 
     /// If this is a [`Number`] expression, return that. Otherwise return None.
+    ///
+    /// # Migration
+    ///
+    /// ```
+    /// # use wolfram_expr::{Expr, ExprKind, expr};
+    /// # let expr = expr!(42);
+    /// match expr.kind() {
+    ///     ExprKind::Integer(i) => { /* use i: &i64 */ },
+    ///     ExprKind::Real(r)    => { /* use r: &F64 */ },
+    ///     _ => {},
+    /// }
+    /// ```
     #[deprecated(note = "match on `Expr::kind()` instead")]
     pub fn try_as_number(&self) -> Option<Number> {
         match self.kind() {

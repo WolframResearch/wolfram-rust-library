@@ -8,6 +8,37 @@ use crate::wxf::writer::WxfWriter;
 use crate::Error;
 
 /// Types that know how to serialize themselves into a WXF stream.
+///
+/// Implement this trait manually for fine-grained control, or derive it with
+/// `#[derive(ToWXF)]` for structs and enums:
+///
+/// ```
+/// use wolfram_serialize::{ToWXF, to_wxf, CompressionLevel};
+///
+/// #[derive(ToWXF)]
+/// struct Point {
+///     x: f64,
+///     y: f64,
+/// }
+///
+/// let p = Point { x: 1.0, y: 2.0 };
+/// let bytes = to_wxf(&p, CompressionLevel::None).unwrap();
+/// // `bytes` is a WXF-encoded <|"x" -> 1.0, "y" -> 2.0|>
+/// ```
+///
+/// Primitive types and common collections have built-in implementations:
+///
+/// ```
+/// use wolfram_serialize::{to_wxf, CompressionLevel};
+///
+/// let _ = to_wxf(&42_i64, CompressionLevel::None).unwrap();
+/// let _ = to_wxf(&3.14_f64, CompressionLevel::None).unwrap();
+/// let _ = to_wxf("hello", CompressionLevel::None).unwrap();
+/// // Vec<f64> encodes as NumericArray["Real64"]
+/// let _ = to_wxf(&vec![1.0_f64, 2.0, 3.0], CompressionLevel::None).unwrap();
+/// // Vec<u8> encodes as ByteArray
+/// let _ = to_wxf(&vec![0u8, 1, 2], CompressionLevel::None).unwrap();
+/// ```
 pub trait ToWXF {
     /// Write `self` to `w` as a complete WXF value (tag + payload).
     fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error>;
