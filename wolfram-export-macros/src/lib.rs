@@ -112,7 +112,7 @@ pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
 /// LibraryLink ABI. Re-exported by `wolfram-export-native` as `export`.
 ///
 /// Supported parameter and return types: `bool`, `i64`, `f64`, `String`,
-/// [`NumericArray`][wolfram_library_link::NumericArray], and references thereof.
+/// `NumericArray`, and references thereof.
 ///
 /// ```rust
 /// # mod scope {
@@ -143,7 +143,7 @@ pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The function receives a `Vec<Expr>` (all arguments as a list) and returns an
 /// `Expr`, or takes a `&mut Link` for low-level control. Use the
-/// [`expr!`][wolfram_expr::expr] macro to build return values.
+/// `expr!` macro to build return values.
 ///
 /// ```rust
 /// # mod scope {
@@ -179,8 +179,8 @@ pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
 /// Annotate a function for export via the WXF typed-arg ABI.
 ///
 /// The generated wrapper reads a WXF-encoded `ByteArray` MArgument, deserializes
-/// all arguments via [`FromWXF`][wolfram_serialize::FromWXF], calls your
-/// function, and serializes the return value via [`ToWXF`][wolfram_serialize::ToWXF]
+/// all arguments via `FromWXF`, calls your
+/// function, and serializes the return value via `ToWXF`
 /// back into a `ByteArray`. Panics are caught and returned as structured
 /// `Failure["RustPanic", …]` expressions.
 ///

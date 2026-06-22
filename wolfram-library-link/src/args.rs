@@ -12,11 +12,13 @@ use ref_cast::RefCast;
 #[cfg(feature = "wstp")]
 use crate::wstp::Link;
 use crate::{
-    expr::{expr, Expr, Symbol},
+    expr::{expr, Expr},
     rtl,
     sys::{self, mint, mreal, MArgument},
     DataStore, Image, NumericArray,
 };
+#[cfg(feature = "wstp")]
+use crate::expr::Symbol;
 
 /// Trait implemented for types that can be passed via an [`MArgument`].
 pub trait FromArg<'a> {

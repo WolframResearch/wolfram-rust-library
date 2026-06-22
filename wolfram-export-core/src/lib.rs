@@ -21,7 +21,7 @@ use wolfram_serialize::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
 /// via [`__wolfram_manifest_data__`]. Defined here so the CLI can share the
-/// type and deserialize directly with [`wolfram_serialize::deserialize`].
+/// type and deserialize directly with [`fn@wolfram_serialize::from_wxf`].
 ///
 /// `params`/`ret` carry the real argument/return type `Expr`s for `Native`
 /// functions (they are unused for `Wstp`/`Wxf`, whose wire shape is fixed).

@@ -13,7 +13,7 @@ use std::os::raw::c_int;
 use std::panic::AssertUnwindSafe;
 
 use wolfram_expr::Expr;
-use wolfram_library_link::macro_utils::call_and_catch_as_expr;
+use wolfram_library_link::catch_panic::call_and_catch_panic;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::{NativeFunction, NumericArray};
 use wolfram_serialize::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
@@ -90,7 +90,7 @@ pub fn call_and_encode_panic<F>(func: F) -> NumericArray<u8>
 where
     F: FnOnce() -> NumericArray<u8>,
 {
-    match call_and_catch_as_expr(AssertUnwindSafe(func)) {
+    match call_and_catch_panic(AssertUnwindSafe(func)) {
         Ok(result) => result,
         Err(failure_expr) => encode(&failure_expr),
     }
@@ -124,7 +124,7 @@ pub unsafe fn call_wxf_wolfram_library_function<'a, F: NativeFunction<'a>>(
 
     let args: &[MArgument] = std::slice::from_raw_parts(args, argc);
 
-    if call_and_catch_as_expr(AssertUnwindSafe(move || func.call(args, res))).is_err() {
+    if call_and_catch_panic(AssertUnwindSafe(move || func.call(args, res))).is_err() {
         return wolfram_library_link::FAILED_WITH_PANIC;
     }
 

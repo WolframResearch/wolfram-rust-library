@@ -1,7 +1,7 @@
 //! Native-mode runtime: the C-ABI dispatcher the `#[export]` macro calls into
 //! for `MArgument`-based functions, plus the `#[init]` helper.
 //!
-//! Types and helpers (`NativeFunction`, `initialize`, `call_and_catch_as_expr`)
+//! Types and helpers (`NativeFunction`, `initialize`, `call_and_catch_panic`)
 //! are imported from `wolfram-library-link`; the dispatcher logic itself is
 //! owned here so the macro emission paths under `wolfram_export::macro_utils::*`
 //! resolve without going back through `wolfram-library-link`.
@@ -9,7 +9,7 @@
 use std::os::raw::c_int;
 use std::panic::AssertUnwindSafe;
 
-use wolfram_library_link::macro_utils::call_and_catch_as_expr;
+use wolfram_library_link::catch_panic::call_and_catch_panic;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::NativeFunction;
 
@@ -43,7 +43,7 @@ pub unsafe fn call_native_wolfram_library_function<'a, F: NativeFunction<'a>>(
     //        E.g. `fn foo(link: &'static mut str) { ... }`
     let args: &[MArgument] = std::slice::from_raw_parts(args, argc);
 
-    if call_and_catch_as_expr(AssertUnwindSafe(move || func.call(args, res))).is_err() {
+    if call_and_catch_panic(AssertUnwindSafe(move || func.call(args, res))).is_err() {
         return wolfram_library_link::FAILED_WITH_PANIC;
     }
 
@@ -60,7 +60,7 @@ pub unsafe fn init_with_user_function(
         return wolfram_library_link::FAILED_TO_INIT;
     }
 
-    if call_and_catch_as_expr(user_init_func).is_err() {
+    if call_and_catch_panic(user_init_func).is_err() {
         wolfram_library_link::FAILED_WITH_PANIC
     } else {
         sys::LIBRARY_NO_ERROR as c_int

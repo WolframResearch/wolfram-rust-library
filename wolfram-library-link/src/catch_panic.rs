@@ -151,12 +151,12 @@ fn display_backtrace(bt: Option<Backtrace>) -> Expr {
     bt
 }
 
-/// Call `func` and catch any unwinding panic which occurs during that call, returning
-/// information from the caught panic in the form of a `CaughtPanic`.
+/// Call `func` and catch any unwinding panic, returning a `Failure["RustPanic", …]`
+/// [`Expr`] on error.
 ///
 /// NOTE: `func` should not set it's own panic hook, or unset the panic hook set upon
 ///       calling it. Doing so would likely interfere with the operation of this function.
-pub fn call_and_catch_panic<T, F>(func: F) -> Result<T, CaughtPanic>
+pub fn call_and_catch_panic<T, F>(func: F) -> Result<T, Expr>
 where
     F: FnOnce() -> T + UnwindSafe,
 {
@@ -176,11 +176,7 @@ where
     // set).
     panic::set_hook(prev_hook);
 
-    // If `result` is an `Err`, meaning a panic occured, read information out of
-    // CAUGHT_PANICS.
-    let result: Result<T, CaughtPanic> = result.map_err(|()| get_caught_panic());
-
-    result
+    result.map_err(|()| Expr::from(&get_caught_panic().to_library_error()))
 }
 
 fn get_caught_panic() -> CaughtPanic {

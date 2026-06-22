@@ -229,7 +229,7 @@
 
 mod args;
 mod async_tasks;
-mod catch_panic;
+pub mod catch_panic;
 mod data_store;
 mod errors;
 mod image;

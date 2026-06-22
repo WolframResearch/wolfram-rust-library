@@ -2,7 +2,7 @@
 //! into for `LinkObject`-based functions, plus the loader bridge that powers
 //! `generate_loader!`.
 //!
-//! Types and helpers (`WstpFunction`, `initialize`, `call_and_catch_as_expr`)
+//! Types and helpers (`WstpFunction`, `initialize`, `call_and_catch_panic`)
 //! are imported from `wolfram-library-link`; the dispatcher logic itself lives
 //! here so the macro paths under `wolfram_export::macro_utils::*` resolve
 //! without bouncing back through `wolfram-library-link::macro_utils`.
@@ -10,7 +10,7 @@
 use std::os::raw::c_int;
 use std::panic::AssertUnwindSafe;
 
-use wolfram_library_link::macro_utils::call_and_catch_as_expr;
+use wolfram_library_link::catch_panic::call_and_catch_panic;
 use wolfram_library_link::sys::{self, LIBRARY_NO_ERROR};
 use wolfram_library_link::WstpFunction;
 use wstp::Link;
@@ -30,7 +30,7 @@ unsafe fn call_wstp_link_wolfram_library_function<
 
     let link = Link::unchecked_ref_cast_mut(&mut unsafe_link);
 
-    let result = call_and_catch_as_expr(AssertUnwindSafe(|| {
+    let result = call_and_catch_panic(AssertUnwindSafe(|| {
         let _: () = function(link);
     }));
 
