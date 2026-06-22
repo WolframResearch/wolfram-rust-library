@@ -14,7 +14,7 @@ mod numeric_array;
 mod packed_array;
 mod ptr_cmp;
 mod wl;
-pub mod wxf;
+mod wxf;
 mod wxf_impls;
 
 pub mod symbol;

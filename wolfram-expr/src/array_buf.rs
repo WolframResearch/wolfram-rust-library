@@ -73,7 +73,7 @@ impl<Tag: Copy + PartialEq> ArrayBuf<Tag> {
     }
 
     /// Raw byte buffer.
-    pub fn as_bytes(&self) -> &[u8] {
+    pub(crate) fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -88,7 +88,7 @@ impl<Tag: Copy + PartialEq> ArrayBuf<Tag> {
     }
 
     /// Total byte length of the buffer.
-    pub fn byte_count(&self) -> usize {
+    pub(crate) fn byte_count(&self) -> usize {
         self.bytes.len()
     }
 
@@ -139,7 +139,7 @@ pub trait NumericArrayRead {
     fn data_type(&self) -> NumericArrayEnum;
     /// The multi-dimensional shape (row-major).
     fn dimensions(&self) -> &[usize];
-    /// The flat little-endian byte buffer.
+    #[doc(hidden)]
     fn as_bytes(&self) -> &[u8];
 
     /// Number of dimensions.
@@ -150,11 +150,11 @@ pub trait NumericArrayRead {
     fn element_count(&self) -> usize {
         self.dimensions().iter().product()
     }
-    /// Total byte length of the buffer.
+    #[doc(hidden)]
     fn byte_count(&self) -> usize {
         self.as_bytes().len()
     }
-    /// Bytes per element.
+    #[doc(hidden)]
     fn element_size(&self) -> usize {
         self.data_type().size_in_bytes()
     }

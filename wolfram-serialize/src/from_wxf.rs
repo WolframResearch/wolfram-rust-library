@@ -72,7 +72,7 @@ pub trait FromWXF<'de>: Sized {
         Self::from_wxf_with_tag(r, tok)
     }
 
-    /// Read the body given the already-consumed expression token.
+    #[doc(hidden)]
     fn from_wxf_with_tag<R: Reader<'de>>(
         r: &mut WxfReader<R>,
         tok: ExpressionEnum,
