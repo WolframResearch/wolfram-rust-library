@@ -1,6 +1,6 @@
 use wolfram_library_link::{
     export,
-    expr::{Expr, Symbol},
+    expr::{expr, Expr},
 };
 
 struct Point {
@@ -21,9 +21,6 @@ impl Point {
     fn to_expr(&self) -> Expr {
         let Point { x, y } = *self;
 
-        Expr::normal(
-            Symbol::new("System`Point"),
-            vec![Expr::list(vec![Expr::real(x), Expr::real(y)])],
-        )
+        expr!(System::Point[System::List[x, y]])
     }
 }

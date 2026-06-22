@@ -8,7 +8,7 @@
 use std::os::raw::{c_int, c_uint};
 
 use wolfram_library_link::{
-    expr::{Expr, Symbol},
+    expr::{expr, Expr},
     sys::{
         self as wll_sys, WolframLibraryData, LIBRARY_FUNCTION_ERROR, LIBRARY_NO_ERROR,
     },
@@ -100,12 +100,8 @@ pub extern "C" fn demo_wstp_function_callback(
 
         safe_callback_link
             // EvaluatePacket[Print["Hello, World! --- WSTP"]]
-            .put_expr(&Expr::normal(
-                Symbol::new("System`EvaluatePacket"),
-                vec![Expr::normal(
-                    Symbol::new("System`Print"),
-                    vec![Expr::string("Hello, World! --- WSTP")],
-                )],
+            .put_expr(&expr!(
+                System::EvaluatePacket[System::Print["Hello, World! --- WSTP"]]
             ))
             .unwrap();
 

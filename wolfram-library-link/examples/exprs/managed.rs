@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 
 use wolfram_library_link::{
     self as wll,
-    expr::{Expr, ExprKind, Symbol},
+    expr::{expr, Expr, ExprKind},
     managed::{Id, ManagedExpressionEvent},
 };
 
@@ -84,13 +84,7 @@ fn get_instance_data(args: Vec<Expr>) -> Expr {
             .expect("instance does not exist")
     };
 
-    Expr::normal(
-        Symbol::new("System`Association"),
-        vec![Expr::normal(
-            Symbol::new("System`Rule"),
-            vec![Expr::string("Value"), Expr::string(value)],
-        )],
-    )
+    expr!({ "Value" -> value })
 }
 
 fn unwrap_id_arg(arg: &Expr) -> u32 {
