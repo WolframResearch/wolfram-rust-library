@@ -962,7 +962,7 @@ impl WolframApp {
     ///
     /// # Discovery procedure
     ///
-    /// 1. If the [`WOLFRAM_APP_DIRECTORY`][crate::config::env_vars::WOLFRAM_APP_DIRECTORY]
+    /// 1. If the [`WOLFRAM_APP_DIRECTORY`]
     ///    environment variable is set, return that.
     ///
     ///    - Setting this environment variable may be necessary if a Wolfram application
