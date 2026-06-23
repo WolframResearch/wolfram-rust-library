@@ -8,14 +8,21 @@
 //! wolfram-export = "0.5"                                     # native (default)
 //! ```
 //!
-//! Then in your code:
+//! Then in your code (shown here with every mode enabled):
 //!
-//! ```ignore
-//! use wolfram_export::export;
+//! ```
+//! # // Compiled and tested only when all three modes are enabled
+//! # // (e.g. `cargo test --all-features`); a no-op otherwise.
+//! # #[cfg(all(feature = "wstp", feature = "wxf"))]
+//! # mod scope {
+//! use wolfram_export::{export, wstp::Link};
 //!
-//! #[export]                  fn add(a: f64, b: f64) -> f64 { a + b }
-//! #[export(wstp)]            fn foo(link: &mut Link) { /* ... */ }
-//! #[export(wxf)]             fn dot(a: Vec<f64>, b: Vec<f64>) -> f64 { /* ... */ }
+//! #[export]        fn add(a: f64, b: f64) -> f64 { a + b }
+//! #[export(wstp)]  fn echo(link: &mut Link) { let _ = link; }
+//! #[export(wxf)]   fn dot(a: Vec<f64>, b: Vec<f64>) -> f64 {
+//!     a.iter().zip(&b).map(|(x, y)| x * y).sum()
+//! }
+//! # }
 //! ```
 //!
 //! Each mode's wire shape, runtime, and Cargo dep set live in its own
