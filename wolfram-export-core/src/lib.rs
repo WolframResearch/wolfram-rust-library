@@ -99,7 +99,7 @@ fn caller_name(kind: ExportKind) -> &'static str {
 ///   predictable symbol resolution across the link.
 /// - `WXFCaller` serializes the args and deserializes the result so the WXF
 ///   `{ByteArray} -> ByteArray` function presents a normal-expression interface.
-pub fn caller_binding(kind: ExportKind) -> Expr {
+fn caller_binding(kind: ExportKind) -> Expr {
     match kind {
         ExportKind::Native => expr!(::Set[::NativeCaller, ::Identity]),
         ExportKind::Wstp => expr!(::Set[
@@ -166,17 +166,19 @@ pub fn library_function_load(
     }
 }
 
-/// One `key -> Caller[LibraryFunctionLoad[...]]` association rule. `key` is the
-/// final association key (see [`export_key`]); `name` is the exported C symbol.
+/// One `key -> Caller[LibraryFunctionLoad[...]]` association rule. `name` is the
+/// exported C symbol; the association key is `"namespace::name"` when
+/// `namespace` is `Some`, otherwise the bare `name`.
 pub fn library_function_rule(
     kind: ExportKind,
     name: &str,
-    key: &str,
+    namespace: Option<&str>,
     lib: Expr,
     native_sig: Option<(Vec<Expr>, Expr)>,
 ) -> RuleEntry {
+    let key = export_key(namespace, name);
     RuleEntry::rule(
-        Expr::from(key),
+        Expr::from(key.as_str()),
         library_function_load(kind, name, lib, native_sig),
     )
 }
@@ -211,7 +213,7 @@ pub fn with_callers(extra: Vec<Expr>, assoc: Association) -> Expr {
 
 /// Compute the association key for an exported function: `"namespace::name"`
 /// when a namespace is supplied, otherwise the bare `name`.
-pub fn export_key(namespace: Option<&str>, name: &str) -> String {
+fn export_key(namespace: Option<&str>, name: &str) -> String {
     match namespace {
         Some(ns) => format!("{ns}::{name}"),
         None => name.to_owned(),
@@ -379,11 +381,10 @@ pub fn exported_library_functions_association(
                 ExportEntry::Wstp { .. } => (ExportKind::Wstp, None),
                 ExportEntry::Wxf { .. } => (ExportKind::Wxf, None),
             };
-            let key = export_key(None, entry.name());
             Some(library_function_rule(
                 kind,
                 entry.name(),
-                &key,
+                None,
                 lib.clone(),
                 native_sig,
             ))

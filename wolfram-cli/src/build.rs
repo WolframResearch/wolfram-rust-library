@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use wolfram_app_discovery::SystemID;
 use wolfram_export_core::{
-    export_key, library_function_rule, with_callers, ExportKind, FunctionEntry,
+    library_function_rule, with_callers, ExportKind, FunctionEntry,
 };
 use wolfram_expr::{expr, Association, Expr, Symbol};
 
@@ -370,7 +370,6 @@ pub fn generate_package(
                 .iter()
                 .filter_map(move |e| {
                     let kind = ExportKind::from_kind_str(&e.kind)?;
-                    let key = export_key(ns.then(|| info_name.as_str()), &e.name);
                     let native_sig = match kind {
                         ExportKind::Native => Some((e.params.clone(), e.ret.clone())),
                         _ => None,
@@ -378,7 +377,7 @@ pub fn generate_package(
                     Some(library_function_rule(
                         kind,
                         &e.name,
-                        &key,
+                        ns.then(|| info_name.as_str()),
                         libvar.clone(),
                         native_sig,
                     ))
