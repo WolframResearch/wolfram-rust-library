@@ -19,7 +19,7 @@
 #[cfg(feature = "automate-function-loading-boilerplate")]
 pub use inventory;
 
-use wolfram_expr::{expr, Association, Expr, ExprKind, RuleEntry};
+use wolfram_expr::{expr, Association, Expr, ExprKind, RuleEntry, Symbol};
 use wolfram_serialize::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
@@ -30,7 +30,7 @@ use wolfram_serialize::{FromWXF, ToWXF};
 /// functions (they are unused for `Wstp`/`Wxf`, whose wire shape is fixed).
 /// Storing real `Expr`s — not stringified ones — keeps compound type specs like
 /// `List[LibraryDataType["NumericArray", "Integer8"], "Constant"]` intact.
-#[derive(ToWXF, FromWXF, Debug)]
+#[derive(ToWXF, FromWXF, Debug, Clone)]
 pub struct FunctionEntry {
     /// Exported function name (the key used in the generated WL loader).
     pub name: String,
@@ -43,31 +43,29 @@ pub struct FunctionEntry {
 }
 
 //==============================================================================
-// Shared loader-expression builders
+// Loader-expression builder
 //
-// One place that turns an exported function + a library-path `Expr` into the
-// `Caller[LibraryFunctionLoad[...]]` boilerplate. Used by BOTH the runtime
-// `exported_library_functions_association` (path = a string literal) and the
-// `cargo wl build` CLI (path = a `libN` symbol bound in the `Functions.wl`
-// prelude). These are pure functions with no `inventory` dependency, so they
-// live outside the `automate-function-loading-boilerplate` feature gate.
+// `library_functions_loader` is the single public entry point: given the built
+// libraries (each a path `Expr` + its exported functions), it produces the
+// `With[{callers…, libN = …}, <|key -> Caller[LibraryFunctionLoad[...]]|>]`
+// loader written to `Functions.wl`. Used by BOTH the `cargo wl build` CLI and
+// the runtime `exported_library_functions_association`. The private helpers
+// below have no `inventory` dependency, so they live outside the
+// `automate-function-loading-boilerplate` feature gate.
 //==============================================================================
 
 /// Which export transport a function uses. Mirrors the three `#[export]` modes
 /// and the `kind` string stored in [`FunctionEntry`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ExportKind {
-    /// Native MArgument-based export.
+enum ExportKind {
     Native,
-    /// WSTP `LinkObject`-based export.
     Wstp,
-    /// Typed-args WXF-based export.
     Wxf,
 }
 
 impl ExportKind {
     /// Parse the `kind` string stored in a [`FunctionEntry`]; `None` if unknown.
-    pub fn from_kind_str(s: &str) -> Option<ExportKind> {
+    fn from_kind_str(s: &str) -> Option<ExportKind> {
         match s {
             "Native" => Some(ExportKind::Native),
             "Wstp" => Some(ExportKind::Wstp),
@@ -135,7 +133,7 @@ fn caller_binding(kind: ExportKind) -> Expr {
 /// `native_sig` supplies the real argument/return type `Expr`s for
 /// [`ExportKind::Native`]; for `Wstp`/`Wxf` the wire shape is fixed and it is
 /// ignored.
-pub fn library_function_load(
+fn library_function_load(
     kind: ExportKind,
     name: &str,
     lib: Expr,
@@ -169,7 +167,7 @@ pub fn library_function_load(
 /// One `key -> Caller[LibraryFunctionLoad[...]]` association rule. `name` is the
 /// exported C symbol; the association key is `"namespace::name"` when
 /// `namespace` is `Some`, otherwise the bare `name`.
-pub fn library_function_rule(
+fn library_function_rule(
     kind: ExportKind,
     name: &str,
     namespace: Option<&str>,
@@ -188,7 +186,7 @@ pub fn library_function_rule(
 /// referenced by the rules, followed by `extra` (e.g. the CLI's
 /// `libN = FileNameJoin[...]` path bindings). A loader with no WXF functions, for
 /// instance, omits the `WXFCaller` binding entirely.
-pub fn with_callers(extra: Vec<Expr>, assoc: Association) -> Expr {
+fn with_callers(extra: Vec<Expr>, assoc: Association) -> Expr {
     let used = |kind: ExportKind| {
         let name = caller_name(kind);
         assoc.iter().any(|entry| {
@@ -218,6 +216,64 @@ fn export_key(namespace: Option<&str>, name: &str) -> String {
         Some(ns) => format!("{ns}::{name}"),
         None => name.to_owned(),
     }
+}
+
+/// One built library to include in a generated paclet loader: where to find the
+/// library at load time, plus the functions it exports.
+pub struct LibraryArtifact {
+    /// A Wolfram Language expression that evaluates to the library file's path
+    /// when `Functions.wl` is loaded. The CLI passes something like
+    /// `FileNameJoin[{DirectoryName[$InputFileName], "abc123.dylib"}]`; the
+    /// runtime passes a plain absolute-path string.
+    pub path: Expr,
+    /// When `Some(ns)`, every function key is namespaced as `"ns::name"` so
+    /// functions from different libraries cannot collide.
+    pub namespace: Option<String>,
+    /// The functions this library exports, as decoded from its embedded
+    /// manifest (see [`FunctionEntry`]).
+    pub functions: Vec<FunctionEntry>,
+}
+
+/// Build the loader association written to `Functions.wl`, the single entry
+/// point shared by the `cargo wl build` CLI and the runtime WSTP loader.
+///
+/// Produces `With[{<caller prelude…>, lib1 = path1, …}, <|key -> Caller[LibraryFunctionLoad[…]], …|>]`,
+/// where each library's `path` is bound to a `libN` symbol that its functions
+/// reference. Only the caller-prelude bindings (`NativeCaller`/`WSTPCaller`/
+/// `WXFCaller`) actually used are emitted, and libraries with no functions are
+/// skipped.
+pub fn library_functions_loader(libraries: &[LibraryArtifact]) -> Expr {
+    let mut bindings: Vec<Expr> = Vec::new();
+    let mut rules: Vec<RuleEntry> = Vec::new();
+
+    let mut n = 0;
+    for library in libraries {
+        if library.functions.is_empty() {
+            continue;
+        }
+        n += 1;
+        let libvar = Symbol::new(&format!("lib{n}"));
+        bindings.push(expr!(::Set[(Expr::from(libvar.clone())), (library.path.clone())]));
+
+        for entry in &library.functions {
+            let Some(kind) = ExportKind::from_kind_str(&entry.kind) else {
+                continue;
+            };
+            let native_sig = match kind {
+                ExportKind::Native => Some((entry.params.clone(), entry.ret.clone())),
+                _ => None,
+            };
+            rules.push(library_function_rule(
+                kind,
+                &entry.name,
+                library.namespace.as_deref(),
+                Expr::from(libvar.clone()),
+                native_sig,
+            ));
+        }
+    }
+
+    with_callers(bindings, rules.into_iter().collect())
 }
 
 /// Inventory entry for one `#[export]`-marked function.
@@ -307,32 +363,7 @@ pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
 #[no_mangle]
 pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
     let entries: Vec<FunctionEntry> = inventory::iter::<ExportEntry>()
-        .map(|e| match e {
-            ExportEntry::Native { name, signature } => {
-                let (params, ret) =
-                    signature().unwrap_or_else(|_| (vec![], Expr::string("")));
-                FunctionEntry {
-                    name: (*name).to_owned(),
-                    kind: "Native".to_owned(),
-                    params,
-                    ret,
-                }
-            },
-            // `params`/`ret` are unused for the non-native kinds (their wire
-            // shape is fixed); store empty placeholders.
-            ExportEntry::Wstp { name } => FunctionEntry {
-                name: (*name).to_owned(),
-                kind: "Wstp".to_owned(),
-                params: vec![],
-                ret: Expr::string(""),
-            },
-            ExportEntry::Wxf { name, .. } => FunctionEntry {
-                name: (*name).to_owned(),
-                kind: "Wxf".to_owned(),
-                params: vec![],
-                ret: Expr::string(""),
-            },
-        })
+        .filter_map(ExportEntry::to_function_entry)
         .collect();
 
     let wxf =
@@ -367,42 +398,50 @@ pub fn exported_library_functions_association(
     let library = library
         .to_str()
         .expect("unable to convert library file path to str");
-    // Runtime loads from an absolute path, so each rule embeds the path as a
-    // string literal (the CLI instead binds it to a `libN` symbol). No
-    // namespacing — a single dylib's inventory has no cross-library clashes.
-    let lib = Expr::string(library);
 
-    let assoc: Association = inventory::iter::<ExportEntry>()
-        .filter_map(|entry| {
-            let (kind, native_sig) = match entry {
-                ExportEntry::Native { signature, .. } => {
-                    (ExportKind::Native, Some(signature().ok()?))
-                },
-                ExportEntry::Wstp { .. } => (ExportKind::Wstp, None),
-                ExportEntry::Wxf { .. } => (ExportKind::Wxf, None),
-            };
-            Some(library_function_rule(
-                kind,
-                entry.name(),
-                None,
-                lib.clone(),
-                native_sig,
-            ))
-        })
+    // A single dylib's inventory has no cross-library clashes, so no
+    // namespacing; the runtime loads from the resolved absolute path.
+    let functions: Vec<FunctionEntry> = inventory::iter::<ExportEntry>()
+        .filter_map(ExportEntry::to_function_entry)
         .collect();
-    with_callers(Vec::new(), assoc)
+    library_functions_loader(&[LibraryArtifact {
+        path: Expr::string(library),
+        namespace: None,
+        functions,
+    }])
 }
 
-#[cfg_attr(
-    not(feature = "automate-function-loading-boilerplate"),
-    allow(dead_code)
-)]
+#[cfg(feature = "automate-function-loading-boilerplate")]
 impl ExportEntry {
-    fn name(&self) -> &str {
-        match self {
-            ExportEntry::Native { name, .. } => name,
-            ExportEntry::Wstp { name } => name,
-            ExportEntry::Wxf { name, .. } => name,
-        }
+    /// Convert an inventory entry into a serializable [`FunctionEntry`].
+    ///
+    /// Returns `None` for a `Native` function whose signature cannot be
+    /// resolved (e.g. an unsupported argument type) — it could not be loaded,
+    /// so it is omitted from both the manifest and the loader. `Wstp`/`Wxf`
+    /// have a fixed wire shape and carry empty `params`/`ret` placeholders.
+    fn to_function_entry(&self) -> Option<FunctionEntry> {
+        Some(match self {
+            ExportEntry::Native { name, signature } => {
+                let (params, ret) = signature().ok()?;
+                FunctionEntry {
+                    name: (*name).to_owned(),
+                    kind: "Native".to_owned(),
+                    params,
+                    ret,
+                }
+            },
+            ExportEntry::Wstp { name } => FunctionEntry {
+                name: (*name).to_owned(),
+                kind: "Wstp".to_owned(),
+                params: vec![],
+                ret: Expr::string(""),
+            },
+            ExportEntry::Wxf { name, .. } => FunctionEntry {
+                name: (*name).to_owned(),
+                kind: "Wxf".to_owned(),
+                params: vec![],
+                ret: Expr::string(""),
+            },
+        })
     }
 }

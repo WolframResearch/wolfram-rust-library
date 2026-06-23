@@ -4,10 +4,8 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use wolfram_app_discovery::SystemID;
-use wolfram_export_core::{
-    library_function_rule, with_callers, ExportKind, FunctionEntry,
-};
-use wolfram_expr::{expr, Association, Expr, Symbol};
+use wolfram_export_core::{library_functions_loader, FunctionEntry, LibraryArtifact};
+use wolfram_expr::{expr, Expr};
 
 use crate::{BuildArgs, Result};
 
@@ -340,53 +338,24 @@ pub fn generate_package(
     write_wl(lib_dir.join("PacletInfo.wl"), &paclet_info)?;
 
     // ── Functions.wl
-    let active: Vec<(&DylibInfo, &str)> = placed
+    // One `LibraryArtifact` per dylib that exports something; each carries the
+    // load-time path expression and (when namespacing) its library name as the
+    // key prefix. `library_functions_loader` builds the whole
+    // `With[{callers…, libN = …}, <|key -> Caller[LibraryFunctionLoad[…]]|>]`.
+    let libraries: Vec<LibraryArtifact> = placed
         .iter()
         .filter(|(info, _)| !info.entries.is_empty())
-        .map(|(info, dest)| (*info, dest.as_str()))
-        .collect();
-
-    // `With[{NativeCaller = …, WSTPCaller = …, WXFCaller = …, libN = …}, <|entries|>]`.
-    // `with_callers` prepends the shared `NativeCaller`/`WSTPCaller`/`WXFCaller`
-    // bindings; here we only build the per-library `libN = FileNameJoin[...]`
-    // path bindings (one per dylib).
-    let mut lib_bindings = Vec::new();
-    for (i, (_, dest)) in active.iter().enumerate() {
-        let libvar = Symbol::new(&format!("lib{}", i + 1));
-        lib_bindings.push(expr!(::Set[
-            libvar,
-            ::FileNameJoin[::List[::DirectoryName[::$InputFileName], (*dest)]]
-        ]));
-    }
-
-    let entries: Association = active
-        .iter()
-        .enumerate()
-        .flat_map(|(i, (info, _))| {
-            let libvar = Expr::from(Symbol::new(&format!("lib{}", i + 1)));
-            let ns = config.namespace_exports;
-            let info_name = info.name.clone();
-            info.entries
-                .iter()
-                .filter_map(move |e| {
-                    let kind = ExportKind::from_kind_str(&e.kind)?;
-                    let native_sig = match kind {
-                        ExportKind::Native => Some((e.params.clone(), e.ret.clone())),
-                        _ => None,
-                    };
-                    Some(library_function_rule(
-                        kind,
-                        &e.name,
-                        ns.then(|| info_name.as_str()),
-                        libvar.clone(),
-                        native_sig,
-                    ))
-                })
-                .collect::<Vec<_>>()
+        .map(|(info, dest)| LibraryArtifact {
+            path: expr!(::FileNameJoin[::List[
+                ::DirectoryName[::$InputFileName],
+                (dest.as_str())
+            ]]),
+            namespace: config.namespace_exports.then(|| info.name.clone()),
+            functions: info.entries.clone(),
         })
         .collect();
 
-    let functions = with_callers(lib_bindings, entries);
+    let functions = library_functions_loader(&libraries);
     write_wl(lib_dir.join("Functions.wl"), &functions)?;
 
     Ok(lib_dir)
