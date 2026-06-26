@@ -164,23 +164,6 @@ fn library_function_load(
     }
 }
 
-/// One `key -> Caller[LibraryFunctionLoad[...]]` association rule. `name` is the
-/// exported C symbol; the association key is `"namespace::name"` when
-/// `namespace` is `Some`, otherwise the bare `name`.
-fn library_function_rule(
-    kind: ExportKind,
-    name: &str,
-    namespace: Option<&str>,
-    lib: Expr,
-    native_sig: Option<(Vec<Expr>, Expr)>,
-) -> RuleEntry {
-    let key = export_key(namespace, name);
-    RuleEntry::rule(
-        Expr::from(key.as_str()),
-        library_function_load(kind, name, lib, native_sig),
-    )
-}
-
 /// Wrap a finished association in `With[bindings, assoc]`, emitting ONLY the
 /// caller prelude bindings (`NativeCaller`/`WSTPCaller`/`WXFCaller`) actually
 /// referenced by the rules, followed by `extra` (e.g. the CLI's
@@ -263,12 +246,10 @@ pub fn library_functions_loader(libraries: &[LibraryArtifact]) -> Expr {
                 ExportKind::Native => Some((entry.params.clone(), entry.ret.clone())),
                 _ => None,
             };
-            rules.push(library_function_rule(
-                kind,
-                &entry.name,
-                library.namespace.as_deref(),
-                Expr::from(libvar.clone()),
-                native_sig,
+            let key = export_key(library.namespace.as_deref(), &entry.name);
+            rules.push(RuleEntry::rule(
+                Expr::from(key.as_str()),
+                library_function_load(kind, &entry.name, Expr::from(libvar.clone()), native_sig),
             ));
         }
     }

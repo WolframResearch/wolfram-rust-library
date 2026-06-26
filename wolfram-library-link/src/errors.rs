@@ -13,7 +13,8 @@
 
 use std::os::raw::c_int;
 
-use crate::expr::{Expr, Failure};
+use crate::expr::Expr;
+use wolfram_serialize::Failure;
 
 // C-ABI return codes for macro-generated wrapper code. `OFFSET` avoids clashing
 // with `sys::LIBRARY_FUNCTION_ERROR` and related kernel codes.

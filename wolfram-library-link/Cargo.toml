@@ -29,7 +29,8 @@ wolfram-export-core            = { version = "=0.6.0-alpha.3", path = "../wolfra
 # (and any future consumer wanting MArgument-only support) depend on
 # `wolfram-library-link` without pulling the WSTP transport stack.
 wstp         = { version = "=0.6.0-alpha.3", path = "../wstp", optional = true }
-wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
+wolfram-expr      = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
+wolfram-serialize = { version = "=0.6.0-alpha.3", path = "../wolfram-serialize" }
 
 once_cell = "1.8.0"
 static_assertions = "1.1.0"
