@@ -23,7 +23,7 @@ use wolfram_expr::{expr, Association, Expr, ExprKind, RuleEntry, Symbol};
 use wolfram_serialize::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
-/// via [`__wolfram_manifest_data__`]. Defined here so the CLI can share the
+/// via [`__wolfram_manifest__`]. Defined here so the CLI can share the
 /// type and deserialize directly with [`fn@wolfram_serialize::from_wxf`].
 ///
 /// `params`/`ret` carry the real argument/return type `Expr`s for `Native`
@@ -300,49 +300,19 @@ inventory::collect!(ExportEntry);
 // __wolfram_manifest__: build-time-extractable manifest symbol
 //==============================================================================
 
-/// C-ABI symbol that the `cargo wolfram-manifest` subcommand calls via `dlopen`
-/// to extract the library's exported-function manifest at build time, without
-/// running a WSTP loop.
-///
-/// Returns a pointer to a leaked, statically-typed WXF byte buffer of the
-/// manifest Association; the caller writes `*out_len` with the length. The
-/// returned buffer must NOT be freed by the caller (it lives for the rest
-/// of the process — manifests are small and called at most once per build).
-///
-/// The manifest content is identical to what `exported_library_functions_association(None)`
-/// would produce at runtime over WSTP — same Association[name -> LibraryFunctionLoad[...]]
-/// shape, just serialized as WXF bytes for an out-of-band, language-agnostic
-/// consumer.
-#[cfg(feature = "automate-function-loading-boilerplate")]
-#[no_mangle]
-pub extern "C" fn __wolfram_manifest__(out_len: *mut usize) -> *const u8 {
-    let assoc: Expr = exported_library_functions_association(None);
-    let bytes: Vec<u8> =
-        wolfram_serialize::to_wxf(&assoc, None).expect("manifest WXF serialization");
-    // Leak the buffer so the pointer remains valid after this function returns.
-    // The manifest is small and the caller (cargo-wolfram-manifest) only calls
-    // this once per build.
-    let len = bytes.len();
-    let ptr = Box::leak(bytes.into_boxed_slice()).as_ptr();
-    unsafe {
-        *out_len = len;
-    }
-    ptr
-}
-
-/// C-ABI symbol returning WXF-serialized `Vec<FunctionEntry>` for every exported
-/// function. Consumed by `cargo wl build` via `libloading` — no WL kernel needed.
+/// C-ABI symbol called via `dlopen` at build time to extract the library's
+/// exported-function manifest without running a WSTP loop.
 ///
 /// Returns a pointer to a leaked buffer whose first 8 bytes are the WXF payload
-/// length as a little-endian `u64`, followed immediately by the WXF bytes.
-/// Deserialize with:
+/// length as a little-endian `u64`, followed immediately by the WXF-serialized
+/// `Vec<FunctionEntry>`. Deserialize with:
 /// ```ignore
 /// let len = u64::from_le_bytes(buf[..8].try_into().unwrap()) as usize;
 /// wolfram_serialize::deserialize::<Vec<FunctionEntry>>(&buf[8..8+len], None)
 /// ```
 #[cfg(feature = "automate-function-loading-boilerplate")]
 #[no_mangle]
-pub extern "C" fn __wolfram_manifest_data__() -> *const u8 {
+pub extern "C" fn __wolfram_manifest__() -> *const u8 {
     let entries: Vec<FunctionEntry> = inventory::iter::<ExportEntry>()
         .filter_map(ExportEntry::to_function_entry)
         .collect();

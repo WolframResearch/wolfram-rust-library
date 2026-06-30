@@ -455,13 +455,13 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
         .map_err(|e| format!("failed to dlopen {}: {e}", dylib.display()))?;
 
     let manifest_fn: libloading::Symbol<ManifestFn> = unsafe {
-        lib.get(b"__wolfram_manifest_data__\0")
+        lib.get(b"__wolfram_manifest__\0")
     }
-    .map_err(|e| format!("dylib does not export __wolfram_manifest_data__: {e}"))?;
+    .map_err(|e| format!("dylib does not export __wolfram_manifest__: {e}"))?;
 
     let ptr = unsafe { manifest_fn() };
     if ptr.is_null() {
-        return Err("__wolfram_manifest_data__ returned null".to_string());
+        return Err("__wolfram_manifest__ returned null".to_string());
     }
 
     // First 8 bytes: little-endian u64 payload length; remaining bytes: WXF.
