@@ -131,7 +131,7 @@ impl WolframKernelProcess {
         let name = link.link_name();
         assert!(!name.is_empty());
 
-        let kernel_process = process::Command::new(path)
+        let mut kernel_process = process::Command::new(path)
             .arg("-wstp")
             .arg("-linkprotocol")
             .arg("SharedMemory")
@@ -145,10 +145,19 @@ impl WolframKernelProcess {
         // `launch()` behaviour). With `Some(d)` the wait is bounded by the
         // cooperative yield-function abort installed by
         // `Link::activate_with_timeout`.
-        match timeout {
-            Some(d) => link.activate_with_timeout(d)?,
-            None => link.activate()?,
+        let activate_result = match timeout {
+            Some(d) => link.activate_with_timeout(d),
+            None => link.activate(),
         };
+
+        if let Err(e) = activate_result {
+            // `Child::drop` detaches without killing. Explicitly kill and reap
+            // the spawned process so it doesn't linger as an orphan after a
+            // timeout or connection failure.
+            let _ = kernel_process.kill();
+            let _ = kernel_process.wait();
+            return Err(e.into());
+        }
 
         Ok(WolframKernelProcess {
             process: kernel_process,

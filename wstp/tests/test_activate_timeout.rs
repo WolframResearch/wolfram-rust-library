@@ -101,6 +101,51 @@ fn activate_with_timeout_can_be_called_twice_on_same_thread() {
     );
 }
 
+/// Verify that `launch_with_timeout` kills the spawned process when activation
+/// times out, rather than leaving it as an orphan.
+///
+/// We spawn a shell script that writes its own PID to a temp file and then
+/// sleeps; after the timeout we confirm the PID is no longer alive.
+#[cfg(unix)]
+#[test]
+fn launch_with_timeout_kills_spawned_process_on_timeout() {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    use wstp::kernel::WolframKernelProcess;
+
+    let tmp = std::env::temp_dir();
+    let script = tmp.join("wstp_test_fake_kernel.sh");
+    let pid_file = tmp.join("wstp_test_pid.txt");
+
+    // Write a long-lived fake "kernel" that records its own PID so we can
+    // verify it was killed after the timeout.
+    fs::write(
+        &script,
+        format!("#!/bin/sh\necho $$ > {}\nsleep 60\n", pid_file.display()),
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let _ = fs::remove_file(&pid_file);
+
+    let result = WolframKernelProcess::launch_with_timeout(&script, Duration::from_millis(400));
+    assert!(result.is_err(), "expected timeout error, got {result:?}");
+
+    // The pid_file may not exist if the script never got to run `echo $$`
+    // (e.g. the OS was very slow to start it).  That's an acceptable skip.
+    if let Ok(pid_str) = fs::read_to_string(&pid_file) {
+        let pid: u32 = pid_str.trim().parse().expect("pid file should contain a number");
+        // `kill -0 <pid>` exits 0 if the process exists, non-zero otherwise.
+        let alive = std::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        assert!(!alive, "spawned process (PID {pid}) should have been killed on timeout");
+    }
+
+    let _ = fs::remove_file(&script);
+    let _ = fs::remove_file(&pid_file);
+}
+
 /// Kernel test: when given a path that does not exist (or refuses to start),
 /// `launch_with_timeout` should error within roughly `timeout`, instead of
 /// hanging forever like `launch()` would under the same scenario.
