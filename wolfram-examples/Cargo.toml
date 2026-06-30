@@ -59,7 +59,3 @@ crate-type = ["cdylib"]
 [[example]]
 name = "mixed"
 crate-type = ["cdylib"]
-
-[[example]]
-name = "foreign_functions"
-crate-type = ["cdylib"]
