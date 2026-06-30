@@ -290,7 +290,7 @@ where
             return Err(Error::unexpected_token(&["Association"], tok));
         }
         let n = r.read_varint()?;
-        let mut out = HashMap::with_capacity(n as usize);
+        let mut out = HashMap::with_capacity(crate::capped_capacity(n as usize));
         for _ in 0..n {
             let _delayed = r.read_rule()?;
             let k = K::from_wxf(r)?;
@@ -364,7 +364,7 @@ impl<'de, T: FromWXF<'de> + crate::to_wxf::WxfStruct> FromWXF<'de> for Vec<T> {
         }
         let n = r.read_varint()?;
         r.skip()?; // discard head (any head accepted)
-        let mut items = Vec::with_capacity(n as usize);
+        let mut items = Vec::with_capacity(crate::capped_capacity(n as usize));
         for _ in 0..n {
             items.push(T::from_wxf(r)?);
         }

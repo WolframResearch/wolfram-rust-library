@@ -1,7 +1,8 @@
 //! Numeric-widening tests for WXF Vec<T> deserialization (relocated from the
 //! wolfram-serialize crate, which no longer depends on wolfram-expr).
 
-use wolfram_expr::{from_wxf, to_wxf, Expr, NumericArray, ToWXF};
+use wolfram_expr::{Expr, NumericArray};
+use wolfram_serialize::{from_wxf, to_wxf, ToWXF};
 
 fn serialize_to_wxf<T: ToWXF>(value: &T) -> Vec<u8> {
     to_wxf(value, None).unwrap()

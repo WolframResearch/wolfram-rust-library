@@ -19,7 +19,8 @@ use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::{types::ToSql, Connection};
 use uuid::Uuid;
 use wolfram_export::export;
-use wolfram_expr::{expr, Expr, ToWXF};
+use wolfram_expr::{expr, Expr};
+use wolfram_serialize::ToWXF;
 
 struct DuckDbError {
     code: Option<i32>,

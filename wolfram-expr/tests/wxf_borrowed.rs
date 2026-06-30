@@ -1,7 +1,7 @@
 //! Zero-copy borrowed deserialization: `&str` / `&[u8]` fields point straight
 //! into the input buffer.
 
-use wolfram_expr::{from_wxf_ref, to_wxf, FromWXF, ToWXF};
+use wolfram_serialize::{from_wxf_ref, to_wxf, FromWXF, ToWXF};
 
 #[derive(Debug, PartialEq, ToWXF, FromWXF)]
 struct Frame<'a> {

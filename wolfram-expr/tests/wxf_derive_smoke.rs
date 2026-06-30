@@ -3,7 +3,7 @@
 //! coverage matrix lives in `tests/derive.rs` once the deserialize side
 //! also lands.
 
-use wolfram_expr::{from_wxf, to_wxf, FromWXF, ToWXF};
+use wolfram_serialize::{from_wxf, to_wxf, FromWXF, ToWXF};
 use wolfram_expr::{Association, Expr, ExprKind};
 
 /// Linear-scan helper for tests. `Association` itself exposes no lookup —
@@ -74,19 +74,19 @@ fn frame_roundtrips_with_correct_wire_shapes() {
 
     // payload → ByteArray
     assert!(
-        matches!(find(assoc, "payload").kind(), ExprKind::ByteArray(_)),
+        matches!(find(&assoc, "payload").kind(), ExprKind::ByteArray(_)),
         "payload should be ByteArray"
     );
 
     // samples → 1-D NumericArray<Integer32>
-    let ExprKind::NumericArray(na) = find(assoc, "samples").kind() else {
+    let ExprKind::NumericArray(na) = find(&assoc, "samples").kind() else {
         panic!("samples should be NumericArray");
     };
     assert_eq!(na.data_type(), wolfram_expr::NumericArrayEnum::Integer32);
     assert_eq!(na.dimensions(), &[3]);
 
     // tag → Option is an enum: Some(7) ⇒ {"Some", 7} (List head, variant first)
-    let ExprKind::Normal(tag) = find(assoc, "tag").kind() else {
+    let ExprKind::Normal(tag) = find(&assoc, "tag").kind() else {
         panic!("tag (Some) should be a List function");
     };
     let ExprKind::Symbol(tag_head) = tag.head().kind() else {
@@ -147,28 +147,28 @@ fn tensor_fields_become_numeric_arrays() {
         panic!("expected Association, got {:?}", expr);
     };
 
-    let ExprKind::NumericArray(na) = find(assoc, "fixed").kind() else {
+    let ExprKind::NumericArray(na) = find(&assoc, "fixed").kind() else {
         panic!("fixed → NumericArray");
     };
     assert_eq!(na.dimensions(), &[4]);
 
-    let ExprKind::NumericArray(na) = find(assoc, "nested").kind() else {
+    let ExprKind::NumericArray(na) = find(&assoc, "nested").kind() else {
         panic!("nested → 2D NumericArray");
     };
     assert_eq!(na.dimensions(), &[2, 3]);
 
-    let ExprKind::NumericArray(na) = find(assoc, "tup").kind() else {
+    let ExprKind::NumericArray(na) = find(&assoc, "tup").kind() else {
         panic!("tup → 1D NumericArray");
     };
     assert_eq!(na.dimensions(), &[3]);
 
-    let ExprKind::NumericArray(na) = find(assoc, "nested_tup").kind() else {
+    let ExprKind::NumericArray(na) = find(&assoc, "nested_tup").kind() else {
         panic!("nested_tup → 2D NumericArray");
     };
     assert_eq!(na.dimensions(), &[2, 2]);
 
     // hetero (i64, String) should NOT be a NumericArray; should be a List.
-    let hetero = find(assoc, "hetero");
+    let hetero = find(&assoc, "hetero");
     assert!(!matches!(hetero.kind(), ExprKind::NumericArray(_)));
     let ExprKind::Normal(n) = hetero.kind() else {
         panic!("hetero → Function[List, …]");

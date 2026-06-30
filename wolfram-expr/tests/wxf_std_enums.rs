@@ -1,7 +1,8 @@
 //! Option/Result round-trip as enum lists (same wire format as a derived enum),
 //! plus derived-enum equivalence. Wire format: {"VariantName", data...}
 
-use wolfram_expr::{from_wxf, to_wxf, Expr, ExprKind, FromWXF, ToWXF};
+use wolfram_expr::{Expr, ExprKind};
+use wolfram_serialize::{from_wxf, to_wxf, FromWXF, ToWXF};
 
 fn roundtrip<T: ToWXF + for<'de> FromWXF<'de> + PartialEq + std::fmt::Debug>(v: T) {
     let bytes = to_wxf(&v, None).unwrap();

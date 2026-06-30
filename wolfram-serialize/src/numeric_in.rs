@@ -55,12 +55,8 @@ pub fn read_vec_with_tag<'de, T: NumericTarget, R: Reader<'de>>(
     match tok {
         ExpressionEnum::NumericArray | ExpressionEnum::PackedArray => {
             let dt = r.read_numeric_type()?;
-            let rank = r.read_varint()? as usize;
-            let mut count = 1usize;
-            for _ in 0..rank {
-                count *= r.read_varint()? as usize;
-            }
-            let bytes = r.read_bytes(count * dt.size_in_bytes())?;
+            let (_dims, byte_count) = r.read_array_shape(dt.size_in_bytes())?;
+            let bytes = r.read_bytes(byte_count)?;
             T::widen_from(dt, bytes)
                 .map_err(|m| err(path, "compatible numeric source", m))
         },

@@ -41,15 +41,21 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
         let mut result: u64 = 0;
         let mut shift: u32 = 0;
         loop {
+            if shift >= 64 {
+                return Err(Error::invalid("varint exceeds 64 bits".into()));
+            }
             let b = self.inner.read_byte()?;
+            // The 10th group sits at bit 63: only its low bit fits in a u64.
+            // Reject any higher bits (and trailing continuation) rather than
+            // silently truncating an overlong/non-canonical encoding.
+            if shift == 63 && b & !0x01 != 0 {
+                return Err(Error::invalid("varint exceeds 64 bits".into()));
+            }
             result |= u64::from(b & 0x7F) << shift;
             if b & 0x80 == 0 {
                 return Ok(result);
             }
             shift += 7;
-            if shift >= 64 {
-                return Err(Error::invalid("varint exceeds 64 bits".into()));
-            }
         }
     }
 
@@ -158,18 +164,38 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
         Ok((dt, dims, bytes))
     }
 
-    /// Shared array tail: rank varint, `rank` dim varints, then the flat
-    /// little-endian byte buffer (`prod(dims) * elem_size` bytes).
+    /// Read an array shape header: rank varint + `rank` dim varints. Returns the
+    /// dims and the **flat byte count** (`prod(dims) * elem_size`).
+    ///
+    /// Both quantities come from untrusted input, so: the dims vector caps its
+    /// pre-allocation ([`capped_capacity`][crate::capped_capacity]), and the byte
+    /// count is computed with overflow checking — a wrapping `prod(dims) *
+    /// elem_size` would otherwise yield a small count and silently read a
+    /// truncated array instead of erroring.
+    pub fn read_array_shape(
+        &mut self,
+        elem_size: usize,
+    ) -> Result<(Vec<usize>, usize), Error> {
+        let rank = self.read_varint()? as usize;
+        let mut dims = Vec::with_capacity(crate::capped_capacity(rank));
+        for _ in 0..rank {
+            dims.push(self.read_varint()? as usize);
+        }
+        let byte_count = dims
+            .iter()
+            .try_fold(1usize, |acc, &d| acc.checked_mul(d))
+            .and_then(|count| count.checked_mul(elem_size))
+            .ok_or_else(|| Error::invalid("array byte count overflow".into()))?;
+        Ok((dims, byte_count))
+    }
+
+    /// Shared array tail: [`read_array_shape`][Self::read_array_shape] followed by
+    /// the flat little-endian byte buffer, returned as an owned `Vec<u8>`.
     pub fn read_array_body(
         &mut self,
         elem_size: usize,
     ) -> Result<(Vec<usize>, Vec<u8>), Error> {
-        let rank = self.read_varint()? as usize;
-        let mut dims = Vec::with_capacity(rank);
-        for _ in 0..rank {
-            dims.push(self.read_varint()? as usize);
-        }
-        let byte_count = dims.iter().product::<usize>() * elem_size;
+        let (dims, byte_count) = self.read_array_shape(elem_size)?;
         let bytes = self.inner.read_bytes(byte_count)?.to_vec();
         Ok((dims, bytes))
     }
@@ -223,12 +249,8 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
             ExpressionEnum::NumericArray | ExpressionEnum::PackedArray => {
                 // element-type byte (numeric subset shares wire bytes)
                 let dt = self.read_numeric_type()?;
-                let rank = self.read_varint()? as usize;
-                let mut count = 1usize;
-                for _ in 0..rank {
-                    count *= self.read_varint()? as usize;
-                }
-                self.inner.read_bytes(count * dt.size_in_bytes())?;
+                let (_dims, byte_count) = self.read_array_shape(dt.size_in_bytes())?;
+                self.inner.read_bytes(byte_count)?;
             },
             ExpressionEnum::Function => {
                 let n = self.read_varint()?;
@@ -251,5 +273,42 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
             },
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::reader::SliceReader;
+    use crate::wxf::writer::WxfWriter;
+
+    fn varint_roundtrip(n: u64) -> u64 {
+        let mut w = WxfWriter::new(Vec::new());
+        w.write_varint(n).unwrap();
+        let bytes = w.into_inner();
+        WxfReader::new(SliceReader::new(&bytes)).read_varint().unwrap()
+    }
+
+    #[test]
+    fn varint_roundtrips_over_full_range() {
+        for n in [0u64, 1, 127, 128, 16383, 16384, 1_000_000, u64::MAX] {
+            assert_eq!(varint_roundtrip(n), n);
+        }
+    }
+
+    #[test]
+    fn varint_rejects_overlong_encoding() {
+        // 11 continuation bytes: the 10th group already overflows 64 bits.
+        let bytes = [0x80u8; 11];
+        assert!(WxfReader::new(SliceReader::new(&bytes)).read_varint().is_err());
+    }
+
+    #[test]
+    fn varint_rejects_high_bits_in_final_group() {
+        // 9 continuation groups (shift 63) then a final group with a bit above
+        // bit 63 set — must error rather than silently truncate.
+        let mut bytes = vec![0x80u8; 9];
+        bytes.push(0x02);
+        assert!(WxfReader::new(SliceReader::new(&bytes)).read_varint().is_err());
     }
 }

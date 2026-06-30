@@ -2,7 +2,8 @@
 //! just its single payload — no head, no variant tag — while sibling variants
 //! keep their (per-variant) heads.
 
-use wolfram_expr::{expr, from_wxf, to_wxf, Expr, ToWXF};
+use wolfram_expr::{expr, Expr};
+use wolfram_serialize::{from_wxf, to_wxf, ToWXF};
 
 #[derive(ToWXF)]
 #[wolfram(enum_head = "System`Failure", key_processor = "CamelCase")]

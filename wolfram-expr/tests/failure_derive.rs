@@ -2,7 +2,8 @@
 //! variant into `Failure["VariantName", <|CamelCase fields|>]`. The expected
 //! values are built with `expr!` (there is no `failure!` macro).
 
-use wolfram_expr::{expr, Expr, Failure};
+use wolfram_expr::{expr, Expr};
+use wolfram_serialize::Failure;
 
 #[test]
 fn named_fields_camel_case_keys() {

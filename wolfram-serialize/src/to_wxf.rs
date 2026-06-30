@@ -193,11 +193,11 @@ impl ToWXF for () {
 }
 
 // Option<T> and Result<T, E> are ordinary enums on the wire — identical to what
-// `#[derive(ToWXF)]` produces for a user enum of the same shape:
-//   None    → <|"Enum" -> "None"|>
-//   Some(v) → <|"Enum" -> "Some", "Data" -> {v}|>
-//   Ok(v)   → <|"Enum" -> "Ok",   "Data" -> {v}|>
-//   Err(e)  → <|"Enum" -> "Err",  "Data" -> {e}|>
+// `#[derive(ToWXF)]` produces for a user enum of the same shape (see `strategy`):
+//   None    → {"None"}
+//   Some(v) → {"Some", v}
+//   Ok(v)   → {"Ok", v}
+//   Err(e)  → {"Err", e}
 impl<T: ToWXF> ToWXF for Option<T> {
     fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
         match self {

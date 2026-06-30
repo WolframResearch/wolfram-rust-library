@@ -21,10 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ByteArray` are encoded directly via WSTP; the numeric/big types round-trip
   through WXF (`BinaryDeserialize[ByteArray[…]]`).
 
-* `get_expr` now handles `BigInteger` and `BigReal` correctly: values that
-  overflow `i64` / `f64` fall back to `get_number_as_string()` and are wrapped
-  as `ExprKind::BigInteger` / `ExprKind::BigReal`. Reals with a WL precision
-  marker (`` ` ``) are preserved as `BigReal` rather than silently truncated.
+* `get_expr` now reads `BigInteger` values: integers that overflow `i64` are
+  caught (`WSGetInteger64` errors on overflow), re-read via
+  `get_number_as_string()`, and wrapped as `ExprKind::BigInteger`.
+
+  Reals use `WSGetReal64` as the fast path and fall back to
+  `get_number_as_string()` → `ExprKind::BigReal` only when that errors (e.g. a
+  non-finite value). Note: `WSGetReal64` *succeeds* on an arbitrary-precision
+  real by rounding it to `f64`, so an extended-precision `BigReal` is read as a
+  machine real rather than preserved — a known limitation, since (unlike the
+  integer case) there is no error to trigger the string fallback.
 
 
 ## [0.2.9] — 2023-10-07

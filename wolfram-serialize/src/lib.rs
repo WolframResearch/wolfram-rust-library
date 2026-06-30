@@ -32,6 +32,20 @@ pub mod wxf;
 
 pub use crate::errors::Error;
 
+/// Upper bound on container capacity pre-allocated from an untrusted
+/// length/count prefix. Deserialization reads counts (array rank, association
+/// size, function arity) straight from the input; a malformed prefix could
+/// otherwise request a multi-gigabyte allocation before any bytes are validated.
+/// We cap the `with_capacity` *hint* — the container still grows to the real
+/// size as elements are read, but a bogus count can no longer OOM us up front.
+pub(crate) const PREALLOC_CAP: usize = 4096;
+
+/// Clamp a capacity hint that came from an untrusted length prefix to
+/// [`PREALLOC_CAP`]. Use this for every `with_capacity` driven by wire data.
+pub(crate) fn capped_capacity(hint: usize) -> usize {
+    hint.min(PREALLOC_CAP)
+}
+
 pub use crate::complex::{Complex, Complex32, Complex64};
 
 pub use crate::constants::{

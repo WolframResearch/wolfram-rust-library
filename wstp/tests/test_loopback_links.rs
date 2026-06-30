@@ -184,7 +184,7 @@ fn test_loopback_transfer_list() {
 
     assert_eq!(
         new.get_expr().unwrap().to_string(),
-        "System`List[5, \"second\", Global`foo]"
+        "{5, \"second\", Global`foo}"
     );
 }
 

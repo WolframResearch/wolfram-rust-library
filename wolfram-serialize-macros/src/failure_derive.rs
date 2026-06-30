@@ -18,7 +18,10 @@
 //! }
 //! ```
 //!
-//! is just `#[derive(Failure)]` on the enum (which must be `Clone`).
+//! is just `#[derive(Failure)]` on the enum. The owned `From<Enum>` conversion
+//! moves the fields out (no clone); the by-reference `From<&Enum>` clones the
+//! individual fields it reads, so only those fields need to be `Clone` — the
+//! enum as a whole does not.
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -40,11 +43,15 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
         },
     };
 
-    let mut arms = Vec::with_capacity(data.variants.len());
+    // Two arm sets share the same patterns: `owned_arms` move the fields into
+    // the `expr!` (no clone), `ref_arms` clone each field they read (so only the
+    // used fields need `Clone`, not the whole enum).
+    let mut owned_arms = Vec::with_capacity(data.variants.len());
+    let mut ref_arms = Vec::with_capacity(data.variants.len());
     for v in &data.variants {
         let v_name = &v.ident;
         let v_str = v_name.to_string();
-        let arm = match &v.fields {
+        match &v.fields {
             // V { a, b } -> Failure["V", <|"A" -> a, "B" -> b|>]
             Fields::Named(named) => {
                 let idents: Vec<&syn::Ident> = named
@@ -57,23 +64,33 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                     .iter()
                     .map(|id| process_key(&id.to_string(), Some("CamelCase")))
                     .collect();
-                quote! {
+                owned_arms.push(quote! {
                     #name::#v_name { #(#idents),* } =>
                         ::wolfram_expr::expr!(System::Failure[#v_str, { #( #keys -> #idents ),* }]),
-                }
+                });
+                ref_arms.push(quote! {
+                    #name::#v_name { #(#idents),* } =>
+                        ::wolfram_expr::expr!(System::Failure[#v_str, { #( #keys -> (#idents.clone()) ),* }]),
+                });
             },
             // V(x) -> Failure["V", <|"Message" -> x|>]
             Fields::Unnamed(unnamed) if unnamed.unnamed.len() == 1 => {
-                quote! {
+                owned_arms.push(quote! {
                     #name::#v_name(__payload) =>
                         ::wolfram_expr::expr!(System::Failure[#v_str, { "Message" -> __payload }]),
-                }
+                });
+                ref_arms.push(quote! {
+                    #name::#v_name(__payload) =>
+                        ::wolfram_expr::expr!(System::Failure[#v_str, { "Message" -> (__payload.clone()) }]),
+                });
             },
             // V -> Failure["V", <||>]
             Fields::Unit => {
-                quote! {
+                let arm = quote! {
                     #name::#v_name => ::wolfram_expr::expr!(System::Failure[#v_str, {}]),
-                }
+                };
+                owned_arms.push(arm.clone());
+                ref_arms.push(arm);
             },
             Fields::Unnamed(_) => {
                 return Err(syn::Error::new_spanned(
@@ -82,7 +99,6 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
                 ))
             },
         };
-        arms.push(arm);
     }
 
     Ok(quote! {
@@ -91,8 +107,8 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
             for ::wolfram_expr::Expr #where_clause
         {
             fn from(__value: &#name #ty_generics) -> ::wolfram_expr::Expr {
-                match ::core::clone::Clone::clone(__value) {
-                    #(#arms)*
+                match __value {
+                    #(#ref_arms)*
                 }
             }
         }
@@ -102,7 +118,9 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
             for ::wolfram_expr::Expr #where_clause
         {
             fn from(__value: #name #ty_generics) -> ::wolfram_expr::Expr {
-                ::wolfram_expr::Expr::from(&__value)
+                match __value {
+                    #(#owned_arms)*
+                }
             }
         }
     })

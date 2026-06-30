@@ -239,6 +239,26 @@ fn target_wstp_static_library_path(
         return sdk.wstp_static_library_path();
     }
 
+    // No WolframApp was discovered: fall back to wolframscript. That only ever
+    // resolves the *host* library, so refuse to silently link a host-arch
+    // library into a cross-compile — it would produce a broken artifact.
+    let host_system_id = std::env::var("HOST")
+        .ok()
+        .and_then(|host| SystemID::try_from_rust_target(&host).ok());
+    if host_system_id != Some(target_system_id) {
+        panic!(
+            "unable to locate a WSTP static library for target SystemID \
+             {target_system_id}: no Wolfram installation was discovered, and the \
+             wolframscript fallback only provides the host library{}. Install a \
+             Wolfram System with an SDK for the target, or set the \
+             wolfram-app-discovery environment variables to point at one.",
+            match host_system_id {
+                Some(host) => format!(" (host SystemID {host})"),
+                None => String::new(),
+            }
+        );
+    }
+
     wolfram_app_discovery::build_scripts::wstp_static_library_path(None)
         .expect("unable to get WSTP static library path")
         .into_path_buf()

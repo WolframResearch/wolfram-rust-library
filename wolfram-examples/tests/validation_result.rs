@@ -4,7 +4,8 @@
 //! through WXF and comparing against the exact `expr!`-built expected value.
 
 use wolfram_examples::ValidationResult;
-use wolfram_expr::{expr, from_wxf, to_wxf, Expr};
+use wolfram_expr::{expr, Expr};
+use wolfram_serialize::{from_wxf, to_wxf};
 
 fn roundtrip(v: &ValidationResult) -> Expr {
     let bytes = to_wxf(v, None).expect("serialize");
