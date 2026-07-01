@@ -189,12 +189,22 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// ```
 /// # mod scope {
 /// use wolfram_export::export;
+/// use wolfram_expr::{expr, Expr};
 /// use wolfram_serialize::{ToWXF, FromWXF};
 ///
 /// // Primitives and Vec<T> work out of the box.
 /// #[export(wxf)]
 /// fn scale(values: Vec<f64>, factor: f64) -> Vec<f64> {
 ///     values.into_iter().map(|v| v * factor).collect()
+/// }
+///
+/// // `Expr` implements `ToWXF`/`FromWXF` directly (in `wolfram-expr`), so a
+/// // function can take and return untyped Wolfram Language expressions —
+/// // useful when the shape isn't known ahead of time, or a derive isn't worth
+/// // it. Build the result with the `expr!` macro.
+/// #[export(wxf)]
+/// fn add_hold(e: Expr) -> Expr {
+///     expr!(System::Hold[e])
 /// }
 ///
 /// // Structs need #[derive(ToWXF, FromWXF)].
