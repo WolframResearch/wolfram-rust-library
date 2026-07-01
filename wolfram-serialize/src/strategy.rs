@@ -80,13 +80,3 @@ pub fn read_enum_header<'de, R: Reader<'de>>(
         other => Err(Error::unexpected_token(&["Function", "String"], other)),
     }
 }
-
-/// No-op: the old strategy needed a separate `"Data"` key + List header;
-/// the new format inlines data directly after the variant name, so there
-/// is nothing extra to read. Kept for API compatibility with derived code.
-pub fn read_data_header<'de, R: Reader<'de>>(
-    _r: &mut WxfReader<R>,
-    _n_data: usize,
-) -> Result<(), Error> {
-    Ok(())
-}

@@ -3,6 +3,3 @@
 
 pub mod reader;
 pub mod writer;
-
-pub use self::reader::WxfReader;
-pub use self::writer::WxfWriter;

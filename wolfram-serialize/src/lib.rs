@@ -21,14 +21,18 @@ extern crate self as wolfram_serialize;
 
 pub mod complex;
 pub mod constants;
-pub mod errors;
+pub(crate) mod errors;
+// `from_wxf`, `numeric_in`, and `strategy` stay `pub`: the derive macros emit
+// fully-qualified calls into them (`wolfram_serialize::from_wxf::err_at`,
+// `wolfram_serialize::numeric_in::read_fixed`, `wolfram_serialize::strategy::*`)
+// from *downstream* crates, so those paths must resolve outside this crate.
 pub mod from_wxf;
 pub mod numeric_in;
-pub mod reader;
+pub(crate) mod reader;
 pub mod strategy;
-pub mod to_wxf;
-pub mod writer;
-pub mod wxf;
+pub(crate) mod to_wxf;
+pub(crate) mod writer;
+pub(crate) mod wxf;
 
 pub use crate::errors::Error;
 

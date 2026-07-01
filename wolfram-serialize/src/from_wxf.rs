@@ -237,7 +237,7 @@ impl<'de> FromWXF<'de> for () {
 
 // Option<T> / Result<T, E> read the same enum-association format the derive
 // emits (and that `Option`/`Result` ToWXF writes) — via the shared
-// `read_enum_header` / `read_data_header` helpers.
+// `read_enum_header` helper.
 impl<'de, T: FromWXF<'de>> FromWXF<'de> for Option<T> {
     fn from_wxf_with_tag<R: Reader<'de>>(
         r: &mut WxfReader<R>,
@@ -246,10 +246,7 @@ impl<'de, T: FromWXF<'de>> FromWXF<'de> for Option<T> {
         let (_n, variant) = crate::strategy::read_enum_header(r, tok)?;
         match variant.as_str() {
             "None" => Ok(None),
-            "Some" => {
-                crate::strategy::read_data_header(r, 1)?;
-                Ok(Some(T::from_wxf(r)?))
-            },
+            "Some" => Ok(Some(T::from_wxf(r)?)),
             other => Err(Error::UnexpectedSymbol {
                 expected: vec!["None", "Some"],
                 got: other.to_owned(),
@@ -265,14 +262,8 @@ impl<'de, T: FromWXF<'de>, E: FromWXF<'de>> FromWXF<'de> for Result<T, E> {
     ) -> Result<Self, Error> {
         let (_n, variant) = crate::strategy::read_enum_header(r, tok)?;
         match variant.as_str() {
-            "Ok" => {
-                crate::strategy::read_data_header(r, 1)?;
-                Ok(Ok(T::from_wxf(r)?))
-            },
-            "Err" => {
-                crate::strategy::read_data_header(r, 1)?;
-                Ok(Err(E::from_wxf(r)?))
-            },
+            "Ok" => Ok(Ok(T::from_wxf(r)?)),
+            "Err" => Ok(Err(E::from_wxf(r)?)),
             other => Err(Error::UnexpectedSymbol {
                 expected: vec!["Ok", "Err"],
                 got: other.to_owned(),
