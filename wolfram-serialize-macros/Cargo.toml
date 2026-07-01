@@ -25,7 +25,14 @@ quote = "1.0.14"
 # Doc-example only: the derives emit `::wolfram_serialize::*` paths, so the
 # rustdoc examples need the runtime crate present to compile. `wolfram-serialize`
 # depends back on this crate, but Cargo permits dev-dependency cycles.
+#
+# The version requirement here is deliberately a loose (non-`=`) caret range,
+# NOT lockstep-bumped with this crate's own version: at publish time it
+# resolves against whatever's already on crates.io (never the in-flight,
+# not-yet-published version), so it doesn't recreate the chicken-and-egg
+# problem on every release. Locally, the `path` always wins and these doctests
+# run against the current in-repo code regardless of this version string.
 [dev-dependencies]
-wolfram-serialize = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize" }
-wolfram-expr = { version = "=0.6.0-alpha.4", path = "../wolfram-expr" }
+wolfram-serialize = { version = "0.6.0-alpha.3", path = "../wolfram-serialize" }
+wolfram-expr = { version = "0.6.0-alpha.3", path = "../wolfram-expr" }
 thiserror = "2"

@@ -289,6 +289,7 @@ pub fn derive_from_wxf(input: TokenStream) -> TokenStream {
 ///     Timeout { ms: i64 },
 /// }
 /// # }
+/// ```
 #[proc_macro_derive(Failure, attributes(wolfram))]
 pub fn derive_failure(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
