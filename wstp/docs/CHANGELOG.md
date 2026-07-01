@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.4] — 2026-07-01
+
+### Changed
+
+* **`get_expr`'s `Real` handling** now uses `WSGetReal64` as a fast path
+  instead of always round-tripping through the textual representation
+  (`get_number_as_string()` + backtick-marker sniffing introduced in
+  alpha.3). It falls back to the string form (→ `ExprKind::BigReal`) only
+  when `WSGetReal64` itself errors (e.g. a non-finite value).
+
+  **Known limitation:** `WSGetReal64` *succeeds* on an arbitrary-precision
+  real by silently rounding it to `f64` — unlike the integer case, there is
+  no overflow error to trigger the string fallback. As a result, an
+  extended-precision real (e.g. `N[Pi, 50]`) sent over the link is now read
+  back as a machine `Real` rather than an `ExprKind::BigReal`, so its extra
+  precision is truncated without warning. Code that round-trips
+  high-precision reals through `get_expr` should be aware of this.
+
+### Fixed
+
+* **`wstp-sys` build script** now panics with a clear error message when
+  cross-compiling and no WSTP static library can be found for the target,
+  instead of silently falling back to linking the host-architecture library
+  produced by the `wolframscript` discovery fallback. Previously this could
+  produce a broken, architecture-mismatched build artifact with no build
+  error; it now fails fast and tells you to install a Wolfram System SDK for
+  the target (or point `wolfram-app-discovery`'s environment variables at
+  one).
+
 ## [0.6.0-alpha.3] — 2026-06-19
 
 ### Added
@@ -25,12 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caught (`WSGetInteger64` errors on overflow), re-read via
   `get_number_as_string()`, and wrapped as `ExprKind::BigInteger`.
 
-  Reals use `WSGetReal64` as the fast path and fall back to
-  `get_number_as_string()` → `ExprKind::BigReal` only when that errors (e.g. a
-  non-finite value). Note: `WSGetReal64` *succeeds* on an arbitrary-precision
-  real by rounding it to `f64`, so an extended-precision `BigReal` is read as a
-  machine real rather than preserved — a known limitation, since (unlike the
-  integer case) there is no error to trigger the string fallback.
+  Reals are read via their textual representation: a WL-side `N[Pi, 50]`
+  arrives with a precision marker (`` ` ``) in its string form, which is
+  preserved as `ExprKind::BigReal` so precision isn't lost; plain reals parse
+  via `f64`. (See alpha.4 for a later change to this Real-reading path.)
 
 
 ## [0.2.9] — 2023-10-07

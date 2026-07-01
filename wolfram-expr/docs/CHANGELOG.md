@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.4] — 2026-07-01
+
+### Added
+
+* Documented every `ExprKind` variant (previously exempt from doc requirements
+  via `#[allow(missing_docs)]`).
+
+* Substantially expanded the `expr!` macro's documentation with new example
+  sections covering symbols, function application, associations, and
+  splicing Rust values/vectors/iterators into an expression (docs only, no
+  behavior change).
+
+### Changed
+
+* **Deprecated `Number`, `Number::real`, and `Expr::number`.** Construct
+  numbers with `Expr::from(i64)`, `Expr::from(f64)`, or `Expr::real(f64)`
+  instead, and match on `ExprKind::Integer` / `ExprKind::Real` directly
+  rather than the `Number` enum.
+
+### Removed
+
+* **Breaking:** Removed the `wolfram_serialize` re-exports (`to_wxf`,
+  `from_wxf`, `read_wxf`, `ToWXF`, `FromWXF`, `Failure`, `CompressionLevel`,
+  `Reader`) from `wolfram_expr`. WXF serialization now lives exclusively in
+  the `wolfram-serialize` crate — depend on it directly and change imports
+  from `wolfram_expr::{ToWXF, from_wxf, ...}` to `wolfram_serialize::{ToWXF,
+  from_wxf, ...}`.
+
+* **Breaking:** The `wolfram_expr::wxf` module is now private. The WXF
+  constant enums (`ExpressionEnum`, `HeaderEnum`, `NumericArrayEnum`,
+  `PackedArrayEnum`) are only reachable via their crate-root re-export (e.g.
+  `wolfram_expr::ExpressionEnum`), not `wolfram_expr::wxf::ExpressionEnum`.
+
+* **Breaking:** `ArrayBuf::byte_count` has been removed and `ArrayBuf::as_bytes`
+  is no longer public. Use the equivalent `NumericArrayRead` trait methods
+  instead (still callable, though now hidden from generated docs).
+
 ## [0.6.0-alpha.3] — 2026-06-19
 
 ### Added

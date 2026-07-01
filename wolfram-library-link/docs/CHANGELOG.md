@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.4] — 2026-07-01
+
+### Added
+
+* Added a new long-form guide, `docs::using_wxf_mode` ("How To: Export typed
+  functions using WXF"), covering `#[export(wxf)]`, typed structs via
+  `#[derive(ToWXF, FromWXF)]`, `Option`/`Result` tagged-association encoding,
+  structured errors via `#[derive(Failure)]`, zero-copy borrowed struct
+  fields, and `generate_loader!` integration.
+
+* `call_and_catch_panic` is now exported at the crate root
+  (`wolfram_library_link::call_and_catch_panic`), so custom transport code can
+  reuse the same panic-catching logic as the built-in `native`/`wstp`/`wxf`
+  bridges.
+
+### Changed
+
+* **Breaking:** the `catch_panic` module (and its `CaughtPanic` type) is no
+  longer public. Use the crate-root `call_and_catch_panic` instead, which now
+  returns `Result<T, Expr>` directly — a ready-to-use `Failure["RustPanic",
+  …]` expression — rather than `Result<T, CaughtPanic>`.
+
+* **Breaking:** `macro_utils::call_and_catch_as_expr` has been removed,
+  superseded by the crate-root `call_and_catch_panic` (same `Result<T, Expr>`
+  signature).
+
+* `FAILED_TO_INIT` and `FAILED_WITH_PANIC` are now `#[doc(hidden)]`. They
+  remain public (macro-generated code still needs them) but are no longer
+  part of the documented, user-facing API.
+
+* Now depends on `wolfram-serialize` directly for the `#[derive(Failure)]`
+  machinery, since `wolfram-expr` no longer re-exports it.
+
+### Removed
+
+* **Breaking:** removed the crate-root re-exports of `wolfram-expr`'s
+  portable value types — `OwnedNumericArray`, `Association`, `ByteArray`,
+  `NumericArrayEnum`, `NumericArrayRead`, `PackedArray`, `PackedArrayEnum`,
+  `BigInteger`, `BigReal`. Import these directly from `wolfram-expr` instead.
+
+* **Breaking:** `wolfram_library_link::expr::Failure` is no longer available,
+  since `wolfram-expr` dropped its `wolfram-serialize` re-export block.
+  Depend on `wolfram-serialize` directly to derive/import `Failure`, `ToWXF`,
+  and `FromWXF`.
+
 ## [0.6.0-alpha.3] — 2026-06-19
 
 ### Added

@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-export-macros"
-version = "0.6.0-alpha.3"
+version = "0.6.0-alpha.4"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
@@ -31,9 +31,9 @@ proc-macro-crate = "3"
 # must be present to compile them. These crates depend back on this one, but
 # Cargo permits dev-dependency cycles.
 [dev-dependencies]
-wolfram-export = { version = "=0.6.0-alpha.3", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
-wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
-wolfram-serialize = { version = "=0.6.0-alpha.3", path = "../wolfram-serialize" }
+wolfram-export = { version = "=0.6.0-alpha.4", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
+wolfram-expr = { version = "=0.6.0-alpha.4", path = "../wolfram-expr" }
+wolfram-serialize = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize" }
 
 [features]
 default = []

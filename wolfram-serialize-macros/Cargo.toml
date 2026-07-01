@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-serialize-macros"
-version = "0.6.0-alpha.3"
+version = "0.6.0-alpha.4"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
@@ -26,6 +26,6 @@ quote = "1.0.14"
 # rustdoc examples need the runtime crate present to compile. `wolfram-serialize`
 # depends back on this crate, but Cargo permits dev-dependency cycles.
 [dev-dependencies]
-wolfram-serialize = { version = "=0.6.0-alpha.3", path = "../wolfram-serialize" }
-wolfram-expr = { version = "=0.6.0-alpha.3", path = "../wolfram-expr" }
+wolfram-serialize = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize" }
+wolfram-expr = { version = "=0.6.0-alpha.4", path = "../wolfram-expr" }
 thiserror = "2"

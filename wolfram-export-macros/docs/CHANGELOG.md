@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-alpha.4] — 2026-07-01
+
+### Removed
+
+* **Breaking:** removed the `#[export_native]`, `#[export_wstp]`, and
+  `#[export_wxf]` proc-macro attributes. They were redundant leftovers from an
+  earlier plan to split each wire format into its own crate
+  (`wolfram-export-native`/`wolfram-export-wstp`/`wolfram-export-wxf`) that
+  was never carried out — nothing in this repo used them, and their own doc
+  examples already told callers to write `#[export]`, `#[export(wstp)]`, and
+  `#[export(wxf)]` instead. Anyone who wrote `#[export_native]` /
+  `#[export_wstp]` / `#[export_wxf]` directly must switch to the equivalent
+  `#[export]` / `#[export(wstp)]` / `#[export(wxf)]` form.
+
+### Changed
+
+* **`#[export]`** doc comment rewritten to document all three wire-format
+  modes (native, `wstp`, `wxf`) and the Cargo feature flags each one requires
+  on `wolfram-export`, in one place, with a compiling example for each mode.
+* **`#[init]`** doc comment expanded: clarifies it may be applied to at most
+  one function per library, documents panic-catching behavior, and adds a
+  compiling example.
+
 ## [0.6.0-alpha.3] — 2026-06-19
 
 ### Added
