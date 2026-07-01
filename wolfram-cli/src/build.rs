@@ -429,9 +429,12 @@ pub fn copy_cross_dylibs(
         .map_err(|e| format!("failed to create {}: {e}", lib_dir.display()))?;
     for cross in cross_dylibs {
         let cross_name = cross.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        // Windows `.dll`s aren't `lib`-prefixed, unlike macOS/Linux dylibs, so
+        // compare against the prefix-stripped `name` rather than `filename`.
+        let cross_name = cross_name.strip_prefix("lib").unwrap_or(cross_name);
         let host_info = host_infos
             .iter()
-            .find(|i| i.filename == cross_name)
+            .find(|i| i.name == cross_name)
             .ok_or_else(|| format!("no host match for cross dylib {cross_name}"))?;
         let ext = cross
             .extension()

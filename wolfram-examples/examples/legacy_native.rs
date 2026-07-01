@@ -1,7 +1,5 @@
 use wolfram_library_link::{self as wll, NumericArray, UninitNumericArray};
 
-wll::generate_loader!(load_legacy_native_functions);
-
 #[wll::export]
 fn square(x: i64) -> i64 {
     x * x
