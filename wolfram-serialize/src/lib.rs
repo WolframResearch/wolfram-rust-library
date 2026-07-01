@@ -99,6 +99,20 @@ impl CompressionLevel {
 /// The compressed path streams the token body directly through the
 /// [`ZlibEncoder`][flate2::write::ZlibEncoder] — no intermediate uncompressed
 /// buffer.
+///
+/// ```
+/// use wolfram_serialize::{to_wxf, from_wxf, CompressionLevel};
+///
+/// let bytes = to_wxf(&vec![1_i64, 2, 3], None).unwrap();
+/// assert_eq!(&bytes[..2], b"8:"); // uncompressed header
+///
+/// let compressed = to_wxf(&vec![1_i64, 2, 3], CompressionLevel::Default).unwrap();
+/// assert_eq!(&compressed[..3], b"8C:"); // zlib-compressed header
+///
+/// // Both forms decode the same way — `from_wxf` auto-detects the header.
+/// assert_eq!(from_wxf::<Vec<i64>>(&bytes).unwrap(), vec![1, 2, 3]);
+/// assert_eq!(from_wxf::<Vec<i64>>(&compressed).unwrap(), vec![1, 2, 3]);
+/// ```
 pub fn to_wxf<T: ToWXF + ?Sized>(
     value: &T,
     compression: impl Into<Option<CompressionLevel>>,
@@ -170,9 +184,51 @@ fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {
     }
 }
 
-/// Read from a WXF blob (`8:` / `8C:` auto-detected) via a [`WxfReader`]. The
-/// closure can pull one or more top-level values — e.g. a `Function[List, …]`
-/// wrapper around several arguments. For a single value, prefer [`from_wxf`][fn@from_wxf].
+/// Strip the WXF header (`8:` / `8C:` auto-detected, decompressing if needed)
+/// and hand the closure a [`WxfReader`] positioned at the start of the token
+/// stream, so it can drive the cursor directly.
+///
+/// [`from_wxf`][fn@from_wxf] only fits when the *entire* wire value decodes as
+/// one [`FromWXF`] type. Reach for `read_wxf` instead when you need to:
+///
+/// * decode several **positional** values off one cursor — e.g. a LibraryLink
+///   argument list arrives as `Function[<head>, arg0, arg1, …]`, where each
+///   argument has its own Rust type and must be read in order (this is exactly
+///   how `#[export(wxf)]` unpacks its arguments);
+/// * inspect a token (via [`WxfReader::read_expr_token`]) before deciding how
+///   to decode the rest, since [`from_wxf`][fn@from_wxf] commits to a single
+///   `T` up front;
+/// * read **borrowed** (`&str` / `&[u8]`) data — the borrow is tied to the
+///   input buffer, so it must be consumed *inside* the closure instead of
+///   escaping the call (see [`FromWXF`] for the zero-copy story).
+///
+/// ```
+/// use wolfram_serialize::{read_wxf, ExpressionEnum, FromWXF, WxfWriter};
+///
+/// // Hand-build the wire form of `{1, "two", 3.0}`:
+/// // `Function[System`List, 1, "two", 3.0]`.
+/// let mut w = WxfWriter::new(vec![b'8', b':']);
+/// w.write_function(3).unwrap();
+/// w.write_symbol("System`List").unwrap();
+/// w.write_integer(1).unwrap();
+/// w.write_string("two").unwrap();
+/// w.write_real(3.0).unwrap();
+/// let bytes = w.into_inner();
+///
+/// // Decode the three arguments positionally, each with its own Rust type —
+/// // there is no single `FromWXF` type spanning all three, so `from_wxf`
+/// // alone can't do this.
+/// let (a, b, c) = read_wxf(&bytes, |r| {
+///     assert_eq!(r.read_expr_token()?, ExpressionEnum::Function);
+///     let arity = r.read_varint()?;
+///     r.skip()?; // discard the head (`System`List`)
+///     assert_eq!(arity, 3);
+///     Ok((i64::from_wxf(r)?, String::from_wxf(r)?, f64::from_wxf(r)?))
+/// })
+/// .unwrap();
+///
+/// assert_eq!((a, b, c), (1, "two".to_string(), 3.0));
+/// ```
 pub fn read_wxf<T>(
     bytes: &[u8],
     f: impl for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<T, Error>,
@@ -187,6 +243,20 @@ pub fn read_wxf<T>(
 /// Use `T = Expr` for an untyped tree, or any [`FromWXF`] type — including those
 /// produced by `#[derive(FromWXF)]` — for typed deserialization with no
 /// intermediate `Expr`.
+///
+/// ```
+/// use wolfram_serialize::{to_wxf, from_wxf, FromWXF, ToWXF};
+///
+/// #[derive(ToWXF, FromWXF, Debug, PartialEq)]
+/// struct Point { x: f64, y: f64 }
+///
+/// let bytes = to_wxf(&Point { x: 1.0, y: 2.0 }, None).unwrap();
+/// let point: Point = from_wxf(&bytes).unwrap();
+/// assert_eq!(point, Point { x: 1.0, y: 2.0 });
+/// ```
+///
+/// Downstream, `wolfram_expr::Expr` also implements [`FromWXF`], so `T = Expr`
+/// decodes into an untyped tree when the shape isn't known ahead of time.
 pub fn from_wxf<T: for<'de> FromWXF<'de>>(bytes: &[u8]) -> Result<T, Error> {
     read_wxf(bytes, |r| T::from_wxf(r))
 }
