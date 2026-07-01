@@ -49,6 +49,104 @@
 /// // To call a symbol by name write expr!(Global::f[1, 2]) instead.
 /// let call = expr!(head[1, 2]);
 /// ```
+///
+/// ## Symbols
+///
+/// ```
+/// # use wolfram_expr::{expr, Expr, Symbol};
+/// // Fully qualified: each `::` becomes a context backtick.
+/// assert_eq!(expr!(System::Plus), Expr::symbol(Symbol::new("System`Plus")));
+/// assert_eq!(expr!(My::Custom::Symbol), Expr::symbol(Symbol::new("My`Custom`Symbol")));
+///
+/// // Context-less `::Name` produces the bare symbol `Name` (no context prefix)
+/// // — useful for symbols WL resolves relative to the current context, like
+/// // `$Context` or a name meant to land in `Global\``.
+/// assert_eq!(expr!(::Name), Expr::symbol(Symbol::new("Name")));
+///
+/// // `::$Name` covers `$`-prefixed system symbols (the `$` is pasted back on).
+/// assert_eq!(expr!(::$Context), Expr::symbol(Symbol::new("$Context")));
+///
+/// // A Rust `Symbol`/`Expr` value used bare (no `::`) is spliced in as-is —
+/// // not reinterpreted as WL syntax.
+/// let sym = Symbol::new("Global`counter");
+/// assert_eq!(expr!(sym.clone()), Expr::symbol(sym));
+/// ```
+///
+/// ## Function application
+///
+/// ```
+/// # use wolfram_expr::{expr, Expr, Symbol};
+/// // Literal qualified head. `List` gets WL surface syntax (`{…}`); most
+/// // other heads render as `head[…]`, keeping their full qualified name.
+/// assert_eq!(expr!(System::List[1, 2, 3]).to_string(), "{1, 2, 3}");
+/// assert_eq!(expr!(System::Point[1, 2]).to_string(), "System`Point[1, 2]");
+///
+/// // Nested heads recurse to any depth.
+/// assert_eq!(
+///     expr!(System::Point[System::List[1, 2]]).to_string(),
+///     "System`Point[{1, 2}]"
+/// );
+///
+/// // A runtime `Symbol` as the head calls that symbol, same as writing it
+/// // out literally — handy when the head name is only known at runtime
+/// // (e.g. built with `format!` or looked up from user input).
+/// let h = Symbol::new("Global`f");
+/// assert_eq!(expr!(h[1, 2]), expr!(Global::f[1, 2]));
+///
+/// // Curried application `f[1, 2][3, 4]`: the head is itself a `Normal`, built
+/// // as an ordinary Rust variable and spliced in as the head.
+/// let inner = expr!(Global::f[1, 2]);
+/// let curried = expr!(inner[3, 4]);
+/// assert_eq!(curried.to_string(), "Global`f[1, 2][3, 4]");
+/// ```
+///
+/// ## Associations
+///
+/// ```
+/// # use wolfram_expr::expr;
+/// // `{k -> v, ...}` always builds an Association; every element must be a
+/// // `->` Rule — a bare value in `{...}` is a compile error (write
+/// // `System::List[..]` for a WL list instead).
+/// assert_eq!(expr!({"a" -> 1, "b" -> 2}).to_string(), r#"<|"a" -> 1, "b" -> 2|>"#);
+///
+/// // Keys and values can be any `expr!` form, including nested function
+/// // calls and symbols — this is the shape `#[derive(ToWXF)]` emits for a
+/// // per-variant `Failure["OutOfRange", <|"Min" -> 0, "Max" -> 255|>]`.
+/// let e = expr!(System::Failure["OutOfRange", {"Min" -> 0, "Max" -> 255}]);
+/// assert_eq!(e.to_string(), r#"System`Failure["OutOfRange", <|"Min" -> 0, "Max" -> 255|>]"#);
+/// ```
+///
+/// ## Injecting Rust values: variables, vectors, iterators
+///
+/// ```
+/// # use wolfram_expr::{expr, Expr};
+/// // A bare Rust variable in arg position converts via `Expr::from`.
+/// let count = 3i64;
+/// assert_eq!(expr!(System::List[count]), expr!(System::List[3]));
+///
+/// // Parenthesize any other Rust expression — method calls, arithmetic, …
+/// let n = 5i64;
+/// assert_eq!(expr!(System::F[(n * 2)]), expr!(System::F[10]));
+///
+/// // `..iter` splices a sequence of `Into<Expr>` items as args: a `Vec<Expr>`,
+/// // a `Vec<T>` for `T: Into<Expr>`, or any iterator — no intermediate `Vec`
+/// // needed, and it can mix with literal args and other splices.
+/// let values: Vec<i64> = vec![1, 2, 3];
+/// assert_eq!(expr!(System::List[..values]), expr!(System::List[1, 2, 3]));
+///
+/// let middle = vec![1i64, 2];
+/// assert_eq!(
+///     expr!(System::f[0, ..middle, 9]),
+///     expr!(System::f[0, 1, 2, 9])
+/// );
+///
+/// // Splice an iterator adaptor directly, with no collect().
+/// let items = vec![1i64, 2, 3];
+/// assert_eq!(
+///     expr!(System::List[..items.into_iter().rev()]),
+///     expr!(System::List[3, 2, 1])
+/// );
+/// ```
 #[macro_export]
 macro_rules! expr {
     // Booleans (must be before $e:expr to avoid ambiguity)
