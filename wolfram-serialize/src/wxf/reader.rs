@@ -168,10 +168,10 @@ impl<'de, R: Reader<'de>> WxfReader<R> {
     /// dims and the **flat byte count** (`prod(dims) * elem_size`).
     ///
     /// Both quantities come from untrusted input, so: the dims vector caps its
-    /// pre-allocation ([`capped_capacity`][crate::capped_capacity]), and the byte
-    /// count is computed with overflow checking — a wrapping `prod(dims) *
-    /// elem_size` would otherwise yield a small count and silently read a
-    /// truncated array instead of erroring.
+    /// pre-allocation (`capped_capacity`), and the byte count is computed with
+    /// overflow checking — a wrapping `prod(dims) * elem_size` would otherwise
+    /// yield a small count and silently read a truncated array instead of
+    /// erroring.
     pub fn read_array_shape(
         &mut self,
         elem_size: usize,

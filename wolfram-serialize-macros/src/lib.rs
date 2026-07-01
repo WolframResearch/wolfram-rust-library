@@ -126,10 +126,12 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 /// # Zero-copy borrowed fields
 ///
 /// Struct fields of type `&'de str` or `&'de [u8]` borrow directly from the
-/// input buffer — no heap allocation for the string data:
+/// input buffer — no heap allocation for the string data. Because the borrow
+/// is tied to the input, read them inside a `read_wxf` closure rather than
+/// returning them:
 ///
 /// ```
-/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf_ref};
+/// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, read_wxf};
 ///
 /// #[derive(ToWXF)]
 /// struct Owned { name: String }
@@ -138,8 +140,11 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 /// struct Borrowed<'a> { name: &'a str }
 ///
 /// let bytes = to_wxf(&Owned { name: "hello".into() }, None).unwrap();
-/// let b: Borrowed<'_> = from_wxf_ref(&bytes).unwrap();
-/// assert_eq!(b.name, "hello");  // points into `bytes`, no alloc
+/// read_wxf(&bytes, |r| {
+///     let b = Borrowed::from_wxf(r)?;
+///     assert_eq!(b.name, "hello");  // points into `bytes`, no alloc
+///     Ok(())
+/// }).unwrap();
 /// ```
 ///
 /// # Enums

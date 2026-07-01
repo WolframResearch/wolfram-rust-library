@@ -38,10 +38,11 @@ use crate::Error;
 /// ```
 ///
 /// Structs with `&'de str` or `&'de [u8]` fields borrow directly from the
-/// input buffer (zero-copy):
+/// input buffer (zero-copy). Because the borrow is tied to the input, read
+/// them inside a [`read_wxf`][crate::read_wxf] closure rather than returning them:
 ///
 /// ```
-/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, from_wxf_ref};
+/// use wolfram_serialize::{FromWXF, ToWXF, to_wxf, read_wxf};
 ///
 /// // Owned counterpart used for encoding
 /// #[derive(ToWXF)]
@@ -59,8 +60,11 @@ use crate::Error;
 ///
 /// let ds = Dataset { name: "test".into(), values: vec![1.0, 2.0] };
 /// let bytes = to_wxf(&ds, None).unwrap();
-/// let ds_ref: DatasetRef<'_> = from_wxf_ref(&bytes).unwrap();
-/// assert_eq!(ds_ref.name, "test");  // borrowed, no alloc
+/// read_wxf(&bytes, |r| {
+///     let ds_ref = DatasetRef::from_wxf(r)?;
+///     assert_eq!(ds_ref.name, "test");  // borrowed, no alloc
+///     Ok(())
+/// }).unwrap();
 /// ```
 ///
 /// `'de` is the lifetime of the input buffer. Owned types implement

@@ -190,29 +190,3 @@ pub fn read_wxf<T>(
 pub fn from_wxf<T: for<'de> FromWXF<'de>>(bytes: &[u8]) -> Result<T, Error> {
     read_wxf(bytes, |r| T::from_wxf(r))
 }
-
-/// Deserialize `bytes` into a **borrowed** `T` whose `&str` / `&[u8]` fields
-/// point straight into `bytes` (zero-copy). The result borrows `bytes`, so the
-/// input must be **uncompressed** (`8:`) — a `8C:` payload would have to be
-/// decompressed into a temporary the borrow couldn't outlive (use [`from_wxf`][fn@from_wxf]
-/// for the owned form, or [`read_wxf`] to borrow within a closure).
-pub fn from_wxf_ref<'de, T: FromWXF<'de>>(bytes: &'de [u8]) -> Result<T, Error> {
-    use crate::constants::HeaderEnum;
-
-    if bytes.len() < 2 || bytes[0] != HeaderEnum::Version as u8 {
-        return Err(Error::invalid("not a WXF stream".into()));
-    }
-    if bytes[1] == HeaderEnum::Compress as u8 {
-        return Err(Error::invalid(
-            "from_wxf_ref requires uncompressed (8:) WXF — borrowed views can't \
-             point into a decompressed buffer"
-                .into(),
-        ));
-    }
-    if bytes[1] != HeaderEnum::Separator as u8 {
-        return Err(Error::invalid("malformed WXF header".into()));
-    }
-    let payload: &'de [u8] = &bytes[2..];
-    let mut r = WxfReader::new(SliceReader::new(payload));
-    T::from_wxf(&mut r)
-}
