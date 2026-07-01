@@ -1,4 +1,4 @@
-//! Codegen for `#[export_native]` / `#[export_wstp]` / `#[export_wxf]`.
+//! Codegen for the three `#[export]` modes: native, `wstp`, and `wxf`.
 //!
 //! The emitted code names items under one of two host crates:
 //! - `::wolfram_export::*`    — preferred (new canonical home, with feature flags)

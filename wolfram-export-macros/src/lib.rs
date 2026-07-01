@@ -1,5 +1,4 @@
-//! Procedural macros for `#[export]`, `#[export_native]`, `#[export_wstp]`,
-//! `#[export_wxf]`, and `#[init]`.
+//! Procedural macros for `#[export]` and `#[init]`.
 //!
 //! Emitted paths are resolved dynamically at expansion time via
 //! `proc-macro-crate`: if the caller's `Cargo.toml` has `wolfram-export` the
@@ -19,11 +18,37 @@ use syn::{spanned::Spanned, Error, Item};
 // #[init]
 //======================================
 
-/// Mark a function as the library's `WolframLibrary_initialize()` entry point.
+/// Designate an initialization function to run once, when this library is
+/// loaded via Wolfram LibraryLink — distinct from [`export`], which wraps a
+/// function called on *every* invocation from Wolfram.
 ///
-/// The annotated function must take no arguments and return `()`. Behind the
-/// scenes the macro emits a `WolframLibrary_initialize` C symbol that calls
-/// `wolfram_export_native::macro_utils::init_with_user_function(lib, user_fn)`.
+/// The annotated function must take no arguments and return `()`. `#[init]`
+/// can be applied to at most one function in a library, and a library isn't
+/// required to define one at all.
+///
+/// Behind the scenes, the macro generates a `WolframLibrary_initialize()` C
+/// symbol — [the well-known entry point][lib-init] the Wolfram Kernel calls
+/// automatically when the library is loaded, before any exported function
+/// runs.
+///
+/// # Panics
+///
+/// Panics inside the `#[init]` function are caught and reported to the Kernel
+/// as an error code. If initialization panics, the Kernel will not load any
+/// of this library's other exported functions.
+///
+/// # Example
+///
+/// ```
+/// use wolfram_export::init;
+///
+/// #[init]
+/// fn init_my_library() {
+///     println!("library is now initialized");
+/// }
+/// ```
+///
+/// [lib-init]: https://reference.wolfram.com/language/LibraryLink/tutorial/LibraryStructure.html#280210622
 #[proc_macro_attribute]
 pub fn init(attr: TokenStream, item: TokenStream) -> TokenStream {
     match init_(attr.into(), item) {
@@ -86,35 +111,34 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 }
 
 //======================================
-// #[export] — legacy form, dispatches by args
+// #[export] — one macro, three wire formats, picked by a keyword argument.
 //======================================
 
-/// Back-compat `#[export]` / `#[export(wstp)]` proc-macro: dispatches by the
-/// `wstp` keyword in `attrs`. Used by the `wolfram_library_link::export`
-/// re-export so existing call sites compile unchanged — emitted code paths
-/// resolve through `::wolfram_library_link::*`.
-#[proc_macro_attribute]
-pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    let mode = self::export::detect_mode_from_args(&attrs);
-    let attrs = self::export::strip_wstp_arg(attrs);
-    match self::export::export(mode, attrs, item) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.into_compile_error().into(),
-    }
-}
-
-//======================================
-// #[export_native]
-//======================================
-
-/// Annotate a function for export via the native (MArgument-based) Wolfram
-/// LibraryLink ABI. Re-exported by `wolfram-export-native` as `export`.
+/// Export a function as a Wolfram LibraryLink function, in one of three wire
+/// formats picked by a keyword argument. All three need
+/// `LibraryFunctionLoad` on the Wolfram side and none of them need the
+/// `automate-function-loading-boilerplate` feature to *work* — that feature
+/// only affects whether `cargo wl build` can discover the load call for you.
 ///
-/// Supported parameter and return types: `bool`, `i64`, `f64`, `String`,
-/// `NumericArray`, and references thereof.
+/// | Attribute        | Wire format             | Cargo feature (on `wolfram-export`) |
+/// |------------------|--------------------------|--------------------------------------|
+/// | `#[export]`      | native `MArgument` ABI  | `native` (in the default feature set) |
+/// | `#[export(wstp)]`| WSTP `LinkObject`        | `wstp` |
+/// | `#[export(wxf)]` | typed WXF `ByteArray`    | `wxf` |
 ///
-/// ```rust
+/// ```toml
+/// # Cargo.toml
+/// wolfram-export = { version = "0.6", features = ["wstp", "wxf"] }  # native is on by default
+/// ```
+///
+/// # `#[export]` — native mode (default)
+///
+/// Parameters and the return type must implement `FromArg`/`IntoArg`:
+/// `bool`, `i64`, `f64`, `String`, `NumericArray`, and references thereof.
+/// This is the fastest mode — arguments cross the LibraryLink ABI with no
+/// intermediate encoding.
+///
+/// ```
 /// # mod scope {
 /// use wolfram_export::export;
 ///
@@ -125,27 +149,16 @@ pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
 /// fn greet(name: String) -> String { format!("Hello, {name}!") }
 /// # }
 /// ```
-#[proc_macro_attribute]
-pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    match self::export::export(self::export::Mode::Native, attrs, item) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.into_compile_error().into(),
-    }
-}
-
-//======================================
-// #[export_wstp]
-//======================================
-
-/// Annotate a function for export via the WSTP `LinkObject` ABI. Re-exported
-/// by `wolfram-export-wstp` as `export`.
 ///
-/// The function receives a `Vec<Expr>` (all arguments as a list) and returns an
-/// `Expr`, or takes a `&mut Link` for low-level control. Use the
-/// `expr!` macro to build return values.
+/// # `#[export(wstp)]` — WSTP mode
 ///
-/// ```rust
+/// The function receives a `Vec<Expr>` (all arguments as a list) and returns
+/// an `Expr`, or takes a `&mut Link` for low-level control over the wire.
+/// Use this mode when the function's arguments or return value don't fit a
+/// fixed native/WXF shape — e.g. variadic arguments, or streaming a result
+/// incrementally.
+///
+/// ```
 /// # mod scope {
 /// use wolfram_export::export;
 /// use wolfram_expr::{expr, Expr, ExprKind};
@@ -163,30 +176,17 @@ pub fn export_native(attrs: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// # }
 /// ```
-#[proc_macro_attribute]
-pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    match self::export::export(self::export::Mode::Wstp, attrs, item) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.into_compile_error().into(),
-    }
-}
-
-//======================================
-// #[export_wxf]
-//======================================
-
-/// Annotate a function for export via the WXF typed-arg ABI.
 ///
-/// The generated wrapper reads a WXF-encoded `ByteArray` MArgument, deserializes
-/// all arguments via `FromWXF`, calls your
-/// function, and serializes the return value via `ToWXF`
-/// back into a `ByteArray`. Panics are caught and returned as structured
-/// `Failure["RustPanic", …]` expressions.
+/// # `#[export(wxf)]` — typed WXF mode
 ///
-/// Requires `wolfram-export` with `features = ["wxf"]`.
+/// The generated wrapper reads a WXF-encoded `ByteArray` MArgument,
+/// deserializes all arguments via `FromWXF`, calls your function, and
+/// serializes the return value via `ToWXF` back into a `ByteArray`. Panics
+/// are caught and returned as structured `Failure["RustPanic", …]`
+/// expressions. Use this mode for structured arguments/return values
+/// (structs, enums, `Option`/`Result`) without hand-writing WSTP plumbing.
 ///
-/// ```rust
+/// ```
 /// # mod scope {
 /// use wolfram_export::export;
 /// use wolfram_serialize::{ToWXF, FromWXF};
@@ -214,16 +214,18 @@ pub fn export_wstp(attrs: TokenStream, item: TokenStream) -> TokenStream {
 /// # }
 /// ```
 ///
-/// On the Wolfram side the struct maps to an `Association`:
+/// On the Wolfram side a struct maps to an `Association`:
 ///
 /// ```wolfram
 /// midpoint[<|"x" -> 0.0, "y" -> 0.0|>, <|"x" -> 2.0, "y" -> 4.0|>]
 /// (* Returns <|"x" -> 1.0, "y" -> 2.0|> *)
 /// ```
 #[proc_macro_attribute]
-pub fn export_wxf(attrs: TokenStream, item: TokenStream) -> TokenStream {
+pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
-    match self::export::export(self::export::Mode::Wxf, attrs, item) {
+    let mode = self::export::detect_mode_from_args(&attrs);
+    let attrs = self::export::strip_wstp_arg(attrs);
+    match self::export::export(mode, attrs, item) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }

@@ -51,18 +51,18 @@ pub use ::wolfram_export_core::inventory;
 // Mode-gated submodules.
 //==============================================================================
 
-/// Runtime support for native-mode exports (`#[export]` / `#[export_native]`),
-/// which are called over the raw `MArgument` C ABI.
+/// Runtime support for native-mode exports (`#[export]`), which are called
+/// over the raw `MArgument` C ABI.
 #[cfg(feature = "native")]
 pub mod native;
 
-/// Runtime support for WSTP-mode exports (`#[export(wstp)]` / `#[export_wstp]`),
-/// which are called over a WSTP `Link`.
+/// Runtime support for WSTP-mode exports (`#[export(wstp)]`), which are
+/// called over a WSTP `Link`.
 #[cfg(feature = "wstp")]
 pub mod wstp;
 
-/// Runtime support for WXF-mode exports (`#[export(wxf)]` / `#[export_wxf]`),
-/// which exchange typed values as a WXF `ByteArray`.
+/// Runtime support for WXF-mode exports (`#[export(wxf)]`), which exchange
+/// typed values as a WXF `ByteArray`.
 #[cfg(feature = "wxf")]
 pub mod wxf;
 
@@ -71,9 +71,14 @@ pub mod wxf;
 // a separate `wolfram-export-macros` dep.
 //==============================================================================
 
-/// The `#[export]` family of attribute macros, re-exported so user code only
-/// needs a dependency on `wolfram-export`. See [`export`][macro@export].
-pub use wolfram_export_macros::{export, export_native, export_wstp, export_wxf, init};
+/// Export a function as a Wolfram LibraryLink function. See
+/// [`export`][macro@export] for the three wire-format modes (native, `wstp`,
+/// `wxf`) and the Cargo features each one needs.
+pub use wolfram_export_macros::export;
+
+/// Designate a one-time library-load initialization function. See
+/// [`init`][macro@init].
+pub use wolfram_export_macros::init;
 
 //==============================================================================
 // Macro-emission surface.
