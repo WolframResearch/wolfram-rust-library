@@ -196,7 +196,10 @@ pub fn cmd_build(args: BuildArgs) -> Result<()> {
         }
         let cross_dylibs =
             run_cargo_build(&parsed.cargo_args, Some(rust_target(system_id)?))?;
-        copy_cross_dylibs(&host_infos, &cross_dylibs, system_id, &out_dir, &config)?;
+        let lib_dir =
+            copy_cross_dylibs(&host_infos, &cross_dylibs, system_id, &out_dir, &config)?;
+        let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
+        println!("{}", lib_dir.display());
     }
 
     Ok(())
@@ -314,6 +317,21 @@ pub fn generate_package(
         })
         .collect();
 
+    write_package_wl_files(&placed, system_id, &lib_dir, config)?;
+
+    Ok(lib_dir)
+}
+
+/// Write Functions.wl, Artifacts.wl, and PacletInfo.wl into `lib_dir` from
+/// already-placed `(info, dest-filename)` pairs. Shared by [`generate_package`]
+/// (host build) and [`copy_cross_dylibs`] (cross builds), so every platform's
+/// package directory ends up with the same loader scaffolding.
+fn write_package_wl_files(
+    placed: &[(&DylibInfo, String)],
+    system_id: SystemID,
+    lib_dir: &Path,
+    config: &PacletConfig,
+) -> Result<()> {
     // ── Artifacts.wl
     let sigs: Vec<Expr> = placed
         .iter()
@@ -327,9 +345,9 @@ pub fn generate_package(
         "Version"    -> (config.version.as_str()),
         "SystemID"   -> (system_id.as_str()),
         "Extensions" -> ::List[::List[
-            "Resource",
+            "Asset",
             ::Rule["Root", "."],
-            ::Rule["Resources", ::List[
+            ::Rule["Assets", ::List[
                 ::List["Functions", "Functions.wl"],
                 ::List["Artifacts", "Artifacts.wl"]
             ]]
@@ -358,7 +376,7 @@ pub fn generate_package(
     let functions = library_functions_loader(&libraries);
     write_wl(lib_dir.join("Functions.wl"), &functions)?;
 
-    Ok(lib_dir)
+    Ok(())
 }
 
 /// Write a generated WL `Expr` to `path`, prefixed with the "do not edit"
@@ -423,32 +441,40 @@ pub fn copy_cross_dylibs(
     system_id: SystemID,
     out_dir: &Path,
     config: &PacletConfig,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let lib_dir = out_dir.join(format!("{}-{}", config.name, system_id.as_str()));
     std::fs::create_dir_all(&lib_dir)
         .map_err(|e| format!("failed to create {}: {e}", lib_dir.display()))?;
-    for cross in cross_dylibs {
-        let cross_name = cross.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-        // Windows `.dll`s aren't `lib`-prefixed, unlike macOS/Linux dylibs, so
-        // compare against the prefix-stripped `name` rather than `filename`.
-        let cross_name = cross_name.strip_prefix("lib").unwrap_or(cross_name);
-        let host_info = host_infos
-            .iter()
-            .find(|i| i.name == cross_name)
-            .ok_or_else(|| format!("no host match for cross dylib {cross_name}"))?;
-        let ext = cross
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("dylib");
-        let dest = if config.named_exports {
-            format!("{}.{}", host_info.filename, ext)
-        } else {
-            format!("{}.{}", host_info.hash, ext)
-        };
-        std::fs::copy(cross, lib_dir.join(&dest))
-            .map_err(|e| format!("failed to copy {}: {e}", cross.display()))?;
-    }
-    Ok(())
+
+    let placed: Vec<(&DylibInfo, String)> = cross_dylibs
+        .iter()
+        .map(|cross| {
+            let cross_name = cross.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            // Windows `.dll`s aren't `lib`-prefixed, unlike macOS/Linux dylibs, so
+            // compare against the prefix-stripped `name` rather than `filename`.
+            let cross_name = cross_name.strip_prefix("lib").unwrap_or(cross_name);
+            let host_info = host_infos
+                .iter()
+                .find(|i| i.name == cross_name)
+                .ok_or_else(|| format!("no host match for cross dylib {cross_name}"))?;
+            let ext = cross
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("dylib");
+            let dest = if config.named_exports {
+                format!("{}.{}", host_info.filename, ext)
+            } else {
+                format!("{}.{}", host_info.hash, ext)
+            };
+            std::fs::copy(cross, lib_dir.join(&dest))
+                .map_err(|e| format!("failed to copy {}: {e}", cross.display()))?;
+            Ok((host_info, dest))
+        })
+        .collect::<Result<_>>()?;
+
+    write_package_wl_files(&placed, system_id, &lib_dir, config)?;
+
+    Ok(lib_dir)
 }
 
 fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
@@ -457,10 +483,9 @@ fn load_manifest(dylib: &Path) -> Result<Vec<FunctionEntry>> {
     let lib = unsafe { libloading::Library::new(dylib) }
         .map_err(|e| format!("failed to dlopen {}: {e}", dylib.display()))?;
 
-    let manifest_fn: libloading::Symbol<ManifestFn> = unsafe {
-        lib.get(b"__wolfram_manifest__\0")
-    }
-    .map_err(|e| format!("dylib does not export __wolfram_manifest__: {e}"))?;
+    let manifest_fn: libloading::Symbol<ManifestFn> =
+        unsafe { lib.get(b"__wolfram_manifest__\0") }
+            .map_err(|e| format!("dylib does not export __wolfram_manifest__: {e}"))?;
 
     let ptr = unsafe { manifest_fn() };
     if ptr.is_null() {
