@@ -280,3 +280,15 @@ fn compressed_and_plain_decode_equally() {
     assert_eq!(from_plain, from_compressed);
     assert_eq!(from_plain, expr);
 }
+
+#[test]
+fn vec_expr_roundtrips_as_list() {
+    let items = vec![Expr::from(1i64), expr!("two"), expr!(System::List[3, 4])];
+    let bytes = to_wxf(&items, None).unwrap();
+    let parsed: Vec<Expr> = from_wxf(&bytes).unwrap();
+    assert_eq!(parsed, items);
+
+    // Same wire shape as an explicit `Expr::normal(List, items)`.
+    let as_expr: Expr = from_wxf(&bytes).unwrap();
+    assert_eq!(as_expr, expr!(System::List[..items]));
+}

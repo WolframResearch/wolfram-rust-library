@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 use wolfram_serialize::Error;
 use wolfram_serialize::{
     ExpressionEnum, FromWXF, NumericArrayEnum, PackedArrayEnum, Reader, ToWXF, Writer,
-    WxfReader, WxfWriter,
+    WxfReader, WxfStruct, WxfWriter,
 };
 
 use crate::{
@@ -107,6 +107,18 @@ impl ToWXF for Expr {
         }
     }
 }
+
+// `Expr` has its own hand-written impl above rather than going through
+// `#[derive(ToWXF)]`, so it never picked up the `WxfStruct` marker that gates
+// the blanket `impl<T: ToWXF + WxfStruct> ToWXF for Vec<T>` (that bound exists
+// purely so the blanket doesn't collide with the primitive-specific
+// `Vec<u8>`/`Vec<f64>`/etc. impls, which live in `wolfram-serialize` and can't
+// see `Expr`). Implementing the marker here is enough — the already-coherent
+// blanket in `wolfram-serialize` then covers `Vec<Expr>` for both directions
+// with no new `Vec` impl (the orphan rules forbid one anyway: `Vec` isn't a
+// fundamental type, so `impl ForeignTrait for Vec<LocalType>` isn't allowed
+// outside the crate that defines `ForeignTrait`).
+impl WxfStruct for Expr {}
 
 //==============================================================================
 // FromWXF
