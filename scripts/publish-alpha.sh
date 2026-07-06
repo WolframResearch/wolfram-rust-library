@@ -24,7 +24,9 @@ set -euo pipefail
 # The publishable crates. cargo figures out the topological publish order itself
 # and resolves their inter-dependencies locally, so a single `cargo publish`
 # over the whole set validates even though the new versions aren't on crates.io
-# yet. (The other workspace members — examples, cli, xtask — are not published.)
+# yet. (The other workspace members — examples, xtask — are not published.)
+# Entries are cargo package names (`-p <name>`), not directory names — that's
+# why `wolfram-cli`'s entry is `cargo-wl`, its `[package] name`.
 PUBLISH=(
   wolfram-app-discovery
   wolfram-serialize-macros
@@ -37,6 +39,7 @@ PUBLISH=(
   wstp
   wolfram-library-link
   wolfram-export
+  cargo-wl
 )
 
 MODE="dry-run"
