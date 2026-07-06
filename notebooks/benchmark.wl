@@ -2,33 +2,40 @@
 repo  = FileNameJoin[{DirectoryName[$InputFileName], ".."}];
 cargo = FileNameJoin[{$HomeDirectory, ".cargo", "bin", "cargo"}];
 
-(* `--features wstp` is required or the `types_wstp`/`legacy_wstp` examples are
+(* `--features wstp` is required or the `wstp`/`legacy_wstp` modules are
    silently skipped by Cargo's required-features gate (wstp-sys needs a WSTP SDK,
-   so it's opt-in). Without it, $fns["types_wstp::..."] below resolves to a
+   so it's opt-in). Without it, $fns["wstp_..."] below resolves to a
    Missing[KeyAbsent, ...] stub that "returns" instantly without doing any work —
    which used to make WXF look catastrophically slower than WSTP in this
-   benchmark, when in fact WSTP just wasn't running at all. *)
+   benchmark, when in fact WSTP just wasn't running at all.
+
+   Uses `wolfram-examples-internal` (the in-repo test/benchmark crate, built via
+   local path deps) rather than the standalone `wolfram-examples` workspace —
+   that one only holds copy-paste sample crates (duckdb, math) and depends on
+   published crates.io releases, not this checkout's code. Functions here have
+   no namespace prefix (namespace-exports is off); native_/wstp_/wxf_ prefixes
+   in the Rust source disambiguate instead. *)
 libDir = StringTrim @ First @ ExternalEvaluate[
   {"Shell", "ProcessDirectory" -> repo, "ReturnType" -> "StandardOutput"},
-  {cargo -> {"wl", "build", "--release", "--examples", "-p", "wolfram-examples", "--features", "wstp"}}
+  {cargo -> {"wl", "build", "--release", "-p", "wolfram-examples-internal", "--features", "wstp"}}
 ];
 
 (* ── Load ───────────────────────────────────────────────────────────────── *)
 $fns = Get[FileNameJoin[{libDir, "Functions.wl"}]];
 
-nativeAdd   = $fns["types_native::add"];
-nativeDot   = $fns["types_native::dot"];
-nativeScale = $fns["types_native::scale_array"];
-wstpAdd     = $fns["types_wstp::add"];
-wstpDot     = $fns["types_wstp::dot"];
-wstpScale   = $fns["types_wstp::scale_array"];
-wstpDup     = $fns["types_wstp::duplicate"];
-wxfAdd      = $fns["types_wxf::add"];
-wxfDot      = $fns["types_wxf::dot"];
-wxfScale    = $fns["types_wxf::scale_array"];
-wxfDup      = $fns["types_wxf::duplicate"];
-wxfPoint    = $fns["types_wxf::echo_point"];
-wxfDs       = $fns["types_wxf::echo_dataset"];
+nativeAdd   = $fns["native_add"];
+nativeDot   = $fns["native_dot"];
+nativeScale = $fns["native_scale_array"];
+wstpAdd     = $fns["wstp_add"];
+wstpDot     = $fns["wstp_dot"];
+wstpScale   = $fns["wstp_scale_array"];
+wstpDup     = $fns["wstp_duplicate"];
+wxfAdd      = $fns["wxf_add"];
+wxfDot      = $fns["wxf_dot"];
+wxfScale    = $fns["wxf_scale_array"];
+wxfDup      = $fns["wxf_duplicate"];
+wxfPoint    = $fns["wxf_echo_point"];
+wxfDs       = $fns["wxf_echo_dataset"];
 
 (* Fail loudly instead of silently benchmarking a Missing[KeyAbsent, ...] stub —
    that stub "returns" without doing any work, so timing it makes whatever it's
@@ -191,9 +198,9 @@ Print @ Legended[
 Print["\n=== echo_dataset(ds)  -  \[Mu]s vs n ==="];
 dsRows = Table[
   Module[{r = Max[1, Round[4000/n*100]],
-          ds = <|"name" -> "t",
-                 "values"  -> NumericArray[RandomReal[1, n], "Real64"],
-                 "weights" -> NumericArray[RandomReal[1, n], "Real64"]|>},
+          ds = <|"name"   -> "t",
+                 "blob"   -> ByteArray[RandomInteger[{0, 255}, n]],
+                 "values" -> NumericArray[RandomReal[1, n], "Real64"]|>},
     {n, timeMicros[Function[wxfDs[ds]], r]}],
   {n, ns}];
 printTable[
