@@ -1,0 +1,266 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 15.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[      9073,        258]
+NotebookOptionsPosition[      7122,        214]
+NotebookOutlinePosition[      7513,        230]
+CellTagsIndexPosition[      7470,        227]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell["Wolfram Rust Library", "Chapter",
+ CellChangeTimes->{{3.992311344699538*^9, 
+  3.992311351887199*^9}},ExpressionUUID->"37a245b3-34eb-4b12-ba6e-\
+03ece13fb55d"],
+
+Cell[CellGroupData[{
+
+Cell["Unified all crates under one monorepo", "Subsection",
+ CellChangeTimes->{{3.992311427766716*^9, 3.992311435815547*^9}, {
+  3.9923114748131104`*^9, 
+  3.9923114751784983`*^9}},ExpressionUUID->"500f3ff3-04c7-4ab2-ac78-\
+51d8de0ec660"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "\"https://github.com/WolframResearch/wolfram-rust-library\"", 
+   "https://github.com/WolframResearch/wolfram-rust-library"},
+  "HyperlinkURL"]], "Output",
+ CellChangeTimes->{3.992311451375869*^9},
+ CellLabel->"Out[4]=",ExpressionUUID->"b3dd3e9e-5ced-4200-b558-568167ce9d20"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Documentation for crates, alpha 4 is out.", "Subsection",
+ CellChangeTimes->{{3.992311427766716*^9, 3.992311435815547*^9}, {
+  3.992311469869617*^9, 3.9923114732313147`*^9}, {3.9923115350258617`*^9, 
+  3.992311538446583*^9}},ExpressionUUID->"d7bdb4b2-393b-4997-81de-\
+395145fc05a0"],
+
+Cell[BoxData[
+ TagBox[GridBox[{
+    {
+     TemplateBox[{
+      "\"wolfram-app-discovery\"", 
+       "https://docs.rs/wolfram-app-discovery/0.6.0-alpha.4/wolfram_app_\
+discovery/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-export\"", 
+       "https://docs.rs/wolfram-export/0.6.0-alpha.4/wolfram_export/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-export-core\"", 
+       "https://docs.rs/wolfram-export-core/0.6.0-alpha.4/wolfram_export_core/\
+"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-export-macros\"", 
+       "https://docs.rs/wolfram-export-macros/0.6.0-alpha.4/wolfram_export_\
+macros/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-expr\"", 
+       "https://docs.rs/wolfram-expr/0.6.0-alpha.4/wolfram_expr/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-library-link\"", 
+       "https://docs.rs/wolfram-library-link/0.6.0-alpha.4/wolfram_library_\
+link/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-library-link-sys\"", 
+       "https://docs.rs/wolfram-library-link-sys/0.6.0-alpha.4/wolfram_\
+library_link_sys/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-serialize\"", 
+       "https://docs.rs/wolfram-serialize/0.6.0-alpha.4/wolfram_serialize/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wolfram-serialize-macros\"", 
+       "https://docs.rs/wolfram-serialize-macros/0.6.0-alpha.4/wolfram_\
+serialize_macros/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{"\"wstp\"", "https://docs.rs/wstp/0.6.0-alpha.4/wstp/"},
+      "HyperlinkURL"]},
+    {
+     TemplateBox[{
+      "\"wstp-sys\"", "https://docs.rs/wstp-sys/0.6.0-alpha.4/wstp_sys/"},
+      "HyperlinkURL"]}
+   },
+   DefaultBaseStyle->"Column",
+   GridBoxAlignment->{"Columns" -> {{Left}}},
+   GridBoxItemSize->{"Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}}],
+  "Column"]], "Output",
+ CellChangeTimes->{3.992311460713863*^9},
+ CellLabel->"Out[5]=",ExpressionUUID->"e578ef4f-6c20-461c-be4c-88335acf89f1"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Discussion topics", "Chapter",
+ CellChangeTimes->{{3.992311344699538*^9, 3.992311351887199*^9}, {
+  3.992312111336897*^9, 
+  3.9923121137073507`*^9}},ExpressionUUID->"2706e0dc-08d6-4d4f-ac80-\
+f0120d400b14"],
+
+Cell[CellGroupData[{
+
+Cell["WXF import / export", "Subsection",
+ CellChangeTimes->{{3.992311427766716*^9, 3.992311435815547*^9}, {
+  3.9923114748131104`*^9, 3.9923114751784983`*^9}, {3.9923121183251333`*^9, 
+  3.992312125177497*^9}, {3.99231227084554*^9, 3.9923122849740963`*^9}, {
+  3.992312933021896*^9, 
+  3.992312936500966*^9}},ExpressionUUID->"e60c4724-406e-414c-96b8-\
+dc445e05c7ec"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "\"https://docs.rs/wolfram-serialize/0.6.0-alpha.4/wolfram_serialize/\"", 
+   "https://docs.rs/wolfram-serialize/0.6.0-alpha.4/wolfram_serialize/"},
+  "HyperlinkURL"]], "Output",
+ CellChangeTimes->{3.992312987387849*^9},
+ CellLabel->"Out[19]=",ExpressionUUID->"11ad67d7-8747-4cfc-bb6e-159e144d6b5f"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Expansion of ExprKind", "Subsection",
+ CellChangeTimes->{{3.992311427766716*^9, 3.992311435815547*^9}, {
+  3.9923114748131104`*^9, 3.9923114751784983`*^9}, {3.9923121183251333`*^9, 
+  3.992312125177497*^9}, {3.992312181925282*^9, 
+  3.9923121863626623`*^9}},ExpressionUUID->"24c36111-48d6-456a-9ba5-\
+05696f56662e"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "\"https://docs.rs/wolfram-expr/0.6.0-alpha.4/wolfram_expr/enum.ExprKind.\
+html\"", "https://docs.rs/wolfram-expr/0.6.0-alpha.4/wolfram_expr/enum.\
+ExprKind.html"},
+  "HyperlinkURL"]], "Output",
+ CellChangeTimes->{3.992312175389504*^9},
+ CellLabel->"Out[6]=",ExpressionUUID->"f6e98b6d-10b8-40bd-adf9-8535e26f06f8"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["The new expr! macro", "Subsection",
+ CellChangeTimes->{{3.992311427766716*^9, 3.992311435815547*^9}, {
+  3.9923114748131104`*^9, 3.9923114751784983`*^9}, {3.9923121183251333`*^9, 
+  3.992312125177497*^9}},ExpressionUUID->"a7c488ce-6fe4-4f2c-b7a7-\
+020560cb29b6"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "\"https://docs.rs/wolfram-expr/0.6.0-alpha.4/wolfram_expr/macro.expr.html\"\
+", "https://docs.rs/wolfram-expr/0.6.0-alpha.4/wolfram_expr/macro.expr.html"},
+  
+  "HyperlinkURL"]], "Output",
+ CellChangeTimes->{3.992312202989092*^9},
+ CellLabel->"Out[7]=",ExpressionUUID->"fa51064e-bb59-40da-9341-4ea25ea0b994"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["New export(\[OpenCurlyDoubleQuote]wxf\[CloseCurlyDoubleQuote]) mode", \
+"Subsection",
+ CellChangeTimes->{{3.992311427766716*^9, 3.992311435815547*^9}, {
+  3.9923114748131104`*^9, 3.9923114751784983`*^9}, {3.9923121183251333`*^9, 
+  3.992312125177497*^9}, {3.99231227084554*^9, 
+  3.9923122849740963`*^9}},ExpressionUUID->"114bec90-fc02-4fc9-a8d6-\
+74b3a3515a8a"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "\"https://docs.rs/wolfram-library-link/0.6.0-alpha.4/wolfram_library_link/\
+attr.export.html\"", 
+   "https://docs.rs/wolfram-library-link/0.6.0-alpha.4/wolfram_library_link/\
+attr.export.html"},
+  "HyperlinkURL"]], "Output",
+ CellChangeTimes->{3.992312297305896*^9},
+ CellLabel->"Out[8]=",ExpressionUUID->"75bb1d0a-0de9-4766-8b08-53dd48223447"]
+}, Open  ]]
+}, Open  ]],
+
+Cell["Working example", "Chapter",
+ CellChangeTimes->{{3.992311344699538*^9, 3.992311351887199*^9}, {
+  3.992312111336897*^9, 3.9923121137073507`*^9}, {3.9923133831523247`*^9, 
+  3.9923133861548347`*^9}},ExpressionUUID->"02770a54-37fd-4294-a809-\
+a1b15eecf113"]
+},
+WindowSize->{808, 746},
+WindowMargins->{{16, Automatic}, {Automatic, 22}},
+FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (May 6, 2026)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"780734a7-a2ca-4735-8dfc-3a0d438aa0bb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[576, 22, 165, 3, 67, "Chapter",ExpressionUUID->"37a245b3-34eb-4b12-ba6e-03ece13fb55d"],
+Cell[CellGroupData[{
+Cell[766, 29, 238, 4, 53, "Subsection",ExpressionUUID->"500f3ff3-04c7-4ab2-ac78-51d8de0ec660"],
+Cell[1007, 35, 307, 6, 33, "Output",ExpressionUUID->"b3dd3e9e-5ced-4200-b558-568167ce9d20"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[1351, 46, 288, 4, 53, "Subsection",ExpressionUUID->"d7bdb4b2-393b-4997-81de-395145fc05a0"],
+Cell[1642, 52, 2062, 66, 248, "Output",ExpressionUUID->"e578ef4f-6c20-461c-be4c-88335acf89f1"]
+}, Open  ]]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[3753, 124, 213, 4, 67, "Chapter",ExpressionUUID->"2706e0dc-08d6-4d4f-ac80-f0120d400b14"],
+Cell[CellGroupData[{
+Cell[3991, 132, 367, 6, 53, "Subsection",ExpressionUUID->"e60c4724-406e-414c-96b8-dc445e05c7ec"],
+Cell[4361, 140, 330, 6, 33, "Output",ExpressionUUID->"11ad67d7-8747-4cfc-bb6e-159e144d6b5f"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[4728, 151, 321, 5, 53, "Subsection",ExpressionUUID->"24c36111-48d6-456a-9ba5-05696f56662e"],
+Cell[5052, 158, 345, 7, 33, "Output",ExpressionUUID->"f6e98b6d-10b8-40bd-adf9-8535e26f06f8"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[5434, 170, 268, 4, 53, "Subsection",ExpressionUUID->"a7c488ce-6fe4-4f2c-b7a7-020560cb29b6"],
+Cell[5705, 176, 340, 7, 33, "Output",ExpressionUUID->"fa51064e-bb59-40da-9341-4ea25ea0b994"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[6082, 188, 368, 6, 53, "Subsection",ExpressionUUID->"114bec90-fc02-4fc9-a8d6-74b3a3515a8a"],
+Cell[6453, 196, 377, 8, 33, "Output",ExpressionUUID->"75bb1d0a-0de9-4766-8b08-53dd48223447"]
+}, Open  ]]
+}, Open  ]],
+Cell[6857, 208, 261, 4, 67, "Chapter",ExpressionUUID->"02770a54-37fd-4294-a809-a1b15eecf113"]
+}
+]
+*)
+
