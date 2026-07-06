@@ -1,10 +1,10 @@
 [package]
 name = "xtask"
-version = "0.6.0-alpha.4"
+version = "0.6.0-alpha.5"
 edition = "2021"
 publish = false
 
 [dependencies]
 clap = { version = "4.3.3", features = ["derive"] }
 bindgen = "^0.65.1"
-wolfram-app-discovery = { version = "=0.6.0-alpha.4", path = "../wolfram-app-discovery" }
+wolfram-app-discovery = { version = "=0.6.0-alpha.5", path = "../wolfram-app-discovery" }

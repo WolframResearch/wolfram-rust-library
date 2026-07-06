@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-serialize"
-version = "0.6.0-alpha.4"
+version = "0.6.0-alpha.5"
 authors = ["Wolfram Research"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -16,6 +16,6 @@ include = [
 ]
 
 [dependencies]
-wolfram-serialize-macros = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize-macros" }
+wolfram-serialize-macros = { version = "=0.6.0-alpha.5", path = "../wolfram-serialize-macros" }
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
 num_enum = "0.7"
