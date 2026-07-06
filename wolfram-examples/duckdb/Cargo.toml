@@ -3,7 +3,7 @@
 # `-p <name>` never needs the `@<version>` disambiguation Cargo requires when
 # a workspace package and a dependency share a name.
 name = "duckdb-example"
-version = "0.6.0-alpha.4"
+version = "0.6.0-alpha.5"
 edition = "2021"
 publish = false
 
@@ -20,9 +20,9 @@ name = "duckdb"
 crate-type = ["cdylib"]
 
 [dependencies]
-wolfram-export = { version = "=0.6.0-alpha.4", features = ["wxf"] }
-wolfram-expr = { version = "=0.6.0-alpha.4" }
-wolfram-serialize = { version = "=0.6.0-alpha.4" }
+wolfram-export = { version = "=0.6.0-alpha.5", features = ["wxf"] }
+wolfram-expr = { version = "=0.6.0-alpha.5" }
+wolfram-serialize = { version = "=0.6.0-alpha.5" }
 
 # DuckDB is statically compiled in via `bundled`; `vtab-arrow` enables native
 # Arrow output so query results come back as RecordBatches without manual conversion.

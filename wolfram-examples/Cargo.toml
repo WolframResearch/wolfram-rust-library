@@ -6,5 +6,5 @@ resolver = "2"
 # on the published crates.io releases of this repo's crates, not local paths.
 members = [
     "duckdb",
-    "mixed",
+    "math",
 ]
