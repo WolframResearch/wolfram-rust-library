@@ -1,6 +1,6 @@
 Needs["MUnit`"]
 
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "libdata_store",
         "string_join",
@@ -8,9 +8,7 @@ Test[
         String
     ][
         Developer`DataStore["hello", " ", "world"]
-    ]
-    ,
-    "hello world"
-    ,
+    ],
+    "hello world",
     TestID -> "RustLink-DataStore"
 ]

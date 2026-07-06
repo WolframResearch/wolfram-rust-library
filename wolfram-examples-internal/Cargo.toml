@@ -1,0 +1,29 @@
+[package]
+name = "wolfram-examples-internal"
+version = "0.6.0-alpha.4"
+edition = "2021"
+publish = false
+
+[package.metadata.wl.pacletinfo]
+name = "WolframExamples"
+version = "1.0.0"
+output = "../notebooks/"
+named-exports = false
+
+[lib]
+# "rlib" (in addition to "cdylib") so `tests/validation_result.rs` can link
+# against this crate as an ordinary Rust dependency.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wolfram-expr = { version = "=0.6.0-alpha.4", path = "../wolfram-expr" }
+wolfram-serialize = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize" }
+wolfram-serialize-macros = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize-macros" }
+wolfram-export = { version = "=0.6.0-alpha.4", path = "../wolfram-export", features = ["wxf"] }
+wolfram-library-link = { version = "=0.6.0-alpha.4", path = "../wolfram-library-link", default-features = false, features = ["panic-failure-backtraces", "automate-function-loading-boilerplate"] }
+
+[features]
+# Pulls in wstp-sys, which needs a WSTP SDK for the target platform. Off by
+# default so a plain `cargo build`/`check` (e.g. when cross-compiling) doesn't
+# require one. Gates the `legacy_wstp` and `wstp` modules (see src/lib.rs).
+wstp = ["wolfram-export/wstp", "wolfram-library-link/wstp"]

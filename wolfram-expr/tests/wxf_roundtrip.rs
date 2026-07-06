@@ -1,11 +1,11 @@
 //! WXF self-roundtrip tests: serialize → deserialize → equal.
 
-use wolfram_serialize::{from_wxf, to_wxf, CompressionLevel};
 use wolfram_expr::expr;
 use wolfram_expr::{
     Association, ByteArray, Complex32, Complex64, Expr, ExprKind, NumericArray,
     NumericArrayEnum, PackedArray, PackedArrayEnum, RuleEntry,
 };
+use wolfram_serialize::{from_wxf, to_wxf, CompressionLevel};
 
 fn roundtrip(expr: Expr) {
     let bytes = to_wxf(&expr, None).expect("serialize Wxf");

@@ -42,12 +42,17 @@ pub fn decode_args<R, F>(
     read: F,
 ) -> Result<R, wolfram_serialize::Error>
 where
-    F: for<'a> FnOnce(&mut WxfReader<SliceReader<'a>>) -> Result<R, wolfram_serialize::Error>,
+    F: for<'a> FnOnce(
+        &mut WxfReader<SliceReader<'a>>,
+    ) -> Result<R, wolfram_serialize::Error>,
 {
     wolfram_serialize::read_wxf(input.as_slice(), |r| {
         let tok = r.read_expr_token()?;
         if tok != ExpressionEnum::Function {
-            return Err(wolfram_serialize::Error::unexpected_token(&["Function"], tok));
+            return Err(wolfram_serialize::Error::unexpected_token(
+                &["Function"],
+                tok,
+            ));
         }
         let n = r.read_varint()?;
         r.skip()?; // discard head — any shape ok

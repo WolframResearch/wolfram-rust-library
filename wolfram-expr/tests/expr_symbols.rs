@@ -24,7 +24,9 @@ fn context_qualified_head() {
 fn system_qualified_head() {
     let e = expr!(System::List[1, 2, 3]);
     assert_eq!(head(&e), "System`List");
-    let ExprKind::Normal(n) = e.kind() else { panic!("expected Normal") };
+    let ExprKind::Normal(n) = e.kind() else {
+        panic!("expected Normal")
+    };
     assert_eq!(n.elements().len(), 3);
 }
 
@@ -39,7 +41,9 @@ fn bare_ident_head_is_a_variable() {
 #[test]
 fn bare_symbol_value() {
     let e = expr!(System::InputForm);
-    let ExprKind::Symbol(s) = e.kind() else { panic!("expected Symbol") };
+    let ExprKind::Symbol(s) = e.kind() else {
+        panic!("expected Symbol")
+    };
     assert_eq!(s.as_str(), "System`InputForm");
 }
 
@@ -47,13 +51,17 @@ fn bare_symbol_value() {
 fn context_less_symbol_via_leading_colons() {
     // `::Name` is the context-less symbol `Name` (no context prefix).
     let e = expr!(::Plus);
-    let ExprKind::Symbol(s) = e.kind() else { panic!("expected Symbol") };
+    let ExprKind::Symbol(s) = e.kind() else {
+        panic!("expected Symbol")
+    };
     assert_eq!(s.as_str(), "Plus");
 
     // …and as a head: `::List[1, 2]` -> the bare `List` applied to args.
     let call = expr!(::List[1, 2]);
     assert_eq!(head(&call), "List");
-    let ExprKind::Normal(n) = call.kind() else { panic!("expected Normal") };
+    let ExprKind::Normal(n) = call.kind() else {
+        panic!("expected Normal")
+    };
     assert_eq!(n.elements().len(), 2);
 }
 
@@ -67,11 +75,15 @@ fn nested_qualified_call_mixed_with_variable_and_string() {
     ]);
 
     assert_eq!(head(&e), "Tabular`Arrow`ToTabular");
-    let ExprKind::Normal(outer) = e.kind() else { panic!("expected Normal") };
+    let ExprKind::Normal(outer) = e.kind() else {
+        panic!("expected Normal")
+    };
 
     let inner = &outer.elements()[0];
     assert_eq!(head(inner), "Tabular`Arrow`ReadArrowIPCByteArray");
-    let ExprKind::Normal(inner_n) = inner.kind() else { panic!("expected Normal") };
+    let ExprKind::Normal(inner_n) = inner.kind() else {
+        panic!("expected Normal")
+    };
     assert_eq!(inner_n.elements()[0], Expr::from(42i64));
 
     assert_eq!(outer.elements()[1], Expr::from("STRING"));
@@ -80,7 +92,9 @@ fn nested_qualified_call_mixed_with_variable_and_string() {
 #[test]
 fn qualified_symbol_as_argument() {
     let e = expr!(System::Head[System::All, 1]);
-    let ExprKind::Normal(n) = e.kind() else { panic!("expected Normal") };
+    let ExprKind::Normal(n) = e.kind() else {
+        panic!("expected Normal")
+    };
     assert_eq!(head(&e), "System`Head");
     assert_eq!(n.elements()[0], Expr::symbol(Symbol::new("System`All")));
     assert_eq!(n.elements()[1], Expr::from(1i64));

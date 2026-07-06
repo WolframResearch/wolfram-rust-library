@@ -87,7 +87,6 @@ impl<Tag: Copy + PartialEq> ArrayBuf<Tag> {
         self.dimensions.iter().product()
     }
 
-
     /// Construct from a typed slice. Dimensions must satisfy
     /// `prod(dimensions) == slice.len()`.
     pub fn from_slice<T: ArrayElement<Tag>>(dimensions: Vec<usize>, slice: &[T]) -> Self {

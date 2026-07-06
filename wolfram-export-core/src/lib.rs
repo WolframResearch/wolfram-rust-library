@@ -249,7 +249,12 @@ pub fn library_functions_loader(libraries: &[LibraryArtifact]) -> Expr {
             let key = export_key(library.namespace.as_deref(), &entry.name);
             rules.push(RuleEntry::rule(
                 Expr::from(key.as_str()),
-                library_function_load(kind, &entry.name, Expr::from(libvar.clone()), native_sig),
+                library_function_load(
+                    kind,
+                    &entry.name,
+                    Expr::from(libvar.clone()),
+                    native_sig,
+                ),
             ));
         }
     }
@@ -317,8 +322,8 @@ pub extern "C" fn __wolfram_manifest__() -> *const u8 {
         .filter_map(ExportEntry::to_function_entry)
         .collect();
 
-    let wxf =
-        wolfram_serialize::to_wxf(&entries, None).expect("manifest WXF serialization failed");
+    let wxf = wolfram_serialize::to_wxf(&entries, None)
+        .expect("manifest WXF serialization failed");
     // Prepend the payload length as 8 little-endian bytes so the caller needs
     // no out-parameter — one zero-arg call, read [0..8] for the length, [8..] for WXF.
     let mut buf = Vec::with_capacity(8 + wxf.len());

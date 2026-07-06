@@ -17,9 +17,7 @@ fn test_runtime_function_from_non_main_thread() -> String {
             // Do nothing, just to avoid printing panic message to stderr.
         }));
 
-        let result = panic::catch_unwind(|| {
-            wll::evaluate(&expr!(System::Plus[2, 2]))
-        });
+        let result = panic::catch_unwind(|| wll::evaluate(&expr!(System::Plus[2, 2])));
 
         // Restore the previous (default) hook.
         let _ = panic::take_hook();

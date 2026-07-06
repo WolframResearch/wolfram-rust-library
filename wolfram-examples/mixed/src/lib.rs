@@ -1,4 +1,5 @@
 use wolfram_export::export;
+#[cfg(feature = "wstp")]
 use wolfram_expr::{expr, Expr, ExprKind};
 
 // Native — MArgument scalars.
@@ -7,7 +8,10 @@ fn add(a: f64, b: f64) -> f64 {
     a + b
 }
 
-// WSTP — read a list of Exprs, return them reversed.
+// WSTP — read a list of Exprs, return them reversed. Off by default: pulls in
+// wstp-sys, which needs a WSTP SDK for the target platform. Build with
+// `cargo wl build --features wstp` (or `cargo wl test --features wstp`).
+#[cfg(feature = "wstp")]
 #[export(wstp)]
 fn reverse(args: Vec<Expr>) -> Expr {
     let list = args.into_iter().next().expect("reverse: expected 1 arg");

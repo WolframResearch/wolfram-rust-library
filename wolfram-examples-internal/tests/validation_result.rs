@@ -3,7 +3,7 @@
 //! container default `System`Failure`. Each case is checked by round-tripping
 //! through WXF and comparing against the exact `expr!`-built expected value.
 
-use wolfram_examples::ValidationResult;
+use wolfram_examples_internal::core::ValidationResult;
 use wolfram_expr::{expr, Expr};
 use wolfram_serialize::{from_wxf, to_wxf};
 

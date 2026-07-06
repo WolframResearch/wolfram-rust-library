@@ -19,6 +19,13 @@ include = [
     "/RustLink/Examples/Docs"
 ]
 
+# `RustLink/Tests/*.wlt` and `RustLink/Examples/*.wlt` call `LibraryFunctionLoad`
+# directly by literal dylib filename (e.g. "liblibrary_tests"), so `cargo wl
+# test` must keep the built dylibs under their original names rather than a
+# content hash.
+[package.metadata.wl.pacletinfo]
+named-exports = true
+
 [dependencies]
 wolfram-export-macros          = { version = "=0.6.0-alpha.4", path = "../wolfram-export-macros" }
 

@@ -1,0 +1,31 @@
+[package]
+# Named differently from the `duckdb` dependency below (crates.io) so
+# `-p <name>` never needs the `@<version>` disambiguation Cargo requires when
+# a workspace package and a dependency share a name.
+name = "duckdb-example"
+version = "0.6.0-alpha.4"
+edition = "2021"
+publish = false
+
+[package.metadata.wl.pacletinfo]
+name = "WolframExamples"
+version = "1.0.0"
+namespace = "duckdb"
+named-exports = false
+
+[lib]
+# Keeps the built dylib (and so the WL function namespace, `duckdb::fn_name`)
+# named `duckdb` regardless of the package name above.
+name = "duckdb"
+crate-type = ["cdylib"]
+
+[dependencies]
+wolfram-export = { version = "=0.6.0-alpha.4", features = ["wxf"] }
+wolfram-expr = { version = "=0.6.0-alpha.4" }
+wolfram-serialize = { version = "=0.6.0-alpha.4" }
+
+# DuckDB is statically compiled in via `bundled`; `vtab-arrow` enables native
+# Arrow output so query results come back as RecordBatches without manual conversion.
+duckdb    = { version = "1", features = ["bundled", "vtab-arrow"] }
+arrow-ipc = { version = "58" }
+uuid      = { version = "1", features = ["v4"] }

@@ -205,15 +205,23 @@ fn db_query(id: String, sql: String, params: HashMap<String, String>) -> DuckDbR
         let mut writer = match arrow_ipc::writer::StreamWriter::try_new(&mut buf, &schema)
         {
             Ok(writer) => writer,
-            Err(e) => return DuckDbResult::SerializationError { message: e.to_string() },
+            Err(e) => {
+                return DuckDbResult::SerializationError {
+                    message: e.to_string(),
+                }
+            },
         };
         for batch in &batches {
             if let Err(e) = writer.write(batch) {
-                return DuckDbResult::SerializationError { message: e.to_string() };
+                return DuckDbResult::SerializationError {
+                    message: e.to_string(),
+                };
             }
         }
         if let Err(e) = writer.finish() {
-            return DuckDbResult::SerializationError { message: e.to_string() };
+            return DuckDbResult::SerializationError {
+                message: e.to_string(),
+            };
         }
     }
 

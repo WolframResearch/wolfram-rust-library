@@ -1,6 +1,6 @@
 Needs["MUnit`"]
 
-Test[
+VerificationTest[
 	func = LibraryFunctionLoad[
 		"libnumeric_arrays",
 		"sum_int_numeric_array",
@@ -11,18 +11,15 @@ Test[
 	{
 		func[NumericArray[Range[10], "Integer64"]],
 		func[NumericArray[Range[255], "UnsignedInteger8"]]
-	}
-	,
+	},
 	{
 		55,
 		32640
-	}
-
-    ,
-    TestID -> "RustLink-NumericArrays-1"
+	},
+	TestID -> "RustLink-NumericArrays-1"
 ]
 
-Test[
+VerificationTest[
 	func = LibraryFunctionLoad[
 		"libnumeric_arrays",
 		"sum_real_numeric_array",
@@ -33,13 +30,10 @@ Test[
 	{
 		func[NumericArray[Range[1, 10, 1/81], "Real32"]],
 		func[NumericArray[Range[1, 10, 1/81], "Real64"]]
-	}
-	,
+	},
 	{
 		4015.0,
 		4015.0
-	}
-
-    ,
-    TestID -> "RustLink-NumericArrays-2"
+	},
+	TestID -> "RustLink-NumericArrays-2"
 ]

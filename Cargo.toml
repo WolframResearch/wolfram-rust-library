@@ -13,10 +13,17 @@ members = [
     "wolfram-export-macros",
     "wolfram-export-core",
     "wolfram-export",
-    "wolfram-examples",
+    "wolfram-examples-internal",
     "wolfram-cli",
     "xtask",
 ]
+
+# `wolfram-examples` is its own standalone workspace (see
+# wolfram-examples/Cargo.toml): it depends on the published crates.io releases
+# of this repo's crates (not local paths), so it isn't a member here and has
+# its own Cargo.lock. Unlike `wolfram-examples-internal`, its crates are meant
+# to be copy-pasted as standalone starting points, not built from this repo.
+exclude = ["wolfram-examples"]
 
 # default-members excludes the -sys crates so contributors without a local
 # Wolfram installation can still run `cargo check` / `cargo test` from the

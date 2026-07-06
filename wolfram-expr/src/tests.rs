@@ -153,7 +153,10 @@ fn display_of_new_variants_is_non_empty() {
     };
     let na = Expr::from(NumericArray::from_slice::<u8>(vec![1], &[42]));
     let pa = Expr::from(PackedArray::from_slice::<i32>(vec![1], &[42]));
-    assert!(format!("{}", ba).starts_with("ByteArray[\"") && format!("{}", ba).ends_with("\"]"));
+    assert!(
+        format!("{}", ba).starts_with("ByteArray[\"")
+            && format!("{}", ba).ends_with("\"]")
+    );
     assert!(
         format!("{}", assoc).starts_with("<|") && format!("{}", assoc).ends_with("|>")
     );
@@ -179,8 +182,14 @@ fn display_uses_wl_surface_syntax() {
     // Unknown heads, known heads with a non-infix arity, and slots whose
     // argument is neither a number nor a string all fall back to `head[…]`.
     assert_eq!(expr!(System::Foo[1, 2]).to_string(), "System`Foo[1, 2]");
-    assert_eq!(expr!(System::Set[1, 2, 3]).to_string(), "System`Set[1, 2, 3]");
-    assert_eq!(expr!(System::Slot[System::x]).to_string(), "System`Slot[System`x]");
+    assert_eq!(
+        expr!(System::Set[1, 2, 3]).to_string(),
+        "System`Set[1, 2, 3]"
+    );
+    assert_eq!(
+        expr!(System::Slot[System::x]).to_string(),
+        "System`Slot[System`x]"
+    );
     assert_eq!(expr!(System::Slot[1, 2]).to_string(), "System`Slot[1, 2]");
 }
 
@@ -258,7 +267,10 @@ fn expr_macro_contextless_symbols_nest() {
     let by_hand = no_ctx(
         "List",
         vec![
-            no_ctx("Inner", vec![Expr::from("x"), Expr::symbol(Symbol::new("Bare"))]),
+            no_ctx(
+                "Inner",
+                vec![Expr::from("x"), Expr::symbol(Symbol::new("Bare"))],
+            ),
             no_ctx("List", vec![Expr::from(1), Expr::from(2)]),
             Expr::symbol(Symbol::new("$Context")),
         ],
@@ -272,7 +284,10 @@ fn expr_macro_contextless_symbols_nest() {
         panic!("expected Association, got {}", assoc);
     };
     let mut it = entries.iter();
-    assert_eq!(it.next().unwrap().value, no_ctx("Inner", vec![Expr::from("v")]));
+    assert_eq!(
+        it.next().unwrap().value,
+        no_ctx("Inner", vec![Expr::from("v")])
+    );
     assert_eq!(it.next().unwrap().value, Expr::symbol(Symbol::new("Bare")));
 }
 

@@ -16,7 +16,11 @@ use crate::{expr, Expr, ExprKind, Normal};
 /// Serialize `expr` to WXF bytes and format as `BinaryDeserialize[ByteArray["<base64>"]]`.
 /// Built with `expr!` and rendered through `fmt_kind` so the bracketing and
 /// string escaping come from the same place as everything else.
-fn wxf_display(f: &mut fmt::Formatter, expr: &Expr, indent: Option<usize>) -> fmt::Result {
+fn wxf_display(
+    f: &mut fmt::Formatter,
+    expr: &Expr,
+    indent: Option<usize>,
+) -> fmt::Result {
     use base64::Engine;
     match wolfram_serialize::to_wxf(expr, None) {
         Ok(bytes) => {
@@ -183,7 +187,11 @@ fn fmt_slot(
 /// compact (`Display`) form and `Some(depth)` for the indented (`Debug`) form,
 /// which breaks `Normal`/`Association` nodes that contain a nested child. The
 /// per-variant formatting — how each leaf prints — is defined here, once.
-fn fmt_kind(f: &mut fmt::Formatter, kind: &ExprKind, indent: Option<usize>) -> fmt::Result {
+fn fmt_kind(
+    f: &mut fmt::Formatter,
+    kind: &ExprKind,
+    indent: Option<usize>,
+) -> fmt::Result {
     match kind {
         ExprKind::Normal(n) => fmt_normal(f, n, indent),
         ExprKind::Association(a) => {
@@ -255,7 +263,7 @@ impl fmt::Display for crate::Number {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             crate::Number::Integer(i) => fmt_kind(f, &ExprKind::Integer(*i), None),
-            crate::Number::Real(r)    => fmt_kind(f, &ExprKind::Real(*r), None),
+            crate::Number::Real(r) => fmt_kind(f, &ExprKind::Real(*r), None),
         }
     }
 }

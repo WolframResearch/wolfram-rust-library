@@ -4,7 +4,7 @@ Needs["MUnit`"]
 (* Raw WSTP Functions                   *)
 (*======================================*)
 
-Test[
+VerificationTest[
 	func = LibraryFunctionLoad[
 		"libraw_wstp_function",
 		"demo_wstp_function",
@@ -12,15 +12,12 @@ Test[
 		LinkObject
 	];
 
-	func[2, 2]
-	,
-	4
-
-    ,
-    TestID -> "RustLink-RawFunctions-1"
+	func[2, 2],
+	4,
+	TestID -> "RustLink-RawFunctions-1"
 ]
 
-Test[
+VerificationTest[
 	func = LibraryFunctionLoad[
 		"libraw_wstp_function",
 		"demo_wstp_function_callback",
@@ -28,15 +25,12 @@ Test[
 		LinkObject
 	];
 
-	func[]
-	,
-	"returned normally"
-
-    ,
-    TestID -> "RustLink-RawFunctions-2"
+	func[],
+	"returned normally",
+	TestID -> "RustLink-RawFunctions-2"
 ]
 
-Test[
+VerificationTest[
 	func = LibraryFunctionLoad[
 		"libraw_wstp_function",
 		"wstp_expr_function",
@@ -44,13 +38,10 @@ Test[
 		LinkObject
 	];
 
-	func[{1, 2, 3}]
-	,
+	func[{1, 2, 3}],
 	(* FIXME: This output is a bug. Fix the bug and update this test case. *)
 	Failure["WSTP Error", <|
 		"Message" -> "WSTP error: symbol name 'List' has no context"
-	|>]
-
-    ,
-    TestID -> "RustLink-RawFunctions-3"
+	|>],
+	TestID -> "RustLink-RawFunctions-3"
 ]

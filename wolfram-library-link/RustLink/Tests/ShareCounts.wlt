@@ -4,7 +4,7 @@ $NAType = LibraryDataType[NumericArray, "Integer64"]
 (* Constructs a fresh NumericArray on each access. *)
 $NA := NumericArray[{1, 2, 3}, "Integer64"]
 
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_na_automatic_count",
@@ -12,12 +12,11 @@ Test[
             {LibraryDataType[NumericArray, "Integer64"], Automatic}
         },
         Integer
-    ][$NA]
-    ,
+    ][$NA],
     0
 ]
 
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_na_constant_count",
@@ -25,12 +24,11 @@ Test[
             {LibraryDataType[NumericArray, "Integer64"], "Constant"}
         },
         Integer
-    ][$NA]
-    ,
+    ][$NA],
     0
 ]
 
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_na_manual_count",
@@ -38,12 +36,11 @@ Test[
             {LibraryDataType[NumericArray, "Integer64"], "Manual"}
         },
         Integer
-    ][$NA]
-    ,
+    ][$NA],
     0
 ]
 
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_na_shared_count",
@@ -51,13 +48,12 @@ Test[
             {LibraryDataType[NumericArray, "Integer64"], "Shared"}
         },
         Integer
-    ][$NA]
-    ,
+    ][$NA],
     1
 ]
 
 (* Test passing one NumericArray as two different arguments, using "Constant". *)
-Test[
+VerificationTest[
     With[{array = $NA},
         LibraryFunctionLoad[
             "liblibrary_tests",
@@ -68,8 +64,7 @@ Test[
             },
             "DataStore"
         ][array, array]
-    ]
-    ,
+    ],
     (* The two arrays:
         * should be `ptr_eq()`
         * their `share_count()` should be 0
@@ -78,7 +73,7 @@ Test[
 ]
 
 (* Test passing one NumericArray as two different arguments, using "Manual". *)
-Test[
+VerificationTest[
     With[{array = $NA},
         LibraryFunctionLoad[
             "liblibrary_tests",
@@ -89,8 +84,7 @@ Test[
             },
             "DataStore"
         ][array, array]
-    ]
-    ,
+    ],
     (* The two arrays:
         * should *not* be `ptr_eq()`
         * their `share_count()` should be 0
@@ -100,7 +94,7 @@ Test[
 ]
 
 (* Test passing one NumericArray as two different arguments, using "Shared". *)
-Test[
+VerificationTest[
     With[{array = $NA},
         LibraryFunctionLoad[
             "liblibrary_tests",
@@ -111,8 +105,7 @@ Test[
             },
             "DataStore"
         ][array, array]
-    ]
-    ,
+    ],
     (* The two arrays:
         * should be `ptr_eq()`
         * their `share_count()` should be 2
@@ -122,7 +115,7 @@ Test[
 ]
 
 (* Test cloning a NumericArray *)
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_na_clone",
@@ -132,7 +125,7 @@ Test[
 ]
 
 (* Test cloning a "Shared" NumericArray *)
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_na_shared_clone",

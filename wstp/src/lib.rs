@@ -163,7 +163,7 @@ use std::ffi::{c_char, CStr, CString};
 use std::fmt::{self, Display};
 use std::net;
 
-use wolfram_expr::{BigInteger, BigReal, Expr, ExprKind, Symbol};
+use wolfram_expr::{Expr, ExprKind, Symbol};
 use wstp_sys::{WSErrorMessage, WSReady, WSReleaseErrorMessage, WSLINK};
 
 //-----------------------------------
@@ -861,52 +861,24 @@ impl Link {
         &mut self,
         mut resolver: &mut dyn FnMut(&str) -> Option<Symbol>,
     ) -> Result<Expr, Error> {
-        use crate::get::TokenType;
+        let value = self.get_token()?;
 
-        let token_type = self.get_type()?;
-
-        let expr: Expr = match token_type {
-            TokenType::Integer => {
-                // Use WSTP's own integer parser (WSGetInteger64) for the
-                // common case. It fails on values that don't fit i64
-                // (`2^200`, etc.); recover by clearing the error and
-                // re-reading the token as its decimal-digit string via
-                // WSGetNumberAsString, then wrap as BigInteger.
-                match self.get_i64() {
-                    Ok(v) => Expr::from(v),
-                    Err(_) => {
-                        self.clear_error();
-                        let digits = self.get_number_as_string()?;
-                        Expr::new(ExprKind::BigInteger(BigInteger(digits)))
+        let expr: Expr = match value {
+            Token::Integer(value) => Expr::from(value),
+            Token::Real(value) => {
+                let real: wolfram_expr::F64 = match wolfram_expr::F64::new(value) {
+                    Ok(real) => real,
+                    // TODO: Try passing a NaN value or a BigReal value through WSLINK.
+                    Err(_is_nan) => {
+                        return Err(Error::custom(format!(
+                        "NaN value passed on WSLINK cannot be used to construct an Expr"
+                    )))
                     },
-                }
+                };
+                Expr::from(real.into_inner())
             },
-            TokenType::Real => {
-                // Fast path: WSGetReal64 covers all machine-precision reals.
-                // Note: WSGetReal64 silently truncates arbitrary-precision
-                // BigReal values — unlike WSGetInteger64 there is no overflow
-                // error. Fall back to the string representation only if the
-                // fast path fails (e.g. NaN from the kernel side).
-                match self.get_f64() {
-                    Ok(v) => {
-                        let real = wolfram_expr::F64::new(v).map_err(|_| {
-                            Error::custom(
-                                "NaN value passed on WSLINK cannot be used to construct an Expr"
-                                    .to_owned(),
-                            )
-                        })?;
-                        Expr::from(real.into_inner())
-                    },
-                    Err(_) => {
-                        self.clear_error();
-                        let s = self.get_number_as_string()?;
-                        Expr::new(ExprKind::BigReal(BigReal(s)))
-                    },
-                }
-            },
-            TokenType::String => Expr::string(self.get_string_ref()?.as_str()),
-            TokenType::Symbol => {
-                let value = self.get_symbol_ref()?;
+            Token::String(value) => Expr::string(value.as_str()),
+            Token::Symbol(value) => {
                 let symbol_str: &str = value.as_str();
 
                 // If `symbol_str` is not an absolute symbol, use the provided `resolver`
@@ -925,8 +897,9 @@ impl Link {
 
                 Expr::symbol(symbol)
             },
-            TokenType::Function => {
-                let arg_count = self.get_arg_count()?;
+            Token::Function { length: arg_count } => {
+                drop(value);
+
                 let head = self.get_expr_with_resolver(&mut resolver)?;
 
                 let mut contents = Vec::with_capacity(arg_count);

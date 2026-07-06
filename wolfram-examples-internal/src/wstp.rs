@@ -2,37 +2,37 @@ use wolfram_export::{export, wstp::Link};
 use wolfram_expr::{Expr, ExprKind};
 
 #[export(wstp)]
-fn add(args: Vec<Expr>) -> Expr {
+fn wstp_add(args: Vec<Expr>) -> Expr {
     let a = as_f64(&args[0]);
     let b = as_f64(&args[1]);
-    Expr::real(wolfram_examples::add(a, b))
+    Expr::real(crate::core::add(a, b))
 }
 
 #[export(wstp)]
-fn dot(link: &mut Link) {
+fn wstp_dot(link: &mut Link) {
     enter_function(link); // List[a, b]
     let a = get_f64_numeric_array(link);
     let b = get_f64_numeric_array(link);
-    link.put_f64(wolfram_examples::dot(&a, &b)).unwrap();
+    link.put_f64(crate::core::dot(&a, &b)).unwrap();
 }
 
 #[export(wstp)]
-fn scale_array(link: &mut Link) {
+fn wstp_scale_array(link: &mut Link) {
     enter_function(link); // List[array, factor]
     let arr = get_f64_numeric_array(link);
     let factor = link.get_f64().unwrap();
-    let result = wolfram_examples::scale_array(&arr, factor);
+    let result = crate::core::scale_array(&arr, factor);
     link.put_f64_array(&result, &[result.len()]).unwrap();
 }
 
 #[export(wstp)]
-fn duplicate(args: Vec<Expr>) -> Expr {
-    wolfram_examples::duplicate(args.into_iter().next().unwrap())
+fn wstp_duplicate(args: Vec<Expr>) -> Expr {
+    crate::core::duplicate(args.into_iter().next().unwrap())
 }
 
 #[export(wstp)]
-fn force_panic(args: Vec<Expr>) -> Expr {
-    wolfram_examples::force_panic(as_f64(&args[0]));
+fn wstp_force_panic(args: Vec<Expr>) -> Expr {
+    crate::core::force_panic(as_f64(&args[0]));
     unreachable!()
 }
 

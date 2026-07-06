@@ -12,8 +12,9 @@
 //!   from the `__wolfram_manifest__` symbol emitted by `#[export]`, so no
 //!   hand-written WL glue is required. Can optionally cross-compile for several
 //!   Wolfram `SystemID`s in one invocation.
-//! - **`cargo wl test`** — build every workspace `cdylib` example, package them,
-//!   then run `.wlt` test files through a Wolfram kernel using `TestReport`.
+//! - **`cargo wl test`** — build and package `cdylib` targets exactly like
+//!   `cargo wl build` (same target-selection and `[package.metadata.wl.pacletinfo]`
+//!   rules), then run `.wlt` test files through a Wolfram kernel using `TestReport`.
 //! - **`cargo wl evaluate`** — evaluate `.wl` files in a Wolfram kernel using
 //!   `Get`, with the built package on the `LibraryPath`.
 //!
@@ -83,9 +84,10 @@ pub struct BuildArgs {
     #[arg(long)]
     pub named_exports: bool,
 
-    /// Prefix every function key with the library name: "libname::fnname"
+    /// Prefix every function key with this namespace: "namespace::fnname".
+    /// Overrides each package's own `[package.metadata.wl.pacletinfo] namespace`.
     #[arg(long)]
-    pub namespace_exports: bool,
+    pub namespace: Option<String>,
 
     /// Extra arguments forwarded verbatim to `cargo build`
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -98,7 +100,7 @@ pub struct TestArgs {
     /// Where to write the result expression as WXF (default: temp dir)
     #[arg(long)]
     pub out: Option<PathBuf>,
-    /// Cargo features to enable when building examples (comma-separated or repeated)
+    /// Cargo features to enable when building lib targets (comma-separated or repeated)
     #[arg(long, value_delimiter = ',')]
     pub features: Vec<String>,
     /// Test files (.wlt) to run; defaults to all *.wlt found recursively

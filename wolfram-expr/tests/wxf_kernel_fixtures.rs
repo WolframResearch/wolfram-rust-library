@@ -13,8 +13,8 @@
 //! you add a test case or want to refresh against a newer kernel.
 
 use wolfram_expr::expr;
-use wolfram_serialize::{from_wxf, to_wxf};
 use wolfram_expr::{Association, ByteArray, Expr, ExprKind, NumericArray, RuleEntry};
+use wolfram_serialize::{from_wxf, to_wxf};
 
 #[path = "fixtures/wxf_kernel_fixtures.rs"]
 mod fix;

@@ -1,6 +1,6 @@
 Needs["MUnit`"]
 
-Test[
+VerificationTest[
     LibraryFunctionLoad[
         "liblibrary_tests",
         "test_image_arg",
@@ -8,20 +8,17 @@ Test[
         NumericArray
     ][
         Image[{{0, 1}, {1, 0}}, "Bit"]
-    ]
-    ,
+    ],
     NumericArray[{0, 1, 1, 0}, "Integer8"]
 ]
 
-Test[
-    LibraryFunctionLoad["liblibrary_tests", "test_create_bitmap_image", {}, Image][]
-    ,
+VerificationTest[
+    LibraryFunctionLoad["liblibrary_tests", "test_create_bitmap_image", {}, Image][],
     Image[{{0, 1}, {1, 0}}, "Bit"]
 ]
 
-Test[
-    LibraryFunctionLoad["liblibrary_tests", "test_create_color_rgb_u8_image", {}, Image][]
-    ,
+VerificationTest[
+    LibraryFunctionLoad["liblibrary_tests", "test_create_color_rgb_u8_image", {}, Image][],
     Image[
         NumericArray[
             {
@@ -37,9 +34,8 @@ Test[
     ]
 ]
 
-Test[
-    LibraryFunctionLoad["liblibrary_tests", "test_create_color_rgb_f32_image", {}, Image][]
-    ,
+VerificationTest[
+    LibraryFunctionLoad["liblibrary_tests", "test_create_color_rgb_f32_image", {}, Image][],
     Image[
         NumericArray[
             {

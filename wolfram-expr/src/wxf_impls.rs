@@ -252,9 +252,7 @@ impl<'de> FromWXF<'de> for Expr {
             ExpressionEnum::BigInteger => {
                 Ok(Expr::from(BigInteger(r.read_symbol_name()?)))
             },
-            ExpressionEnum::BigReal => {
-                Ok(Expr::from(BigReal(r.read_symbol_name()?)))
-            },
+            ExpressionEnum::BigReal => Ok(Expr::from(BigReal(r.read_symbol_name()?))),
             ExpressionEnum::NumericArray => {
                 let (dt, dims, bytes) = r.read_numeric_array_parts()?;
                 Ok(Expr::from(numeric_array_from_parts(dt, dims, bytes)))

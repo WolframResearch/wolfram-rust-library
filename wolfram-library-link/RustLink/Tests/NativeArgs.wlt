@@ -1,101 +1,92 @@
 Needs["MUnit`"]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_no_args",
 		{},
 		Integer
-	][]
-	,
+	][],
 	4
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_ret_void",
 		{},
 		"Void"
-	][]
-	,
+	][],
 	Null
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_mint",
 		{Integer},
 		Integer
-	][5]
-	,
+	][5],
 	25
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_raw_mint",
 		{Integer},
 		Integer
-	][9]
-	,
+	][9],
 	81
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_mint_mint",
 		{Integer, Integer},
 		Integer
-	][5, 10]
-	,
+	][5, 10],
 	15
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_mreal",
 		{Real},
 		Real
-	][2.5]
-	,
+	][2.5],
 	6.25
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_i64",
 		{Integer},
 		Integer
-	][5]
-	,
+	][5],
 	25
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_i64_i64",
 		{Integer, Integer},
 		Integer
-	][5, 10]
-	,
+	][5, 10],
 	15
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_f64",
 		{Real},
 		Real
-	][2.5]
-	,
+	][2.5],
 	6.25
 ]
 
@@ -109,30 +100,27 @@ Test[
 		"test_str",
 		{String},
 		String
-	]["hello"]
-	,
+	]["hello"],
 	"olleh"
 ] *)
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_string",
 		{String},
 		String
-	]["hello"]
-	,
+	]["hello"],
 	"olleh"
 ]
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_c_string",
 		{String},
 		Integer
-	]["hello world"]
-	,
+	]["hello world"],
 	11
 ]
 
@@ -140,16 +128,14 @@ Test[
 (* Panics  *)
 (*---------*)
 
-Test[
+VerificationTest[
 	LibraryFunctionLoad[
 		"liblibrary_tests",
 		"test_panic",
 		{},
 		"Void"
-	][]
-	,
-	LibraryFunctionError["LIBRARY_USER_ERROR", 1002]
-	,
+	][],
+	LibraryFunctionError["LIBRARY_USER_ERROR", 1002],
 	{LibraryFunction::rterr}
 ]
 
@@ -157,7 +143,7 @@ Test[
 (* NumericArray's *)
 (*----------------*)
 
-Test[
+VerificationTest[
 	totalI64 = LibraryFunctionLoad[
 		"liblibrary_tests",
 		"total_i64",
@@ -165,12 +151,11 @@ Test[
 		Integer
 	];
 
-	totalI64[NumericArray[Range[100], "Integer64"]]
-	,
+	totalI64[NumericArray[Range[100], "Integer64"]],
 	5050
 ]
 
-Test[
+VerificationTest[
 	positiveQ = LibraryFunctionLoad[
 		"liblibrary_tests",
 		"positive_i64",
@@ -178,7 +163,6 @@ Test[
 		LibraryDataType[NumericArray, "UnsignedInteger8"]
 	];
 
-	positiveQ[NumericArray[{0, 1, -2, 3, 4,	-5}, "Integer64"]]
-	,
+	positiveQ[NumericArray[{0, 1, -2, 3, 4,	-5}, "Integer64"]],
 	NumericArray[{0, 1, 0, 1, 1, 0}, "UnsignedInteger8"]
 ]

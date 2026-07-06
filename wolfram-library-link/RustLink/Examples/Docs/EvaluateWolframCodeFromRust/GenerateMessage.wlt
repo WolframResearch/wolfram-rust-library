@@ -19,9 +19,7 @@ VerificationTest[
         via WSTP to include their context. *)
     Block[{$Context = "Empty`", $ContextPath = {}},
         generateMessage[]
-    ]
-    ,
-    Null
-    ,
+    ],
+    Null,
     {HoldForm[Message[MySymbol::msg, "a Rust LibraryLink function"]]}
 ]

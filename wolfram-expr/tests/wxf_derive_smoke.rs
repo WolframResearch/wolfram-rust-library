@@ -3,8 +3,8 @@
 //! coverage matrix lives in `tests/derive.rs` once the deserialize side
 //! also lands.
 
-use wolfram_serialize::{from_wxf, to_wxf, FromWXF, ToWXF};
 use wolfram_expr::{Association, Expr, ExprKind};
+use wolfram_serialize::{from_wxf, to_wxf, FromWXF, ToWXF};
 
 /// Linear-scan helper for tests. `Association` itself exposes no lookup —
 /// tests iterate to find an entry.

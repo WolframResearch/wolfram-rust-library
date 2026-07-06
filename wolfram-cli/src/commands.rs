@@ -1,57 +1,49 @@
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
-use wolfram_app_discovery::{SystemID, WolframApp};
+use wolfram_app_discovery::WolframApp;
 use wolfram_expr::{expr, Expr, ExprKind};
 
-use crate::build::{
-    collect_dylib_info, generate_package, resolve_paclet_config, run_cargo_build,
-};
-use crate::{EvaluateArgs, Result, TestArgs};
+use crate::build::build_and_package;
+use crate::{BuildArgs, EvaluateArgs, Result, TestArgs};
 
-/// Implements `cargo wl test`: builds every workspace `cdylib` example,
-/// packages them, then runs the given `.wlt` files (or all discovered ones)
-/// through a Wolfram kernel via `TestReport`.
+/// Implements `cargo wl test`: builds the current package's (or, from a
+/// virtual-manifest workspace root, every member's) `cdylib` targets (`[lib]`
+/// or `[[example]]`), packages them, then runs the given `.wlt` files (or all
+/// discovered ones) through a Wolfram kernel via `TestReport`.
+///
+/// This is just [`build_and_package`] with test-appropriate `cargo build`
+/// target flags — no separate packaging path, so a package's own
+/// `[package.metadata.wl.pacletinfo]` (named-exports, namespace, ...) is
+/// respected exactly as it would be by `cargo wl build`.
 pub fn cmd_test(args: TestArgs) -> Result<()> {
-    let host_system_id = SystemID::try_current_rust_target()
-        .map_err(|e| format!("unsupported host platform: {e}"))?;
-
-    // Always build with --workspace so running from the workspace root picks
-    // up examples from every member package, not just the current one.
-    let mut build_args = vec!["--workspace".to_string(), "--examples".to_string()];
+    // No --workspace override: same target selection as a plain `cargo
+    // build` (and as `cargo wl build`) — the current package if run from a
+    // concrete package directory (e.g. wolfram-library-link/, producing just
+    // its own dylibs), or every member if run from a virtual-manifest
+    // workspace root (e.g. wolfram-examples/, producing duckdb's and mixed's
+    // together). Both --lib and --examples are requested since different
+    // packages use either target kind for their cdylib(s) (e.g.
+    // wolfram-library-link's own test suite uses [[example]] targets,
+    // wolfram-examples-internal uses [lib]); whichever kind a package doesn't
+    // have is silently a no-op.
+    let mut cargo_args = vec!["--lib".to_string(), "--examples".to_string()];
     if !args.features.is_empty() {
-        build_args.push("--features".to_string());
-        build_args.push(args.features.join(","));
+        cargo_args.push("--features".to_string());
+        cargo_args.push(args.features.join(","));
     }
 
-    let dylibs = run_cargo_build(&build_args, None)?;
-    if dylibs.is_empty() {
-        eprintln!("cargo wl: no cdylib examples found");
-        return run_wl_script(
-            include_str!("../commands/test.wl"),
-            vec![],
-            vec![],
-            args.out,
-        );
-    }
-
-    let out_dir = dylibs
-        .first()
-        .and_then(|p| p.parent())
-        .map(|p| p.join("wl-test"))
-        .unwrap_or_else(|| PathBuf::from("wl-test"));
-
-    let infos = dylibs
-        .iter()
-        .map(|p| collect_dylib_info(p))
-        .collect::<Result<Vec<_>>>()?;
-
-    let config = resolve_paclet_config(None, None, None, None, true, true, false, vec![]);
-    let lib_dir = generate_package(&infos, host_system_id, &out_dir, &config)?;
+    let lib_dirs = build_and_package(&BuildArgs {
+        out: None,
+        cleanup: false,
+        named_exports: false,
+        namespace: None,
+        cargo_args,
+    })?;
 
     run_wl_script(
         include_str!("../commands/test.wl"),
         args.files,
-        vec![lib_dir],
+        lib_dirs,
         args.out,
     )
 }
@@ -108,9 +100,7 @@ fn run_wl_script(
         .collect::<Result<_>>()?;
     let files_list: Vec<Expr> =
         abs_files.iter().map(|f| Expr::string(f.as_str())).collect();
-    let cwd_str = cwd
-        .to_str()
-        .ok_or("current directory is not valid UTF-8")?;
+    let cwd_str = cwd.to_str().ok_or("current directory is not valid UTF-8")?;
     let lib_paths_list: Vec<Expr> = lib_dirs
         .iter()
         .map(|p| {

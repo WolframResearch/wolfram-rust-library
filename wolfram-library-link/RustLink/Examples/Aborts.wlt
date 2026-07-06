@@ -1,6 +1,6 @@
 Needs["MUnit`"]
 
-Test[
+VerificationTest[
     (* Use TimeConstrained to start an abort that will trigger after we've started
        executing the Rust library function. *)
     TimeConstrained[
@@ -9,13 +9,10 @@ Test[
             "wait_for_abort",
             {},
             Integer
-        ][]
-        ,
+        ][],
         (* Wait for a tenth of a second. *)
         0.25
-    ]
-    ,
-    $Aborted
-    ,
+    ],
+    $Aborted,
     TestID -> "RustLink-Aborts"
 ]

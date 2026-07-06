@@ -270,8 +270,8 @@ pub use self::macro_utils::exported_library_functions_association;
 pub use self::{
     args::{FromArg, IntoArg, NativeFunction},
     async_tasks::AsyncTaskObject,
-    data_store::{DataStore, DataStoreNode, DataStoreNodeValue, Nodes},
     catch_panic::call_and_catch_panic,
+    data_store::{DataStore, DataStoreNode, DataStoreNodeValue, Nodes},
     errors::{LibraryError, FAILED_TO_INIT, FAILED_WITH_PANIC},
     image::{ColorSpace, Image, ImageData, ImageType, Pixel, UninitImage},
     library_data::{get_library_data, initialize, WolframLibraryData},
@@ -283,7 +283,6 @@ pub use self::{
 
 #[cfg(feature = "wstp")]
 pub use self::args::WstpFunction;
-
 
 use wolfram_library_link_sys::mint;
 #[cfg(feature = "wstp")]

@@ -286,7 +286,9 @@ mod tests {
         let mut w = WxfWriter::new(Vec::new());
         w.write_varint(n).unwrap();
         let bytes = w.into_inner();
-        WxfReader::new(SliceReader::new(&bytes)).read_varint().unwrap()
+        WxfReader::new(SliceReader::new(&bytes))
+            .read_varint()
+            .unwrap()
     }
 
     #[test]
@@ -300,7 +302,9 @@ mod tests {
     fn varint_rejects_overlong_encoding() {
         // 11 continuation bytes: the 10th group already overflows 64 bits.
         let bytes = [0x80u8; 11];
-        assert!(WxfReader::new(SliceReader::new(&bytes)).read_varint().is_err());
+        assert!(WxfReader::new(SliceReader::new(&bytes))
+            .read_varint()
+            .is_err());
     }
 
     #[test]
@@ -309,6 +313,8 @@ mod tests {
         // bit 63 set — must error rather than silently truncate.
         let mut bytes = vec![0x80u8; 9];
         bytes.push(0x02);
-        assert!(WxfReader::new(SliceReader::new(&bytes)).read_varint().is_err());
+        assert!(WxfReader::new(SliceReader::new(&bytes))
+            .read_varint()
+            .is_err());
     }
 }

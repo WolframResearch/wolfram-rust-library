@@ -1,4 +1,4 @@
-use cargo_metadata::Message;
+use cargo_metadata::{Message, PackageId};
 use sha2::{Digest, Sha256};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -23,10 +23,19 @@ pub struct DylibInfo {
     pub hash: String,
     /// The functions this library exports, decoded from its embedded manifest.
     pub entries: Vec<FunctionEntry>,
+    /// Prefix for this dylib's function keys in `Functions.wl`
+    /// (`"namespace::fnname"`), from this package's own
+    /// `[package.metadata.wl.pacletinfo] namespace` string (or a CLI
+    /// override). Unlike the rest of `PacletConfig` this is resolved
+    /// per-package rather than shared across a build or output location:
+    /// two packages sharing the same location may use a different (or no)
+    /// namespace, so it's the one setting exempt from `check_configs_agree`.
+    pub namespace: Option<String>,
 }
 
 /// Fully resolved packaging settings, merged from CLI flags, the crate's
 /// `[package.metadata.wl.pacletinfo]` table, and built-in defaults.
+#[derive(Clone)]
 pub struct PacletConfig {
     /// Paclet / library name used in the output directory and loader keys.
     pub name: String,
@@ -38,8 +47,6 @@ pub struct PacletConfig {
     pub cleanup: bool,
     /// Copy each dylib under its original name instead of its content hash.
     pub named_exports: bool,
-    /// Prefix every function key with the library name (`"libname::fnname"`).
-    pub namespace_exports: bool,
     /// Extra `SystemID`s to cross-compile for in addition to the host.
     pub system_ids: Vec<SystemID>,
 }
@@ -66,7 +73,6 @@ pub fn resolve_paclet_config(
     package: Option<&str>,
     out: Option<PathBuf>,
     named_exports: bool,
-    namespace_exports: bool,
     cleanup: bool,
     system_ids: Vec<SystemID>,
 ) -> PacletConfig {
@@ -107,11 +113,6 @@ pub fn resolve_paclet_config(
             .and_then(|p| p["named-exports"].as_bool())
             .unwrap_or(false);
 
-    let resolved_namespace_exports = namespace_exports
-        || pi
-            .and_then(|p| p["namespace-exports"].as_bool())
-            .unwrap_or(false);
-
     let resolved_cleanup =
         cleanup || pi.and_then(|p| p["cleanup"].as_bool()).unwrap_or(false);
 
@@ -134,75 +135,285 @@ pub fn resolve_paclet_config(
         output: resolved_output,
         cleanup: resolved_cleanup,
         named_exports: resolved_named_exports,
-        namespace_exports: resolved_namespace_exports,
         system_ids: resolved_system_ids,
     }
 }
 
+/// Resolve the namespace prefix for one package's exported functions: the
+/// CLI override if given, else this package's own
+/// `[package.metadata.wl.pacletinfo] namespace` string, else `None` (bare
+/// function names). Unlike the rest of `PacletConfig`, this is resolved
+/// per-package rather than shared across a whole build or output location —
+/// see [`DylibInfo::namespace`].
+pub fn resolve_namespace(
+    cli_override: Option<&str>,
+    meta: Option<&cargo_metadata::Metadata>,
+    package_id: &PackageId,
+) -> Option<String> {
+    if let Some(ns) = cli_override {
+        return Some(ns.to_owned());
+    }
+    let pkg = meta?.packages.iter().find(|p| p.id == *package_id)?;
+    pkg.metadata["wl"]["pacletinfo"]["namespace"]
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// One resolved output location: every package that ends up writing here
+/// must have agreed on `config`; `dylibs`/`package_names` accumulate as more
+/// agreeing packages are folded in. Each dylib keeps its own package id so
+/// its namespace can be resolved independently later (see
+/// [`DylibInfo::namespace`]).
+struct Location {
+    /// Name of the package that first claimed this location, for error messages.
+    owner: String,
+    config: PacletConfig,
+    dylibs: Vec<(PathBuf, PackageId)>,
+    package_names: Vec<String>,
+}
+
 /// Implements `cargo wl build`: builds the host `cdylib`s, generates the WL
-/// loader package, then cross-builds and copies binaries for any additional
-/// `SystemID`s. Prints the generated package directory to stdout.
+/// loader package(s), then cross-builds and copies binaries for any
+/// additional `SystemID`s. Prints the generated package directory to stdout
+/// (one line per output location).
 pub fn cmd_build(args: BuildArgs) -> Result<()> {
-    let parsed = parse_forwarded_args(args.cargo_args)?;
+    for lib_dir in build_and_package(&args)? {
+        println!("{}", lib_dir.display());
+    }
+    Ok(())
+}
+
+/// Builds `args.cargo_args`' `cdylib` targets and generates a WL loader
+/// package per resolved output location, cross-compiling and copying
+/// binaries for any additional `SystemID`s each location's packages declare.
+/// Returns every generated package directory. Shared by `cargo wl build` and
+/// `cargo wl test` — testing just builds with different `cargo build` target
+/// flags (see [`crate::commands::cmd_test`]) and points the Wolfram kernel's
+/// `$LibraryPath` at the same output, rather than duplicating this logic.
+///
+/// A build can span several packages at once (e.g. running from a workspace
+/// root with no `-p`). Each package's own `[package.metadata.wl.pacletinfo]`
+/// is resolved independently and packages are grouped by their resolved
+/// output location (`output` dir + `name`), so building the whole workspace
+/// never differs from building each contributing package individually.
+/// Two packages *may* legitimately share a location (e.g. several small
+/// crates meant to merge into one paclet) — but then every setting must
+/// match exactly, or this is almost certainly a misconfiguration, so it's a
+/// hard error rather than one package silently clobbering another's output.
+pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
+    let parsed = parse_forwarded_args(args.cargo_args.clone())?;
     let host_system_id = SystemID::try_current_rust_target()
         .map_err(|e| format!("unsupported host platform: {e}"))?;
     rust_target(host_system_id)?;
 
-    let config = resolve_paclet_config(
-        parsed.paclet_name.as_deref(),
-        parsed.paclet_version.as_deref(),
-        parsed.package.as_deref(),
-        parsed.out.or(args.out),
-        args.named_exports,
-        args.namespace_exports,
-        args.cleanup || parsed.cleanup,
-        parsed.system_ids,
-    );
+    let mut generated: Vec<PathBuf> = Vec::new();
 
-    let system_ids = target_system_ids(host_system_id, config.system_ids.clone());
-
-    let host_dylibs = run_cargo_build(&parsed.cargo_args, None)?;
+    let host_dylibs = run_cargo_build_with_packages(&parsed.cargo_args, None)?;
     if host_dylibs.is_empty() {
         eprintln!(
             "cargo wl: warning: no cdylib artifacts found — generating empty package"
         );
-    }
-
-    let out_dir = config.output.clone().unwrap_or_else(|| {
-        host_dylibs
-            .first()
-            .and_then(|p| p.parent())
-            .map(|p| p.join("wl-package"))
-            .unwrap_or_else(|| PathBuf::from("wl-package"))
-    });
-
-    if config.cleanup && out_dir.exists() {
-        std::fs::remove_dir_all(&out_dir)
-            .map_err(|e| format!("failed to clear {}: {e}", out_dir.display()))?;
-    }
-
-    let host_infos: Vec<DylibInfo> = host_dylibs
-        .iter()
-        .map(|p| collect_dylib_info(p))
-        .collect::<Result<_>>()?;
-
-    let lib_dir = generate_package(&host_infos, host_system_id, &out_dir, &config)?;
-    let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
-    println!("{}", lib_dir.display());
-
-    for system_id in system_ids.iter().copied() {
-        if system_id == host_system_id {
-            continue;
+        let config = resolve_paclet_config(
+            parsed.paclet_name.as_deref(),
+            parsed.paclet_version.as_deref(),
+            parsed.package.as_deref(),
+            parsed.out.clone().or_else(|| args.out.clone()),
+            args.named_exports,
+            args.cleanup || parsed.cleanup,
+            parsed.system_ids,
+        );
+        let out_dir = config
+            .output
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("wl-package"));
+        if config.cleanup && out_dir.exists() {
+            std::fs::remove_dir_all(&out_dir)
+                .map_err(|e| format!("failed to clear {}: {e}", out_dir.display()))?;
         }
-        let cross_dylibs =
-            run_cargo_build(&parsed.cargo_args, Some(rust_target(system_id)?))?;
-        let lib_dir =
-            copy_cross_dylibs(&host_infos, &cross_dylibs, system_id, &out_dir, &config)?;
+        let lib_dir = generate_package(&[], host_system_id, &out_dir, &config)?;
         let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
-        println!("{}", lib_dir.display());
+        generated.push(lib_dir);
+        return Ok(generated);
+    }
+
+    let meta = cargo_metadata::MetadataCommand::new().exec().ok();
+
+    let mut locations: Vec<(PathBuf, Location)> = Vec::new();
+    for dylib in &host_dylibs {
+        let package_name = meta
+            .as_ref()
+            .and_then(|m| m.packages.iter().find(|p| p.id == dylib.package_id))
+            .map(|p| p.name.to_string())
+            .unwrap_or_default();
+
+        let config = resolve_paclet_config(
+            parsed.paclet_name.as_deref(),
+            parsed.paclet_version.as_deref(),
+            Some(&package_name),
+            parsed.out.clone(),
+            args.named_exports,
+            args.cleanup || parsed.cleanup,
+            parsed.system_ids.clone(),
+        );
+
+        let out_dir = config.output.clone().unwrap_or_else(|| {
+            dylib
+                .path
+                .parent()
+                .map(|p| p.join("wl-package"))
+                .unwrap_or_else(|| PathBuf::from("wl-package"))
+        });
+        let abs_out_dir =
+            std::fs::canonicalize(&out_dir).unwrap_or_else(|_| out_dir.clone());
+        let location_key = abs_out_dir.join(&config.name);
+
+        match locations.iter_mut().find(|(key, _)| *key == location_key) {
+            Some((_, loc)) => {
+                check_configs_agree(&loc.owner, &loc.config, &package_name, &config)?;
+                loc.dylibs
+                    .push((dylib.path.clone(), dylib.package_id.clone()));
+                if !loc.package_names.contains(&package_name) {
+                    loc.package_names.push(package_name);
+                }
+            },
+            None => {
+                locations.push((
+                    location_key,
+                    Location {
+                        owner: package_name.clone(),
+                        config,
+                        dylibs: vec![(dylib.path.clone(), dylib.package_id.clone())],
+                        package_names: vec![package_name],
+                    },
+                ));
+            },
+        }
+    }
+
+    for (_, loc) in &locations {
+        let out_dir = loc.config.output.clone().unwrap_or_else(|| {
+            loc.dylibs
+                .first()
+                .and_then(|(p, _)| p.parent())
+                .map(|p| p.join("wl-package"))
+                .unwrap_or_else(|| PathBuf::from("wl-package"))
+        });
+
+        if loc.config.cleanup && out_dir.exists() {
+            std::fs::remove_dir_all(&out_dir)
+                .map_err(|e| format!("failed to clear {}: {e}", out_dir.display()))?;
+        }
+
+        let host_infos: Vec<DylibInfo> = loc
+            .dylibs
+            .iter()
+            .map(|(p, package_id)| {
+                let mut info = collect_dylib_info(p)?;
+                info.namespace = resolve_namespace(
+                    args.namespace.as_deref(),
+                    meta.as_ref(),
+                    package_id,
+                );
+                Ok(info)
+            })
+            .collect::<Result<_>>()?;
+
+        let lib_dir =
+            generate_package(&host_infos, host_system_id, &out_dir, &loc.config)?;
+        let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
+        generated.push(lib_dir);
+
+        let system_ids = target_system_ids(host_system_id, loc.config.system_ids.clone());
+        for system_id in system_ids.iter().copied() {
+            if system_id == host_system_id {
+                continue;
+            }
+            // Cross-build only the packages contributing to this location,
+            // so a cross build spanning several locations can't error out
+            // matching one location's host dylibs against another's.
+            let mut cross_args = parsed.cargo_args.clone();
+            for name in &loc.package_names {
+                cross_args.push("-p".to_string());
+                cross_args.push(name.clone());
+            }
+            let cross_dylibs =
+                run_cargo_build(&cross_args, Some(rust_target(system_id)?))?;
+            let lib_dir = copy_cross_dylibs(
+                &host_infos,
+                &cross_dylibs,
+                system_id,
+                &out_dir,
+                &loc.config,
+            )?;
+            let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
+            generated.push(lib_dir);
+        }
+    }
+
+    Ok(generated)
+}
+
+/// Every setting two packages sharing the same output location must agree
+/// on. `name` isn't included: it's already part of the location key, so a
+/// mismatch there produces a different location rather than reaching here.
+/// `namespace` isn't included either: it's intentionally allowed to differ
+/// (or be absent) per package even within the same location — see
+/// [`DylibInfo::namespace`].
+fn check_configs_agree(
+    prev_owner: &str,
+    prev: &PacletConfig,
+    new_owner: &str,
+    new: &PacletConfig,
+) -> Result<()> {
+    let mismatch = |field: &str, prev_val: &str, new_val: &str| {
+        format!(
+            "cargo wl: package '{new_owner}' doesn't agree with package '{prev_owner}' \
+             on {field}: '{prev_owner}' has {field} = {prev_val}, '{new_owner}' has \
+             {field} = {new_val} (both write to the same output location)"
+        )
+    };
+
+    if prev.version != new.version {
+        return Err(mismatch("version", &prev.version, &new.version));
+    }
+    if prev.named_exports != new.named_exports {
+        return Err(mismatch(
+            "named-exports",
+            &prev.named_exports.to_string(),
+            &new.named_exports.to_string(),
+        ));
+    }
+    if prev.cleanup != new.cleanup {
+        return Err(mismatch(
+            "cleanup",
+            &prev.cleanup.to_string(),
+            &new.cleanup.to_string(),
+        ));
+    }
+    let mut prev_ids = prev.system_ids.clone();
+    let mut new_ids = new.system_ids.clone();
+    prev_ids.sort();
+    new_ids.sort();
+    if prev_ids != new_ids {
+        let fmt = |ids: &[SystemID]| {
+            ids.iter()
+                .map(|id| id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        return Err(mismatch("system-ids", &fmt(&prev_ids), &fmt(&new_ids)));
     }
 
     Ok(())
+}
+
+/// A built `cdylib` artifact together with the id of the package that
+/// produced it, so callers merging several packages' dylibs together (like
+/// `cargo wl build` run across a whole workspace) can look back up each
+/// one's own `pacletinfo` settings.
+pub struct BuiltDylib {
+    pub path: PathBuf,
+    pub package_id: PackageId,
 }
 
 /// Run `cargo build` (optionally for `rust_target`), streaming its JSON output
@@ -212,6 +423,17 @@ pub fn run_cargo_build(
     cargo_args: &[String],
     rust_target: Option<&str>,
 ) -> Result<Vec<PathBuf>> {
+    Ok(run_cargo_build_with_packages(cargo_args, rust_target)?
+        .into_iter()
+        .map(|d| d.path)
+        .collect())
+}
+
+/// Same as [`run_cargo_build`], but keeps each dylib's owning package id.
+pub fn run_cargo_build_with_packages(
+    cargo_args: &[String],
+    rust_target: Option<&str>,
+) -> Result<Vec<BuiltDylib>> {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cargo = Command::new(cargo_bin);
     cargo
@@ -228,7 +450,7 @@ pub fn run_cargo_build(
         .spawn()
         .map_err(|e| format!("failed to spawn cargo build: {e}"))?;
     let stdout = child.stdout.take().unwrap();
-    let mut dylibs: Vec<PathBuf> = Vec::new();
+    let mut dylibs: Vec<BuiltDylib> = Vec::new();
 
     for message in Message::parse_stream(BufReader::new(stdout)) {
         let Message::CompilerArtifact(artifact) = message
@@ -246,11 +468,14 @@ pub fn run_cargo_build(
             continue;
         }
 
-        for filename in artifact.filenames {
+        for filename in &artifact.filenames {
             let path = filename.as_std_path();
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
             if matches!(ext, "dylib" | "so" | "dll") {
-                dylibs.push(path.to_owned());
+                dylibs.push(BuiltDylib {
+                    path: path.to_owned(),
+                    package_id: artifact.package_id.clone(),
+                });
             }
         }
     }
@@ -283,6 +508,7 @@ pub fn collect_dylib_info(dylib: &Path) -> Result<DylibInfo> {
         name,
         hash,
         entries,
+        namespace: None,
     })
 }
 
@@ -357,9 +583,9 @@ fn write_package_wl_files(
 
     // ── Functions.wl
     // One `LibraryArtifact` per dylib that exports something; each carries the
-    // load-time path expression and (when namespacing) its library name as the
-    // key prefix. `library_functions_loader` builds the whole
-    // `With[{callers…, libN = …}, <|key -> Caller[LibraryFunctionLoad[…]]|>]`.
+    // load-time path expression and (when this dylib's own package declared
+    // one) its namespace as the key prefix. `library_functions_loader` builds
+    // the whole `With[{callers…, libN = …}, <|key -> Caller[LibraryFunctionLoad[…]]|>]`.
     let libraries: Vec<LibraryArtifact> = placed
         .iter()
         .filter(|(info, _)| !info.entries.is_empty())
@@ -368,7 +594,7 @@ fn write_package_wl_files(
                 ::DirectoryName[::$InputFileName],
                 (dest.as_str())
             ]]),
-            namespace: config.namespace_exports.then(|| info.name.clone()),
+            namespace: info.namespace.clone(),
             functions: info.entries.clone(),
         })
         .collect();

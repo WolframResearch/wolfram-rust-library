@@ -1,7 +1,7 @@
 Needs["MUnit`"]
 
 (* Test the async_file_watcher_raw.rs example. *)
-Test[
+VerificationTest[
     delay = 100;
     file = CreateFile[];
 
@@ -34,16 +34,14 @@ Test[
 
     StopAsynchronousTask[task];
 
-    $changes
-    ,
-    {expectedModifiedTime}
-    ,
+    $changes,
+    {expectedModifiedTime},
     TestID -> "RustLink-AsyncExamples-1"
 ]
 
 (* Test the async_file_watcher.rs example. This is identical to the above test, except the
    example implementation uses the safe wrappers. *)
-Test[
+VerificationTest[
     delay = 100;
     file = CreateFile[];
 
@@ -76,9 +74,7 @@ Test[
 
     StopAsynchronousTask[task];
 
-    $changes2
-    ,
-    {expectedModifiedTime}
-    ,
+    $changes2,
+    {expectedModifiedTime},
     TestID -> "RustLink-AsyncExamples-2"
 ]

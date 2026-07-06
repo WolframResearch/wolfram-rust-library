@@ -44,7 +44,6 @@ pub use self::numeric_array::NumericArray;
 pub use self::packed_array::PackedArray;
 pub use self::wxf::{ExpressionEnum, HeaderEnum, NumericArrayEnum, PackedArrayEnum};
 
-
 #[cfg(feature = "unstable_parse")]
 pub use self::ptr_cmp::ExprRefCmp;
 
@@ -160,12 +159,15 @@ impl Expr {
     /// let f = F64::new(3.14).unwrap();
     /// let _real = Expr::new(ExprKind::Real(f));
     /// ```
-    #[deprecated(since = "0.6.0-alpha.3", note = "use `Expr::from(i64)` or `Expr::from(f64)` instead")]
+    #[deprecated(
+        since = "0.6.0-alpha.3",
+        note = "use `Expr::from(i64)` or `Expr::from(f64)` instead"
+    )]
     #[allow(deprecated)]
     pub fn number(num: Number) -> Expr {
         match num {
             Number::Integer(i) => Expr::from(i),
-            Number::Real(r)    => Expr::new(ExprKind::Real(r)),
+            Number::Real(r) => Expr::new(ExprKind::Real(r)),
         }
     }
 
@@ -391,7 +393,10 @@ pub struct Normal<E = Expr> {
 ///
 /// To *construct* a number expression use [`Expr::from`] or [`Expr::real`] — see
 /// [`Expr::number`] for the full mapping.
-#[deprecated(since = "0.6.0-alpha.3", note = "match on `ExprKind::Integer` / `ExprKind::Real` directly")]
+#[deprecated(
+    since = "0.6.0-alpha.3",
+    note = "match on `ExprKind::Integer` / `ExprKind::Real` directly"
+)]
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Number {
@@ -458,9 +463,14 @@ impl Number {
     /// # Panics
     ///
     /// Panics if `r` is NaN.
-    #[deprecated(since = "0.6.0-alpha.3", note = "use `Expr::from(f64)` or `Expr::real(f64)` instead")]
+    #[deprecated(
+        since = "0.6.0-alpha.3",
+        note = "use `Expr::from(f64)` or `Expr::real(f64)` instead"
+    )]
     pub fn real(r: f64) -> Self {
-        let ExprKind::Real(f) = Expr::real(r).to_kind() else { unreachable!() };
+        let ExprKind::Real(f) = Expr::real(r).to_kind() else {
+            unreachable!()
+        };
         Number::Real(f)
     }
 }
@@ -475,7 +485,6 @@ impl fmt::Debug for Expr {
         write!(f, "{:?}", inner)
     }
 }
-
 
 //======================================
 // Comparision trait impls

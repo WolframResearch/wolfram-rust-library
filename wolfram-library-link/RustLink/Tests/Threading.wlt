@@ -1,16 +1,15 @@
 Needs["MUnit`"]
 
-Test[
+VerificationTest[
     Block[{$Context = "UnlikelyContext`", $ContextPath = {}},
         LibraryFunctionLoad[
             "liblibrary_tests", "test_runtime_function_from_main_thread", {}, "Boolean"
         ][]
-    ]
-    ,
+    ],
     True
 ]
 
-Test[
+VerificationTest[
     result = Block[{$Context = "UnlikelyContext`", $ContextPath = {}},
         LibraryFunctionLoad[
             "liblibrary_tests", "test_runtime_function_from_non_main_thread", {}, String

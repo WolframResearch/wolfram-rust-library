@@ -1,0 +1,25 @@
+[package]
+name = "mixed"
+version = "0.6.0-alpha.4"
+edition = "2021"
+publish = false
+
+[package.metadata.wl.pacletinfo]
+name = "WolframExamples"
+version = "1.0.0"
+namespace = "mixed"
+named-exports = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wolfram-export = { version = "=0.6.0-alpha.4", features = ["wxf"] }
+wolfram-expr = { version = "=0.6.0-alpha.4" }
+
+[features]
+# Pulls in wstp-sys, which needs a WSTP SDK for the target platform. Off by
+# default so a plain `cargo build`/`check` (e.g. when cross-compiling) doesn't
+# require one. Gates only the `reverse` function (see src/lib.rs) — `add`
+# and `dot` always compile and export regardless.
+wstp = ["wolfram-export/wstp"]

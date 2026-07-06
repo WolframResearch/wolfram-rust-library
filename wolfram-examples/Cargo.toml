@@ -1,67 +1,10 @@
-[package]
-name = "wolfram-examples"
-version = "0.6.0-alpha.4"
-edition = "2021"
-publish = false
+[workspace]
+resolver = "2"
 
-[package.metadata.wl.pacletinfo]
-name = "WolframExamples"
-version = "1.0.0"
-output = "../notebooks/"
-namespace-exports = true
-named-exports = false
-
-[dependencies]
-wolfram-library-link = { version = "=0.6.0-alpha.4", path = "../wolfram-library-link", default-features = false, features = ["panic-failure-backtraces", "automate-function-loading-boilerplate"] }
-wolfram-expr = { version = "=0.6.0-alpha.4", path = "../wolfram-expr" }
-wolfram-export = { version = "=0.6.0-alpha.4", path = "../wolfram-export", features = ["native", "wxf"] }
-wolfram-serialize = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize" }
-wolfram-serialize-macros = { version = "=0.6.0-alpha.4", path = "../wolfram-serialize-macros" }
-
-# Heavy, example-specific deps — only compiled when the `duckdb` feature is on.
-# DuckDB is statically compiled in via `bundled`; `vtab-arrow` enables native
-# Arrow output so query results come back as RecordBatches without manual conversion.
-duckdb    = { version = "1", features = ["bundled", "vtab-arrow"], optional = true }
-arrow-ipc = { version = "58", optional = true }
-uuid      = { version = "1", features = ["v4"], optional = true }
-
-[features]
-# Build with `cargo wl test --features duckdb` (or `cargo build --features duckdb`).
-duckdb = ["dep:duckdb", "dep:arrow-ipc", "dep:uuid"]
-
-# Pulls in wstp-sys, which needs a WSTP SDK for the target platform. Off by
-# default so `--examples` (e.g. when cross-compiling) doesn't require one.
-wstp = ["wolfram-export/wstp", "wolfram-library-link/wstp"]
-
-[[example]]
-name = "duckdb"
-crate-type = ["cdylib"]
-required-features = ["duckdb"]
-
-[[example]]
-name = "legacy_native"
-crate-type = ["cdylib"]
-required-features = ["wolfram-library-link/automate-function-loading-boilerplate"]
-
-[[example]]
-name = "legacy_wstp"
-crate-type = ["cdylib"]
-required-features = ["wstp", "wolfram-library-link/automate-function-loading-boilerplate"]
-
-[[example]]
-name = "types_native"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "types_wstp"
-crate-type = ["cdylib"]
-required-features = ["wstp"]
-
-[[example]]
-name = "types_wxf"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "mixed"
-crate-type = ["cdylib"]
-required-features = ["wstp"]
+# A standalone workspace — not part of the main repo workspace (see the root
+# Cargo.toml's `exclude`). These are copy-paste-able sample crates: they depend
+# on the published crates.io releases of this repo's crates, not local paths.
+members = [
+    "duckdb",
+    "mixed",
+]
