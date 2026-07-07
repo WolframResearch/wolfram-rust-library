@@ -26,6 +26,9 @@ $fns = Get[FileNameJoin[{libDir, "Functions.wl"}]];
 nativeAdd   = $fns["native_add"];
 nativeDot   = $fns["native_dot"];
 nativeScale = $fns["native_scale_array"];
+margsAdd    = $fns["margs_add"];
+margsDot    = $fns["margs_dot"];
+margsScale  = $fns["margs_scale_array"];
 wstpAdd     = $fns["wstp_add"];
 wstpDot     = $fns["wstp_dot"];
 wstpScale   = $fns["wstp_scale_array"];
@@ -42,6 +45,7 @@ wxfDs       = $fns["wxf_echo_dataset"];
    being compared against look arbitrarily slow. *)
 missingFns = Select[
   {"nativeAdd" -> nativeAdd, "nativeDot" -> nativeDot, "nativeScale" -> nativeScale,
+   "margsAdd" -> margsAdd, "margsDot" -> margsDot, "margsScale" -> margsScale,
    "wstpAdd" -> wstpAdd, "wstpDot" -> wstpDot, "wstpScale" -> wstpScale, "wstpDup" -> wstpDup,
    "wxfAdd" -> wxfAdd, "wxfDot" -> wxfDot, "wxfScale" -> wxfScale, "wxfDup" -> wxfDup,
    "wxfPoint" -> wxfPoint, "wxfDs" -> wxfDs},
@@ -54,6 +58,7 @@ If[missingFns =!= {},
 
 (* ── Helpers ─────────────────────────────────────────────────────────────── *)
 nC = RGBColor["#2196F3"]; wC = RGBColor["#FF5722"]; xC = RGBColor["#4CAF50"];
+mC = RGBColor["#9C27B0"];
 
 rotN = 32; idx = 0; nextI[] := (idx = Mod[idx, rotN] + 1; idx);
 mkNA[n_] := Table[NumericArray[RandomReal[1, n], "Real64"], rotN];
@@ -106,19 +111,21 @@ ns = {10, 100, 1000, 10000, 100000};
 (* add                                                                        *)
 (* ══════════════════════════════════════════════════════════════════════════ *)
 Print["\n=== add(a, b) ==="];
-Module[{tN, tW, tX},
+Module[{tN, tM, tW, tX},
   tN = avgUs[nativeAdd[3., 4.]];
+  tM = avgUs[margsAdd[3., 4.]];
   tW = avgUs[wstpAdd[3., 4.]];
   tX = avgUs[wxfAdd[3., 4.]];
   printTable[
     {"impl", "time", "vs native", "vs wstp"},
     {{"native", fmtUs[tN], "1.00x", fmtRatio[tN/tW]},
+     {"margs",  fmtUs[tM], fmtRatio[tM/tN], fmtRatio[tM/tW]},
      {"wstp",   fmtUs[tW], fmtRatio[tW/tN], "1.00x"},
      {"wxf",    fmtUs[tX], fmtRatio[tX/tN], fmtRatio[tX/tW]}}
   ];
   Print @ BarChart[
-    {tN, tW, tX},
-    Sequence @@ barOpts["add(a, b)", {nC, wC, xC}, {"native", "wstp", "wxf"}]];
+    {tN, tM, tW, tX},
+    Sequence @@ barOpts["add(a, b)", {nC, mC, wC, xC}, {"native", "margs", "wstp", "wxf"}]];
 ];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
@@ -157,18 +164,19 @@ dotRows = Table[
     idx = 0;
     {n,
      timeMicros[Function[Module[{j=nextI[]}, nativeDot[as[[j]], bs[[j]]]]], r],
+     timeMicros[Function[Module[{j=nextI[]}, margsDot[as[[j]], bs[[j]]]]], r],
      timeMicros[Function[Module[{j=nextI[]}, wstpDot[as[[j]], bs[[j]]]]], r],
      timeMicros[Function[Module[{j=nextI[]}, wxfDot[as[[j]], bs[[j]]]]], r]}],
   {n, ns}];
 printTable[
-  {"n", "native", "wstp", "wxf", "wxf/wstp"},
-  Map[{ToString[#[[1]]], fmtUs[#[[2]]], fmtUs[#[[3]]], fmtUs[#[[4]]], fmtRatio[#[[4]]/#[[3]]]} &, dotRows]
+  {"n", "native", "margs", "wstp", "wxf", "wxf/wstp"},
+  Map[{ToString[#[[1]]], fmtUs[#[[2]]], fmtUs[#[[3]]], fmtUs[#[[4]]], fmtUs[#[[5]]], fmtRatio[#[[5]]/#[[4]]]} &, dotRows]
 ];
 Print @ Legended[
-  ListLinePlot[{dotRows[[All,{1,2}]], dotRows[[All,{1,3}]], dotRows[[All,{1,4}]]},
+  ListLinePlot[{dotRows[[All,{1,2}]], dotRows[[All,{1,3}]], dotRows[[All,{1,4}]], dotRows[[All,{1,5}]]},
     Sequence @@ lineOpts["dot(a, b)  -  \[Mu]s vs n",
-      {Directive[nC,Thick], Directive[wC,Thick], Directive[xC,Thick]}]],
-  mkLegend[{"native","wstp","wxf"}, {nC, wC, xC}]];
+      {Directive[nC,Thick], Directive[mC,Thick], Directive[wC,Thick], Directive[xC,Thick]}]],
+  mkLegend[{"native","margs","wstp","wxf"}, {nC, mC, wC, xC}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
 (* scale_array                                                                *)
@@ -179,18 +187,19 @@ scRows = Table[
     idx = 0;
     {n,
      timeMicros[Function[Module[{j=nextI[]}, Total @ nativeScale[as[[j]], 2.]]], r],
+     timeMicros[Function[Module[{j=nextI[]}, Total @ margsScale[as[[j]], 2.]]], r],
      timeMicros[Function[Module[{j=nextI[]}, Total @ Normal @ wstpScale[as[[j]], 2.]]], r],
      timeMicros[Function[Module[{j=nextI[]}, Total @ Normal @ wxfScale[as[[j]], 2.]]], r]}],
   {n, ns}];
 printTable[
-  {"n", "native", "wstp", "wxf", "wxf/wstp"},
-  Map[{ToString[#[[1]]], fmtUs[#[[2]]], fmtUs[#[[3]]], fmtUs[#[[4]]], fmtRatio[#[[4]]/#[[3]]]} &, scRows]
+  {"n", "native", "margs", "wstp", "wxf", "wxf/wstp"},
+  Map[{ToString[#[[1]]], fmtUs[#[[2]]], fmtUs[#[[3]]], fmtUs[#[[4]]], fmtUs[#[[5]]], fmtRatio[#[[5]]/#[[4]]]} &, scRows]
 ];
 Print @ Legended[
-  ListLinePlot[{scRows[[All,{1,2}]], scRows[[All,{1,3}]], scRows[[All,{1,4}]]},
+  ListLinePlot[{scRows[[All,{1,2}]], scRows[[All,{1,3}]], scRows[[All,{1,4}]], scRows[[All,{1,5}]]},
     Sequence @@ lineOpts["scale_array(arr, f)  -  \[Mu]s vs n",
-      {Directive[nC,Thick], Directive[wC,Thick], Directive[xC,Thick]}]],
-  mkLegend[{"native","wstp","wxf"}, {nC, wC, xC}]];
+      {Directive[nC,Thick], Directive[mC,Thick], Directive[wC,Thick], Directive[xC,Thick]}]],
+  mkLegend[{"native","margs","wstp","wxf"}, {nC, mC, wC, xC}]];
 
 (* ══════════════════════════════════════════════════════════════════════════ *)
 (* echo_dataset                                                               *)

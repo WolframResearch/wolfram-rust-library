@@ -12,6 +12,7 @@ function, and serializes the return value via `ToWXF`.
 | Use case | Recommended mode |
 |----------|-----------------|
 | Scalars, `NumericArray`, images — maximum speed | `#[export]` (native) |
+| Full manual control over `MArgument` marshaling | `#[export(margs)]` |
 | Arbitrary `Expr` trees, dynamic argument counts | `#[export(wstp)]` |
 | Typed Rust structs / enums, `Option`, `Result` | `#[export(wxf)]` |
 

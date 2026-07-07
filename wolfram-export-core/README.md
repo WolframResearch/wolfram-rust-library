@@ -7,9 +7,9 @@ This crate is not intended to be used directly. Depend on
 
 It hosts:
 
-* The `ExportEntry` inventory record type (shared by native, WSTP, and WXF
-  modes).
-* The `inventory::collect!` declaration that all three runtimes submit into.
+* The `ExportEntry` inventory record type (shared by native, margs, WSTP, and
+  WXF modes).
+* The `inventory::collect!` declaration that all four runtimes submit into.
 * `exported_library_functions_association` — the builder that produces the
   `Association[name -> LibraryFunctionLoad[…], …]` expression used at both
   WSTP load time and WXF build time.

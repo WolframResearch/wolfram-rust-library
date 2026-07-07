@@ -11,10 +11,10 @@ This crate is typically not depended on directly — use `wolfram-export` or
 
 | Attribute | Description |
 |-----------|-------------|
-| `#[export]` | Multi-mode: native by default, `#[export(wstp)]` for WSTP, `#[export(wxf)]` for WXF |
-| `#[export_native]` | Explicit native `MArgument` mode |
-| `#[export_wstp]` | Explicit WSTP `Link` mode |
-| `#[export_wxf]` | Explicit WXF `ByteArray` mode |
+| `#[export]` | Native `MArgument` mode (default) — arguments/return marshaled via `FromArg`/`IntoArg` |
+| `#[export(margs)]` | Raw native mode — same C ABI as `#[export]`, but you marshal `&[MArgument]`/`MArgument` by hand |
+| `#[export(wstp)]` | WSTP `Link` mode |
+| `#[export(wxf)]` | Typed WXF `ByteArray` mode |
 | `#[init]` | Run once when the library is first loaded |
 
 Paths in emitted code are resolved via `proc-macro-crate` so that the macro

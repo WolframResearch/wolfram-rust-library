@@ -32,17 +32,43 @@
 //!
 //! ## Library function types
 //!
-//! Three calling conventions are supported, each with a different tradeoff:
+//! Four calling conventions are supported, each with a different tradeoff:
 //!
 //! | Mode | Attribute | Best for |
 //! |------|-----------|----------|
 //! | **Native** | `#[export]` | Scalars, `NumericArray`, images — maximum efficiency |
+//! | **Raw native** | `#[export(margs)]` | Same ABI as Native, full manual control over marshaling |
 //! | **WSTP** | `#[export(wstp)]` | Arbitrary `Expr` trees, streaming, dynamic argument counts |
 //! | **WXF** | `#[export(wxf)]` | Typed Rust structs/enums auto-serialized via `#[derive(ToWXF, FromWXF)]` |
 //!
 //! **Native** functions pass values as C-ABI `MArgument` slots — machine integers,
 //! doubles, C strings, or [`NumericArray`]s. Very fast, but limited to a fixed set of
 //! primitive types.
+//!
+//! **Raw native** functions receive the same `MArgument` slots as Native, but
+//! as a raw `&[MArgument]`/`MArgument` instead of having `FromArg`/`IntoArg`
+//! applied automatically — use this when you need full manual control over
+//! argument/return conversion. Since the macro can't see real types from a
+//! `fn(&[MArgument], MArgument)` signature, declare them by hand with
+//! `args = (..)`/`ret = ..`:
+//!
+//! ```
+//! # mod scope {
+//! use wolfram_library_link::{self as wll, sys::MArgument, FromArg};
+//!
+//! #[wll::export(margs, args = (::Real, ::Real), ret = ::Real)]
+//! fn raw_add(args: &[MArgument], ret: MArgument) {
+//!     let a = unsafe { f64::from_arg(&args[0]) };
+//!     let b = unsafe { f64::from_arg(&args[1]) };
+//!     unsafe { *ret.real = a + b; }
+//! }
+//! # }
+//! ```
+//!
+//! Omitting `args`/`ret` still compiles, but defaults the generated
+//! `LibraryFunctionLoad` type spec to the same fixed `LinkObject`/`LinkObject`
+//! placeholder WSTP mode uses (which a raw `MArgument` function doesn't
+//! actually accept) and emits a compile-time warning telling you to annotate it.
 //!
 //! **WSTP** functions pass values over a WSTP [`Link`] object that can carry any Wolfram
 //! Language expression, including associations, nested lists, and symbols. Use the
@@ -204,9 +230,6 @@
 //!
 //! Now the error shown when a panic occurs will include a backtrace.
 //!
-//! *The error message may include more information if the `"nightly"`
-//! [feature][cargo-features] of `wolfram-library-link` is enabled.*
-//!
 //!
 //!
 //!
@@ -222,9 +245,7 @@
 //! [library-link-guide]: https://reference.wolfram.com/language/guide/LibraryLink.html
 //! [LibraryFunctionLoad]: https://reference.wolfram.com/language/ref/LibraryFunctionLoad.html
 //! [failure]: https://reference.wolfram.com/language/ref/Failure.html
-//! [cargo-features]: https://doc.rust-lang.org/cargo/reference/features.html
 // #![doc = include_str!("../docs/included/Overview.md")]
-#![cfg_attr(feature = "nightly", feature(panic_info_message))]
 #![warn(missing_docs)]
 
 mod args;
@@ -683,6 +704,12 @@ pub use wolfram_export_macros::export;
 // actionable messages when the wrong mode is requested for this crate.
 #[doc(hidden)]
 pub const fn __assert_native_enabled() {}
+
+// Same C ABI/feature-gating as native — margs is "native, but you marshal
+// `&[MArgument]`/`MArgument` by hand" — so it's unconditionally available
+// wherever native is.
+#[doc(hidden)]
+pub const fn __assert_margs_enabled() {}
 
 #[cfg(feature = "wstp")]
 #[doc(hidden)]

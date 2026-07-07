@@ -114,17 +114,20 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 // #[export] — one macro, three wire formats, picked by a keyword argument.
 //======================================
 
-/// Export a function as a Wolfram LibraryLink function, in one of three wire
-/// formats picked by a keyword argument. All three need
+/// Export a function as a Wolfram LibraryLink function, in one of four wire
+/// formats picked by a keyword argument. All four need
 /// `LibraryFunctionLoad` on the Wolfram side and none of them need the
 /// `automate-function-loading-boilerplate` feature to *work* — that feature
-/// only affects whether `cargo wl build` can discover the load call for you.
+/// only affects whether `cargo wl build` can discover the load call for you
+/// (`#[export(margs)]` needs an `args =`/`ret =` annotation for that
+/// discovered call to be correct — see below).
 ///
-/// | Attribute        | Wire format             | Cargo feature (on `wolfram-export`) |
-/// |------------------|--------------------------|--------------------------------------|
-/// | `#[export]`      | native `MArgument` ABI  | `native` (in the default feature set) |
-/// | `#[export(wstp)]`| WSTP `LinkObject`        | `wstp` |
-/// | `#[export(wxf)]` | typed WXF `ByteArray`    | `wxf` |
+/// | Attribute         | Wire format             | Cargo feature (on `wolfram-export`) |
+/// |-------------------|--------------------------|--------------------------------------|
+/// | `#[export]`       | native `MArgument` ABI  | `native` (in the default feature set) |
+/// | `#[export(margs)]`| raw `MArgument` ABI      | `native` |
+/// | `#[export(wstp)]` | WSTP `LinkObject`        | `wstp` |
+/// | `#[export(wxf)]`  | typed WXF `ByteArray`    | `wxf` |
 ///
 /// ```toml
 /// # Cargo.toml
@@ -149,6 +152,39 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// fn greet(name: String) -> String { format!("Hello, {name}!") }
 /// # }
 /// ```
+///
+/// # `#[export(margs)]` — raw native mode
+///
+/// Same C ABI as plain `#[export]`, but the function receives the raw
+/// `&[MArgument]` arguments and `MArgument` return slot directly, with no
+/// `FromArg`/`IntoArg` marshaling performed for you. Use this when you need
+/// full manual control over argument/return conversion.
+///
+/// Since the parameter/return types aren't visible to the macro from the
+/// function signature alone, declare them by hand with `args = (..)`/
+/// `ret = ..` — each fragment is spliced verbatim into a `wolfram_expr::expr!`
+/// call, so `wolfram-expr` must be a direct dependency of your crate to use
+/// them:
+///
+/// ```
+/// # mod scope {
+/// use wolfram_export::{export, sys::MArgument};
+///
+/// #[export(margs, args = (::Real, ::Real), ret = ::Real)]
+/// fn raw_add(args: &[MArgument], ret: MArgument) {
+///     unsafe { *ret.real = *args[0].real + *args[1].real; }
+/// }
+/// # }
+/// ```
+///
+/// This makes `raw_add` show up in `cargo wl build`'s generated
+/// `Functions.wl` with a real, correct `LibraryFunctionLoad` call — same as
+/// if you'd written `LibraryFunctionLoad["...", "raw_add", {Real, Real}, Real]`
+/// by hand. Omitting `args`/`ret` still compiles, but defaults the generated
+/// entry's type spec to the same fixed `LinkObject`/`LinkObject` placeholder
+/// `#[export(wstp)]` uses — which a raw MArgument function does *not* actually
+/// accept, so calling it would misbehave — and emits a compile-time warning
+/// telling you to annotate it.
 ///
 /// # `#[export(wstp)]` — WSTP mode
 ///
@@ -232,10 +268,37 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// ```
 #[proc_macro_attribute]
 pub fn export(attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let attrs: syn::AttributeArgs = syn::parse_macro_input!(attrs);
+    // `args = ..`/`ret = ..` (margs-only) can't go through `syn::AttributeArgs`
+    // at all — that grammar only accepts `key = <literal>`, and these need
+    // arbitrary `expr!`-style token trees as their value. Pull them out of the
+    // raw token stream first; everything left over goes through the normal
+    // `syn::AttributeArgs`-based parser below, unchanged.
+    let (remaining, args_tokens, ret_tokens) =
+        match self::export::extract_args_ret_tokens(TokenStream2::from(attrs)) {
+            Ok(v) => v,
+            Err(err) => return err.into_compile_error().into(),
+        };
+    // `syn::AttributeArgs` (`Vec<NestedMeta>`) has no direct `Parse` impl —
+    // `parse_macro_input!(attrs as syn::AttributeArgs)` normally handles this
+    // via its own special-cased expansion; reproducing that here with an
+    // explicit `Punctuated` parser since we already hold a `TokenStream2`.
+    let attr_parser =
+        syn::punctuated::Punctuated::<syn::NestedMeta, syn::Token![,]>::parse_terminated;
+    let attrs: syn::AttributeArgs =
+        match syn::parse::Parser::parse2(attr_parser, remaining) {
+            Ok(attrs) => attrs.into_iter().collect(),
+            Err(err) => return err.into_compile_error().into(),
+        };
     let mode = self::export::detect_mode_from_args(&attrs);
     let attrs = self::export::strip_wstp_arg(attrs);
-    match self::export::export(mode, attrs, item) {
+
+    let margs_signature =
+        match self::export::parse_margs_signature(mode, args_tokens, ret_tokens) {
+            Ok(sig) => sig,
+            Err(err) => return err.into_compile_error().into(),
+        };
+
+    match self::export::export(mode, attrs, item, margs_signature) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }

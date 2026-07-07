@@ -5,19 +5,25 @@
 //! ```toml
 //! wolfram-export = { version = "0.5", features = ["wxf"] }   # typed WXF
 //! wolfram-export = { version = "0.5", features = ["wstp"] }  # WSTP Link
-//! wolfram-export = "0.5"                                     # native (default)
+//! wolfram-export = "0.5"                                     # native + margs (default)
 //! ```
+//!
+//! `#[export(margs)]` (raw `MArgument`, manual marshaling) rides on the
+//! `native` feature — there's no separate feature flag for it.
 //!
 //! Then in your code (shown here with every mode enabled):
 //!
 //! ```
-//! # // Compiled and tested only when all three modes are enabled
+//! # // Compiled and tested only when all three feature-gated modes are enabled
 //! # // (e.g. `cargo test --all-features`); a no-op otherwise.
 //! # #[cfg(all(feature = "wstp", feature = "wxf"))]
 //! # mod scope {
-//! use wolfram_export::{export, wstp::Link};
+//! use wolfram_export::{export, sys::MArgument, wstp::Link};
 //!
-//! #[export]        fn add(a: f64, b: f64) -> f64 { a + b }
+//! #[export]         fn add(a: f64, b: f64) -> f64 { a + b }
+//! #[export(margs)]  fn raw_add(args: &[MArgument], ret: MArgument) {
+//!     unsafe { *ret.real = *args[0].real + *args[1].real; }
+//! }
 //! #[export(wstp)]  fn echo(link: &mut Link) { let _ = link; }
 //! #[export(wxf)]   fn dot(a: Vec<f64>, b: Vec<f64>) -> f64 {
 //!     a.iter().zip(&b).map(|(x, y)| x * y).sum()
@@ -72,8 +78,8 @@ pub mod wxf;
 //==============================================================================
 
 /// Export a function as a Wolfram LibraryLink function. See
-/// [`export`][macro@export] for the three wire-format modes (native, `wstp`,
-/// `wxf`) and the Cargo features each one needs.
+/// [`export`][macro@export] for the four wire-format modes (native, `margs`,
+/// `wstp`, `wxf`) and the Cargo features each one needs.
 pub use wolfram_export_macros::export;
 
 /// Designate a one-time library-load initialization function. See
@@ -148,6 +154,17 @@ pub const fn __assert_native_enabled() {}
 pub const fn __assert_native_enabled() {
     panic!(
         "`#[export]` (native mode) requires enabling the `native` feature of `wolfram-export`"
+    );
+}
+
+#[cfg(feature = "native")]
+#[doc(hidden)]
+pub const fn __assert_margs_enabled() {}
+#[cfg(not(feature = "native"))]
+#[doc(hidden)]
+pub const fn __assert_margs_enabled() {
+    panic!(
+        "`#[export(margs)]` requires enabling the `native` feature of `wolfram-export`"
     );
 }
 

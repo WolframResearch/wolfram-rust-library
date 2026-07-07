@@ -2,7 +2,7 @@
 //! crates.
 //!
 //! Hosts the [`ExportEntry`] enum (the unified inventory entry type used by
-//! all three modes — Native, Wstp, Wxf), the `inventory::collect!` declaration,
+//! all four modes — Native, Margs, Wstp, Wxf), the `inventory::collect!` declaration,
 //! and the [`exported_library_functions_association`] builder that produces
 //! the WL `Association[name -> LibraryFunctionLoad[...], ...]` Expr used by
 //! both the WSTP-mode `generate_loader!` runtime path and the WXF-mode
@@ -34,7 +34,7 @@ use wolfram_serialize::{FromWXF, ToWXF};
 pub struct FunctionEntry {
     /// Exported function name (the key used in the generated WL loader).
     pub name: String,
-    /// Transport mode as a string: `"Native"`, `"Wstp"`, or `"Wxf"`.
+    /// Transport mode as a string: `"Native"`, `"Margs"`, `"Wstp"`, or `"Wxf"`.
     pub kind: String,
     /// Parameter type specs as `Expr`s (native mode only; empty otherwise).
     pub params: Vec<Expr>,
@@ -59,6 +59,11 @@ pub struct FunctionEntry {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ExportKind {
     Native,
+    /// Raw MArgument export (`#[export(margs)]`). Argument/return types are
+    /// opaque to the macro, so this can never become a working
+    /// `LibraryFunctionLoad` call — [`library_function_load`] maps it
+    /// straight to `Missing["NotAvailable"]` instead.
+    Margs,
     Wstp,
     Wxf,
 }
@@ -68,6 +73,7 @@ impl ExportKind {
     fn from_kind_str(s: &str) -> Option<ExportKind> {
         match s {
             "Native" => Some(ExportKind::Native),
+            "Margs" => Some(ExportKind::Margs),
             "Wstp" => Some(ExportKind::Wstp),
             "Wxf" => Some(ExportKind::Wxf),
             _ => None,
@@ -84,6 +90,10 @@ fn caller_name(kind: ExportKind) -> &'static str {
         ExportKind::Native => "NativeCaller",
         ExportKind::Wstp => "WSTPCaller",
         ExportKind::Wxf => "WXFCaller",
+        // Margs entries are never wrapped in a caller (see
+        // `library_function_load`) and `with_callers` never iterates this
+        // variant, so this is never reached.
+        ExportKind::Margs => unreachable!("margs mode never needs a caller binding"),
     }
 }
 
@@ -122,17 +132,25 @@ fn caller_binding(kind: ExportKind) -> Expr {
                 ::List
             ]]
         ]),
+        ExportKind::Margs => unreachable!("margs mode never needs a caller binding"),
     }
 }
 
 /// Build `Caller[LibraryFunctionLoad[lib, name, <args>, <ret>]]` for one
-/// exported function.
+/// exported function — every kind always produces a real
+/// `LibraryFunctionLoad` call. [`ExportKind::Margs`] carries a real
+/// `native_sig` unconditionally too: the macro always materializes one —
+/// either the user's `#[export(margs, args = .., ret = ..)]` annotation, or
+/// (with a compile-time warning) a default of the same fixed
+/// `LinkObject`/`LinkObject` placeholder `ExportKind::Wstp` uses. So `Margs`
+/// is handled identically to `Native` here — same wire ABI, same
+/// `NativeCaller = Identity` wrapper.
 ///
 /// `lib` is any `Expr` that evaluates to the dylib path — a string literal at
 /// runtime, or a `libN` symbol bound in the generated `Functions.wl` prelude.
 /// `native_sig` supplies the real argument/return type `Expr`s for
-/// [`ExportKind::Native`]; for `Wstp`/`Wxf` the wire shape is fixed and it is
-/// ignored.
+/// [`ExportKind::Native`] and [`ExportKind::Margs`]; for `Wstp`/`Wxf` the
+/// wire shape is fixed and it is ignored.
 fn library_function_load(
     kind: ExportKind,
     name: &str,
@@ -140,12 +158,12 @@ fn library_function_load(
     native_sig: Option<(Vec<Expr>, Expr)>,
 ) -> Expr {
     // `(arg-type spec, return-type spec)` — the 3rd and 4th positional args to
-    // LibraryFunctionLoad. Native carries the real signature; Wstp passes the
-    // bare `LinkObject` marker; Wxf is always `{{ByteArray,"Constant"}} -> ByteArray`
-    // ("Constant" is the no-mutate promise that lets the kernel skip a deep copy
-    // of the serialized input).
+    // LibraryFunctionLoad. Native/Margs carry the real signature; Wstp passes
+    // the bare `LinkObject` marker; Wxf is always
+    // `{{ByteArray,"Constant"}} -> ByteArray` ("Constant" is the no-mutate
+    // promise that lets the kernel skip a deep copy of the serialized input).
     let (args, ret): (Expr, Expr) = match kind {
-        ExportKind::Native => {
+        ExportKind::Native | ExportKind::Margs => {
             let (args, ret) =
                 native_sig.unwrap_or_else(|| (Vec::new(), Expr::string("")));
             (Expr::from(args), ret)
@@ -158,7 +176,7 @@ fn library_function_load(
     };
     let load = expr!(::LibraryFunctionLoad[lib, name, args, ret]);
     match kind {
-        ExportKind::Native => expr!(::NativeCaller[load]),
+        ExportKind::Native | ExportKind::Margs => expr!(::NativeCaller[load]),
         ExportKind::Wstp => expr!(::WSTPCaller[load]),
         ExportKind::Wxf => expr!(::WXFCaller[load]),
     }
@@ -243,7 +261,9 @@ pub fn library_functions_loader(libraries: &[LibraryArtifact]) -> Expr {
                 continue;
             };
             let native_sig = match kind {
-                ExportKind::Native => Some((entry.params.clone(), entry.ret.clone())),
+                ExportKind::Native | ExportKind::Margs => {
+                    Some((entry.params.clone(), entry.ret.clone()))
+                },
                 _ => None,
             };
             let key = export_key(library.namespace.as_deref(), &entry.name);
@@ -279,6 +299,22 @@ pub enum ExportEntry {
         /// See the implementation note on `LibraryLinkFunction::Native::signature`
         /// for why this is a `fn` pointer rather than a `Box<dyn ...>`.
         signature: fn() -> Result<(Vec<Expr>, Expr), String>,
+    },
+    /// Raw MArgument-based export (`#[export(margs)]`). Argument/return types
+    /// are opaque to the macro by default (the user marshals
+    /// `&[MArgument]`/`MArgument` by hand) — unlike `Native`, whose signature
+    /// is inferred from `FromArg`/`IntoArg` impls, there's nothing to infer
+    /// here. `signature` is never absent, though: the macro always
+    /// materializes one at expansion time — the user's
+    /// `#[export(margs, args = ..., ret = ...)]` annotation if given, or
+    /// (with a compile-time warning) a default of the same fixed
+    /// `LinkObject`/`LinkObject` placeholder `Wstp` uses.
+    Margs {
+        /// Exported symbol name.
+        name: &'static str,
+        /// (arg types, return type) — user-declared, or the macro's own
+        /// `LinkObject`/`LinkObject` default.
+        signature: fn() -> (Vec<Expr>, Expr),
     },
     /// WSTP `LinkObject`-based export.
     Wstp {
@@ -375,6 +411,9 @@ impl ExportEntry {
     /// resolved (e.g. an unsupported argument type) — it could not be loaded,
     /// so it is omitted from both the manifest and the loader. `Wstp`/`Wxf`
     /// have a fixed wire shape and carry empty `params`/`ret` placeholders.
+    /// `Margs`'s `signature` never fails to resolve — the macro always
+    /// materializes one, whether from the user's annotation or its own
+    /// `LinkObject`/`LinkObject` default — so it's never omitted either.
     fn to_function_entry(&self) -> Option<FunctionEntry> {
         Some(match self {
             ExportEntry::Native { name, signature } => {
@@ -382,6 +421,15 @@ impl ExportEntry {
                 FunctionEntry {
                     name: (*name).to_owned(),
                     kind: "Native".to_owned(),
+                    params,
+                    ret,
+                }
+            },
+            ExportEntry::Margs { name, signature } => {
+                let (params, ret) = signature();
+                FunctionEntry {
+                    name: (*name).to_owned(),
+                    kind: "Margs".to_owned(),
                     params,
                     ret,
                 }

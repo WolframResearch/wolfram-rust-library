@@ -10,17 +10,175 @@
 //! call sites without forcing users to choose at macro-name level.
 
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Delimiter, TokenStream as TokenStream2, TokenTree};
 
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 use syn::{spanned::Spanned, Error, Ident, Item, Meta, NestedMeta};
 
-/// Which export shape (native MArgument / WSTP Link / typed WXF) the macro
-/// is generating.
+/// A parsed, not-yet-quoted `args = (...)`/`ret = ...` signature from
+/// `#[export(margs, args = ..., ret = ...)]`. `args` has already been split
+/// into one raw token-fragment per parameter (from inside the parens); `ret`
+/// is the single raw fragment as-is. Each fragment is spliced verbatim into a
+/// `wolfram_expr::expr!(..)` call at codegen time — see [`export_margs_function`].
+pub(crate) struct MargsSignature {
+    pub args: Vec<TokenStream2>,
+    pub ret: TokenStream2,
+}
+
+/// Split a flat token stream on top-level commas. Bracketed/braced/parenthesized
+/// groups (`[...]`, `(...)`, `{...}`) are already atomic `TokenTree::Group`s at
+/// this level, so commas nested inside them are never mistaken for separators.
+/// A trailing comma produces no extra empty segment.
+fn split_top_level_commas(tokens: TokenStream2) -> Vec<TokenStream2> {
+    let mut segments: Vec<TokenStream2> = vec![TokenStream2::new()];
+    for tt in tokens {
+        match &tt {
+            TokenTree::Punct(p) if p.as_char() == ',' => {
+                segments.push(TokenStream2::new())
+            },
+            _ => segments.last_mut().unwrap().extend(std::iter::once(tt)),
+        }
+    }
+    if segments.last().is_some_and(TokenStream2::is_empty) {
+        segments.pop();
+    }
+    segments
+}
+
+/// Pull the `args = ...`/`ret = ...` keyword arguments (if any) out of
+/// `#[export(...)]`'s raw attribute token stream, returning the remaining
+/// tokens (everything else, still comma-separated, ready for the existing
+/// `syn::AttributeArgs`-based parser) plus each one's raw value tokens.
+///
+/// These two keys can't go through `syn::AttributeArgs`/`Meta` at all — that
+/// grammar only accepts `key = <literal>`, and `args`/`ret` need arbitrary
+/// `expr!`-style token trees (`::List[::Real, ::Real]`, `(::Real, ::Real)`,
+/// …) as their value, which isn't a `syn::Lit`. So this runs as a raw
+/// token-level pre-pass before any `syn` parsing happens.
+pub(crate) fn extract_args_ret_tokens(
+    attrs: TokenStream2,
+) -> Result<(TokenStream2, Option<TokenStream2>, Option<TokenStream2>), Error> {
+    let mut passthrough: Vec<TokenStream2> = Vec::new();
+    let mut args_tokens: Option<TokenStream2> = None;
+    let mut ret_tokens: Option<TokenStream2> = None;
+
+    for segment in split_top_level_commas(attrs) {
+        let mut iter = segment.clone().into_iter();
+        let key_and_eq = match (iter.next(), iter.next()) {
+            (Some(TokenTree::Ident(key)), Some(TokenTree::Punct(eq)))
+                if eq.as_char() == '=' =>
+            {
+                Some(key)
+            },
+            _ => None,
+        };
+        let Some(key) = key_and_eq else {
+            passthrough.push(segment);
+            continue;
+        };
+        let key_name = key.to_string();
+        if key_name != "args" && key_name != "ret" {
+            passthrough.push(segment);
+            continue;
+        }
+
+        let slot = if key_name == "args" {
+            &mut args_tokens
+        } else {
+            &mut ret_tokens
+        };
+        if slot.is_some() {
+            return Err(Error::new(
+                key.span(),
+                format!("duplicate `{key_name}` export attribute argument"),
+            ));
+        }
+        let value: TokenStream2 = iter.collect();
+        if value.is_empty() {
+            return Err(Error::new(
+                key.span(),
+                format!("expected an expression after `{key_name} =`"),
+            ));
+        }
+        *slot = Some(value);
+    }
+
+    let mut remaining = TokenStream2::new();
+    for (i, segment) in passthrough.into_iter().enumerate() {
+        if i > 0 {
+            remaining.extend(std::iter::once(TokenTree::Punct(proc_macro2::Punct::new(
+                ',',
+                proc_macro2::Spacing::Alone,
+            ))));
+        }
+        remaining.extend(segment);
+    }
+
+    Ok((remaining, args_tokens, ret_tokens))
+}
+
+/// Validate and shape the raw `args`/`ret` tokens extracted by
+/// [`extract_args_ret_tokens`] into a [`MargsSignature`], enforcing that:
+/// - they're only used with `Mode::Margs` (every other mode has its own
+///   signature source: `FromArg`/`IntoArg` types, or a fixed wire shape);
+/// - when given, both `args` and `ret` are given together;
+/// - `args`'s value is a parenthesized, comma-separated list — `(t1, t2, ..)`
+///   — one raw fragment per parameter (an empty `()` is a valid 0-arg spec).
+pub(crate) fn parse_margs_signature(
+    mode: Mode,
+    args_tokens: Option<TokenStream2>,
+    ret_tokens: Option<TokenStream2>,
+) -> Result<Option<MargsSignature>, Error> {
+    if mode != Mode::Margs {
+        if let Some(bad) = args_tokens.or(ret_tokens) {
+            return Err(Error::new_spanned(
+                bad,
+                "`args`/`ret` are only valid with `#[export(margs)]` — every \
+                other mode gets its signature from Rust types (`FromArg`/`IntoArg`) \
+                or has a fixed wire shape",
+            ));
+        }
+        return Ok(None);
+    }
+
+    let (args_tokens, ret_tokens) = match (args_tokens, ret_tokens) {
+        (Some(a), Some(r)) => (a, r),
+        (None, None) => return Ok(None),
+        (a, r) => {
+            return Err(Error::new_spanned(
+                a.or(r).unwrap(),
+                "`#[export(margs, ...)]` requires both `args` and `ret` together, or neither",
+            ));
+        },
+    };
+
+    let mut iter = args_tokens.clone().into_iter();
+    let group = match (iter.next(), iter.next()) {
+        (Some(TokenTree::Group(g)), None) if g.delimiter() == Delimiter::Parenthesis => g,
+        _ => {
+            return Err(Error::new_spanned(
+                args_tokens,
+                "expected `args = (<type>, <type>, ..)` — a parenthesized, \
+                comma-separated list of `expr!`-style argument type specs, one \
+                per parameter",
+            ));
+        },
+    };
+    let args = split_top_level_commas(group.stream());
+
+    Ok(Some(MargsSignature {
+        args,
+        ret: ret_tokens,
+    }))
+}
+
+/// Which export shape (native MArgument / raw MArgument / WSTP Link / typed
+/// WXF) the macro is generating.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) enum Mode {
     Native,
+    Margs,
     Wstp,
     Wxf,
 }
@@ -79,15 +237,20 @@ fn found_as(name: &str) -> Option<TokenStream2> {
 fn assert_fn_ident(mode: Mode) -> Ident {
     match mode {
         Mode::Native => format_ident!("__assert_native_enabled"),
+        Mode::Margs => format_ident!("__assert_margs_enabled"),
         Mode::Wstp => format_ident!("__assert_wstp_enabled"),
         Mode::Wxf => format_ident!("__assert_wxf_enabled"),
     }
 }
 
-/// Detect the export mode from the keyword args: `wstp`, `wxf`, or native (default).
+/// Detect the export mode from the keyword args: `margs`, `wstp`, `wxf`, or
+/// native (default).
 pub(crate) fn detect_mode_from_args(attrs: &syn::AttributeArgs) -> Mode {
     for attr in attrs {
         if let NestedMeta::Meta(Meta::Path(path)) = attr {
+            if path.is_ident("margs") {
+                return Mode::Margs;
+            }
             if path.is_ident("wstp") {
                 return Mode::Wstp;
             }
@@ -99,14 +262,14 @@ pub(crate) fn detect_mode_from_args(attrs: &syn::AttributeArgs) -> Mode {
     Mode::Native
 }
 
-/// Drop the mode keyword (`wstp`, `wxf`) from the arg list — only meaningful
-/// to the dispatch shim; the regular arg parser would reject them.
+/// Drop the mode keyword (`margs`, `wstp`, `wxf`) from the arg list — only
+/// meaningful to the dispatch shim; the regular arg parser would reject them.
 pub(crate) fn strip_wstp_arg(attrs: syn::AttributeArgs) -> syn::AttributeArgs {
     attrs
         .into_iter()
         .filter(|attr| match attr {
             NestedMeta::Meta(Meta::Path(path)) => {
-                !path.is_ident("wstp") && !path.is_ident("wxf")
+                !path.is_ident("margs") && !path.is_ident("wstp") && !path.is_ident("wxf")
             },
             _ => true,
         })
@@ -117,6 +280,7 @@ pub(crate) fn export(
     mode: Mode,
     attrs: syn::AttributeArgs,
     item: TokenStream,
+    margs_signature: Option<MargsSignature>,
 ) -> Result<TokenStream2, Error> {
     let prefix = &Prefix::resolve();
     let ExportArgs {
@@ -155,6 +319,9 @@ pub(crate) fn export(
     let wrapper = match mode {
         Mode::Native => {
             export_native_function(&name, &exported_name, params.len(), hidden, prefix)
+        },
+        Mode::Margs => {
+            export_margs_function(&name, &exported_name, hidden, prefix, margs_signature)
         },
         Mode::Wstp => export_wstp_function(&name, &exported_name, params, hidden, prefix),
         Mode::Wxf => export_wxf_function(&name, &exported_name, params, hidden, prefix),
@@ -216,6 +383,116 @@ fn export_native_function(
                         let func: &dyn #p::NativeFunction<'_> = &func;
                         func.signature()
                     }
+                }
+            }
+        });
+    }
+
+    tokens
+}
+
+//--------------------------------------
+// Margs (raw MArgument) wrapper
+//--------------------------------------
+
+/// Like [`export_native_function`], but the wrapped function always has the
+/// fixed signature `fn(&[MArgument], MArgument)` — the user takes full manual
+/// control over argument/return marshaling instead of going through
+/// `FromArg`/`IntoArg`. Same C ABI as native mode, so it reuses
+/// `call_native_wolfram_library_function`; only the signature handed to the
+/// user's function differs.
+fn export_margs_function(
+    name: &Ident,
+    exported_name: &Ident,
+    hidden: bool,
+    prefix: &Prefix,
+    signature: Option<MargsSignature>,
+) -> TokenStream2 {
+    let p = &prefix.crate_path;
+
+    // Emitted only when unannotated, and only inside this function's own
+    // `mod #name { .. }` below — NOT at the shared outer scope, which is
+    // common to every `#[export(margs)]` function in the file and would
+    // collide on this constant's name across more than one of them.
+    let missing_signature_warning = if signature.is_none() {
+        quote! {
+            #[deprecated(note = "\
+                `#[export(margs)]` without `args`/`ret` defaults its LibraryFunctionLoad \
+                signature to `LinkObject`/`LinkObject` (the same fixed placeholder \
+                `#[export(wstp)]` uses) — add `args = (..)` and `ret = ..` to this \
+                attribute to declare the real signature")]
+            const __MARGS_SIGNATURE_MISSING: () = ();
+            const _: () = __MARGS_SIGNATURE_MISSING;
+        }
+    } else {
+        TokenStream2::new()
+    };
+
+    let assert_fn = assert_fn_ident(Mode::Margs);
+    let mut tokens = quote! {
+        const _: () = #p::#assert_fn();
+
+        mod #name {
+            #missing_signature_warning
+
+            #[no_mangle]
+            pub unsafe extern "C" fn #exported_name(
+                lib: #p::sys::WolframLibraryData,
+                argc: #p::sys::mint,
+                args: *mut #p::sys::MArgument,
+                res: #p::sys::MArgument,
+            ) -> std::os::raw::c_int {
+                // Underscores, not an explicit `&[MArgument]` annotation: a
+                // written-out reference type elaborates to a higher-ranked
+                // (`for<'r> fn(&'r [MArgument], _)`) fn pointer, which the
+                // `NativeFunction<'a>` impl (generic over a *free* lifetime)
+                // doesn't unify with. Inferring from `super::#name` instead
+                // picks the same non-HRTB instantiation the plain native-mode
+                // codegen below relies on.
+                let func: fn(_, _) -> _ = super::#name;
+                #p::macro_utils::call_native_wolfram_library_function(
+                    lib,
+                    args,
+                    argc,
+                    res,
+                    func
+                )
+            }
+        }
+    };
+
+    // `signature()` always returns a real `(Vec<Expr>, Expr)` — either built
+    // from the user's `args = (..)`/`ret = ..` tokens (spliced verbatim into
+    // `expr!` calls), or, when omitted, a default of the same fixed
+    // `LinkObject`/`LinkObject` placeholder `#[export(wstp)]` uses (with a
+    // compile-time nudge to add a real one, since a raw MArgument function
+    // certainly doesn't actually take a WSTP `LinkObject`).
+    //
+    // `expr!` is referenced directly at its defining crate (`wolfram_expr`),
+    // not through the `#p` host-crate indirection used elsewhere in this
+    // file — a user annotating `args`/`ret` needs `wolfram-expr` as a direct
+    // dependency regardless (it's the only place `Expr`/`expr!` come from).
+    let signature_fn = match &signature {
+        Some(MargsSignature { args, ret }) => quote! {
+            || (
+                ::std::vec![ #( ::wolfram_expr::expr!(#args) ),* ],
+                ::wolfram_expr::expr!(#ret),
+            )
+        },
+        None => quote! {
+            || (
+                ::std::vec![ ::wolfram_expr::expr!(::LinkObject) ],
+                ::wolfram_expr::expr!(::LinkObject),
+            )
+        },
+    };
+
+    if !hidden && cfg!(feature = "automate-function-loading-boilerplate") {
+        tokens.extend(quote! {
+            #p::inventory::submit! {
+                #p::macro_utils::LibraryLinkFunction::Margs {
+                    name: stringify!(#exported_name),
+                    signature: #signature_fn,
                 }
             }
         });

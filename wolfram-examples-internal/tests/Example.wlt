@@ -175,6 +175,26 @@ $Tests = {
       "Messages" -> {},
       "TestID" -> "Examples-wxf-echo_point-wrong_type"|>,
 
+    (* ── margs: raw MArgument functions, annotated with args/ret ─────────────── *)
+
+    <|"Export" -> "margs_add",
+      "Input"  -> {2., 3.},
+      "Output" -> 5.,
+      "Messages" -> {},
+      "TestID" -> "Examples-margs-add"|>,
+
+    <|"Export" -> "margs_dot",
+      "Input"  -> {NumericArray[{1., 2., 3.}, "Real64"], NumericArray[{4., 5., 6.}, "Real64"]},
+      "Output" -> 32.,
+      "Messages" -> {},
+      "TestID" -> "Examples-margs-dot"|>,
+
+    <|"Export" -> "margs_scale_array",
+      "Input"  -> {NumericArray[{1., 2., 3.}, "Real64"], 2.},
+      "Output" -> NumericArray[{2., 4., 6.}, "Real64"],
+      "Messages" -> {},
+      "TestID" -> "Examples-margs-scale_array"|>,
+
     (* ── panic tests ─────────────────────────────────────────────────────────── *)
 
     <|"Export" -> "native_force_panic",
@@ -182,6 +202,12 @@ $Tests = {
       "Output" -> _LibraryFunctionError,
       "Messages" -> {_},
       "TestID" -> "Examples-native-force_panic"|>,
+
+    <|"Export" -> "margs_force_panic",
+      "Input"  -> {42.0},
+      "Output" -> _LibraryFunctionError,
+      "Messages" -> {_},
+      "TestID" -> "Examples-margs-force_panic"|>,
 
     <|"Export" -> "wstp_force_panic",
       "Input"  -> {42.0},

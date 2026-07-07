@@ -266,25 +266,10 @@ fn custom_hook(info: &panic::PanicHookInfo) {
 }
 
 fn get_panic_message(info: &panic::PanicHookInfo) -> Option<String> {
-    // Extract the message from `panic!("...")` statements.
-    // In this case, the payload is always the static formatting string.
-    if let Some(string) = info.payload().downcast_ref::<&str>() {
-        return Some(string.to_string());
-    }
-
-    // Extract the message from `panic!("... {} ...", arg...)` statements.
-    // In this case, the payload has to be a dynamically allocated String to contain
-    // the arbitrary formatted arguments.
-    if let Some(string) = info.payload().downcast_ref::<String>() {
-        return Some(string.to_owned());
-    }
-
-    #[cfg(feature = "nightly")]
-    if let Some(fmt_arguments) = info.message() {
-        return Some(format!("{}", fmt_arguments));
-    }
-
-    None
+    // Covers both `panic!("...")` (payload is the static `&str`) and
+    // `panic!("... {} ...", arg)` (payload is a dynamically formatted
+    // `String`) in one call.
+    info.payload_as_str().map(ToOwned::to_owned)
 }
 
 /// Attempt to acquire a lock on CAUGHT_PANIC. Exit the current process if we can not,
