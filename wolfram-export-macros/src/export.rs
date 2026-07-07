@@ -616,18 +616,17 @@ fn export_wxf_function(
                 #p::macro_utils::call_and_encode_panic(|| {
                     // Read args, call the user fn, and serialize the result —
                     // ALL inside the closure, where the borrows into the input
-                    // buffer are live. The closure returns owned `Vec<u8>`, which
-                    // does not borrow the buffer, so zero-copy `&str` / `&[u8]`
-                    // arguments are sound.
+                    // buffer are live. The closure returns an owned
+                    // `NumericArray<u8>` (serialized in place, no intermediate
+                    // Vec), which does not borrow the buffer, so zero-copy
+                    // `&str` / `&[u8]` arguments are sound.
                     let __decoded = #p::macro_utils::decode_args(__input, #n_u64, |__c| {
                         let #tuple_pat = #tuple_read;
                         let __result = super::#name(#(#arg_idents),*);
-                        #p::macro_utils::to_wxf_bytes(&__result)
+                        #p::macro_utils::encode_result(&__result)
                     });
                     match __decoded {
-                        ::core::result::Result::Ok(__bytes) => {
-                            #p::macro_utils::NumericArray::<u8>::from_slice(&__bytes)
-                        }
+                        ::core::result::Result::Ok(__bytes) => __bytes,
                         // Arg decoding failed: build a `Failure["ArgumentError", …]`
                         // from the `wolfram_serialize::Error` (it isn't a Failure itself).
                         ::core::result::Result::Err(__err) => {

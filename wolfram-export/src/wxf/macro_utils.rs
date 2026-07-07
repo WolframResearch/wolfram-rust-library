@@ -9,14 +9,17 @@
 //! shape as the native dispatcher, but kept here so the WXF mode is
 //! self-contained (no detour through `wolfram_library_link::macro_utils`).
 
+use std::mem::MaybeUninit;
 use std::os::raw::c_int;
 use std::panic::AssertUnwindSafe;
 
 use wolfram_expr::Expr;
 use wolfram_library_link::call_and_catch_panic;
 use wolfram_library_link::sys::{self, MArgument};
-use wolfram_library_link::{NativeFunction, NumericArray};
-use wolfram_serialize::{from_wxf, to_wxf, ExpressionEnum, SliceReader, WxfReader};
+use wolfram_library_link::{NativeFunction, NumericArray, UninitNumericArray};
+use wolfram_serialize::{
+    from_wxf, to_wxf_into, wxf_byte_len, ExpressionEnum, SliceReader, WxfReader,
+};
 /// The WXF (de)serialization traits, re-exported so the `#[export(wxf)]`
 /// proc-macro can name them by path in generated code.
 pub use wolfram_serialize::{FromWXF, ToWXF};
@@ -66,11 +69,63 @@ where
     })
 }
 
-/// Serialize `value` to WXF bytes and wrap them in a UInt8 NumericArray.
+/// `io::Write` sink over an uninitialized byte buffer. Lets `to_wxf_into`
+/// serialize directly into an [`UninitNumericArray`]'s storage — the only
+/// safe way to fill one is element-wise `MaybeUninit::write`, which this
+/// batches per `write` call.
+struct UninitSliceWriter<'a> {
+    buf: &'a mut [MaybeUninit<u8>],
+    pos: usize,
+}
+
+impl std::io::Write for UninitSliceWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        // ErrorKind -> io::Error is alloc-free (io::Error::new boxes its
+        // payload, and would do so eagerly on every call via ok_or).
+        let dest = self
+            .buf
+            .get_mut(self.pos..self.pos + bytes.len())
+            .ok_or(std::io::ErrorKind::WriteZero)?;
+        for (d, &b) in dest.iter_mut().zip(bytes) {
+            d.write(b);
+        }
+        self.pos += bytes.len();
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Serialize `value` as WXF directly into a UInt8 NumericArray: a counting
+/// pass computes the exact byte length, then the token stream is written
+/// straight into the array's (kernel-allocated) storage. No intermediate
+/// `Vec<u8>` and no final copy — for large payloads this halves the
+/// Rust-side memory traffic of the return path.
+pub fn try_encode<R: ToWXF>(
+    value: &R,
+) -> Result<NumericArray<u8>, wolfram_serialize::Error> {
+    // WXF output is never empty (2-byte header), so from_dimensions is safe.
+    let len = wxf_byte_len(value)?;
+    let mut uninit = UninitNumericArray::<u8>::from_dimensions(&[len]);
+    let mut sink = UninitSliceWriter {
+        buf: uninit.as_slice_mut(),
+        pos: 0,
+    };
+    to_wxf_into(value, &mut sink)?;
+    debug_assert_eq!(sink.pos, len);
+    // Safety: the sizing pass and the write pass emit identical token
+    // streams, and UninitSliceWriter errors rather than leaving gaps, so all
+    // `len` bytes are initialized.
+    Ok(unsafe { uninit.assume_init() })
+}
+
+/// Serialize `value` to WXF wrapped in a UInt8 NumericArray, panicking on
+/// serialization failure (the panic is caught and encoded by
+/// [`call_and_encode_panic`]).
 pub fn encode<R: ToWXF>(value: &R) -> NumericArray<u8> {
-    let bytes: Vec<u8> =
-        to_wxf(value, None).unwrap_or_else(|e| panic!("WXF serialize failed: {:?}", e));
-    NumericArray::<u8>::from_slice(&bytes)
+    try_encode(value).unwrap_or_else(|e| panic!("WXF serialize failed: {:?}", e))
 }
 
 /// Encode an argument-decode failure for the kernel. A `wolfram_serialize::Error` is
@@ -82,11 +137,13 @@ pub fn encode_arg_error(e: wolfram_serialize::Error) -> NumericArray<u8> {
     ))
 }
 
-/// Serialize a result to owned WXF bytes. The bridge calls this *inside* the
-/// arg-reading closure so the (owned) `Vec<u8>` can escape while borrowed
-/// arguments stay confined to the closure.
-pub fn to_wxf_bytes<R: ToWXF>(value: &R) -> Result<Vec<u8>, wolfram_serialize::Error> {
-    to_wxf(value, None)
+/// Serialize a result for the bridge. Called *inside* the arg-reading
+/// closure so the (owned, kernel-allocated) `NumericArray` can escape while
+/// borrowed arguments stay confined to the closure.
+pub fn encode_result<R: ToWXF>(
+    value: &R,
+) -> Result<NumericArray<u8>, wolfram_serialize::Error> {
+    try_encode(value)
 }
 
 /// Run `func` (the body of a WXF bridge), catch any panic, and return either
