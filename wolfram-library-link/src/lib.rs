@@ -70,6 +70,14 @@
 //! placeholder WSTP mode uses (which a raw `MArgument` function doesn't
 //! actually accept) and emits a compile-time warning telling you to annotate it.
 //!
+//! Raw native mode is also the escape hatch for types that have no
+//! [`FromArg`]/[`IntoArg`] impl — like `SparseArray`. Read the raw
+//! `MArgument.sparse` pointer (an [`MSparseArray`][crate::sys::MSparseArray])
+//! and drive the `MSparseArray_*`/`MTensor_*` functions in [`rtl`] directly;
+//! see `margs_sparse_array_merge` in
+//! [wolfram-examples-internal](https://github.com/WolframResearch/wolfram-library-link-rs/blob/master/wolfram-examples-internal/src/margs.rs)
+//! for a worked example.
+//!
 //! **WSTP** functions pass values over a WSTP [`Link`] object that can carry any Wolfram
 //! Language expression, including associations, nested lists, and symbols. Use the
 //! [`expr!`][crate::expr::expr] macro to build `Expr` values with WL-like syntax.
@@ -583,6 +591,11 @@ pub use wolfram_export_macros::init;
 /// [`NumericArray`]                   | `LibraryExpressionEnum[NumericArray]`
 /// [`NumericArray<T>`]                | `LibraryExpressionEnum[NumericArray, `[`"..."`][ref/NumericArray][^1]`]`
 /// [`DataStore`]                      | `"DataStore"`
+///
+/// Some LibraryLink types — notably `SparseArray` — have no [`FromArg`]/[`IntoArg`]
+/// impl and so can't be used here. Use `#[export(margs)]` instead and read/write
+/// the raw `MArgument.sparse` ([`MSparseArray`][crate::sys::MSparseArray])
+/// pointer by hand; see the "Raw native" section above.
 ///
 /// [^1]: The Details and Options section of the Wolfram Language
 ///       [`NumericArray` reference page][ref/NumericArray] lists the available element

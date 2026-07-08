@@ -52,6 +52,14 @@ Omitting `args`/`ret` still compiles, but defaults the generated
 `MArgument` function doesn't actually accept) and emits a compile-time warning
 telling you to annotate it.
 
+`#[export(margs)]` is also how you reach types with no `FromArg`/`IntoArg`
+impl, like `SparseArray` — read/write the raw `MArgument.sparse`
+(`MSparseArray`) pointer and drive the `WolframSparseLibrary_Functions` C API
+(exposed as `rtl::MSparseArray_*`/`rtl::MTensor_*` in `wolfram-library-link`)
+directly. See `margs_sparse_array_merge` in
+[wolfram-examples-internal/src/margs.rs](https://github.com/WolframResearch/wolfram-library-link-rs/blob/master/wolfram-examples-internal/src/margs.rs)
+for a worked example.
+
 The `automate-function-loading-boilerplate` feature (on by default) emits the
 `__wolfram_manifest__` C-ABI symbol that lets the paclet loader discover all
 exported functions automatically.

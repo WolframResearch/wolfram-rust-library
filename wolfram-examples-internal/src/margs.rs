@@ -2,7 +2,10 @@
 //! receives the raw `&[MArgument]`/`MArgument` directly instead of having
 //! `FromArg`/`IntoArg` applied automatically. Useful when you need manual
 //! control over marshaling (e.g. variable arity, or a return type not covered
-//! by `IntoArg`).
+//! by `IntoArg`) — including types with no `FromArg`/`IntoArg` impl at all,
+//! like `SparseArray` (see `margs_sparse_array_merge` below, which reads the
+//! raw `MArgument.sparse` pointer and drives the
+//! `WolframSparseLibrary_Functions` C API directly).
 
 use wolfram_export::export;
 use wolfram_library_link::{
