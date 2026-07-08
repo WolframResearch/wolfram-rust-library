@@ -195,6 +195,15 @@ $Tests = {
       "Messages" -> {},
       "TestID" -> "Examples-margs-scale_array"|>,
 
+    <|"Export" -> "margs_sparse_array_merge",
+      "Input"  -> {
+        SparseArray[{1 -> 1., 3 -> 3.}, 5],
+        SparseArray[{2 -> 2., 3 -> 30.}, 5]
+      },
+      "Output" -> SparseArray[{1., 2., 30., 0., 0.}],
+      "Messages" -> {},
+      "TestID" -> "Examples-margs-sparse_array_merge"|>,
+
     (* ── panic tests ─────────────────────────────────────────────────────────── *)
 
     <|"Export" -> "native_force_panic",
