@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-export"
-version = "0.6.0-alpha.5"
+version = "0.6.0-alpha.6"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
@@ -15,7 +15,7 @@ include = [
 ]
 
 [dependencies]
-wolfram-export-macros = { version = "=0.6.0-alpha.5", path = "../wolfram-export-macros" }
+wolfram-export-macros = { version = "=0.6.0-alpha.6", path = "../wolfram-export-macros" }
 
 # `wolfram-export-core` is a small workspace-internal crate that owns the
 # `ExportEntry` enum + `inventory::collect!` declaration. It has NO dependency
@@ -23,14 +23,14 @@ wolfram-export-macros = { version = "=0.6.0-alpha.5", path = "../wolfram-export-
 # dependency: `wolfram-library-link` also depends on `wolfram-export-core`
 # (for backward-compat aliases), and `wolfram-export` (this crate) depends on
 # `wolfram-library-link` for the native/wxf runtimes.
-wolfram-export-core = { version = "=0.6.0-alpha.5", path = "../wolfram-export-core", default-features = false }
+wolfram-export-core = { version = "=0.6.0-alpha.6", path = "../wolfram-export-core", default-features = false }
 
 # Mode-gated optional deps. See [features] below.
-wolfram-library-link      = { version = "=0.6.0-alpha.5", path = "../wolfram-library-link", default-features = false, optional = true }
-wolfram-library-link-sys  = { version = "=0.6.0-alpha.5", path = "../wolfram-library-link-sys", optional = true }
-wstp                      = { version = "=0.6.0-alpha.5", path = "../wstp", optional = true }
-wolfram-serialize         = { version = "=0.6.0-alpha.5", path = "../wolfram-serialize", optional = true }
-wolfram-expr              = { version = "=0.6.0-alpha.5", path = "../wolfram-expr", optional = true }
+wolfram-library-link      = { version = "=0.6.0-alpha.6", path = "../wolfram-library-link", default-features = false, optional = true }
+wolfram-library-link-sys  = { version = "=0.6.0-alpha.6", path = "../wolfram-library-link-sys", optional = true }
+wstp                      = { version = "=0.6.0-alpha.6", path = "../wstp", optional = true }
+wolfram-serialize         = { version = "=0.6.0-alpha.6", path = "../wolfram-serialize", optional = true }
+wolfram-expr              = { version = "=0.6.0-alpha.6", path = "../wolfram-expr", optional = true }
 
 [features]
 default = ["native", "automate-function-loading-boilerplate"]
