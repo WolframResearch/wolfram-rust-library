@@ -7,14 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0-alpha.4] — 2026-07-01
+## [0.6.0] — 2026-07-09
+
+### Added
+
+* Initial release. Provides streaming WXF (Wolfram Exchange Format) binary
+  serialization and deserialization for Rust types.
+
+* **`ToWXF` / `FromWXF` traits** — implement on any type to get zero-copy
+  encoding into / decoding from the WXF wire format. `FromWXF<'de>` borrows
+  from the input buffer wherever possible (serde-style lifetime).
+
+* **Top-level entry points** — `to_wxf(value)`, `from_wxf(bytes)`,
+  `read_wxf(reader)`. Zero-copy borrowed (`&str` / `&[u8]`) fields are decoded
+  via `read_wxf(bytes, |r| ...)`, which also handles reading more than one
+  value positionally off a single cursor.
+
+* **`to_wxf_into(value, sink)` / `wxf_byte_len(value)`** — serialize straight
+  into a caller-owned [`Writer`] sink (e.g. a pre-sized LibraryLink
+  `NumericArray<u8>`) with no intermediate `Vec<u8>` and no final copy.
+  `wxf_byte_len` computes the exact output length with a counting pass (no
+  bytes buffered), so callers can size the destination up front. Used by
+  `wolfram-export`'s `#[export(wxf)]` bridge to serialize return values
+  directly into the kernel-allocated buffer.
+
+* **`Reader` / `Writer` traits** — byte-level abstraction. `SliceReader` reads
+  straight from an in-memory `&[u8]` without copying; the default writer is
+  `Vec<u8>`.
+
+* **`WxfReader` / `WxfWriter`** — typed sugar over the byte layer, operating on
+  WXF token enums (`WxfToken`, `WxfType`).
+
+* **Compression support** — `to_wxf` accepts a `CompressionLevel`; compressed
+  payloads are written with the `8C:` header and decompressed transparently on
+  read.
+
+* **Numeric support** — `i8`/`i16`/`i32`/`i64`/`f32`/`f64` plus widening
+  casts so WXF integers and reals round-trip to the closest Rust numeric type.
+
+* **`Complex32` / `Complex64`** — complex number types with `ToWXF`/`FromWXF`
+  implementations.
+
+* **`#[derive(ToWXF)]` / `#[derive(FromWXF)]`** — proc-macro derives re-exported
+  from `wolfram-serialize-macros`. Handles named structs, tuple structs, unit
+  structs, and enums. Recognises `Vec<u8>` as `ByteArray`, numeric `Vec`s and
+  fixed-size nested arrays as `NumericArray`.
+
+* **`#[derive(Failure)]`** — derives `From<YourEnum> for Expr`, mapping each
+  variant to a `Failure["VariantName", <|...|>]` expression.
+
+* New runnable doc examples for `to_wxf`, `from_wxf`, and `read_wxf`,
+  including a worked example of hand-decoding a `Function[...]` value
+  positionally — the same pattern `#[export(wxf)]` codegen uses to unpack
+  LibraryLink argument lists. Expanded documentation for the WXF wire-format
+  constants (`HeaderEnum`, `ExpressionEnum`, `NumericArrayEnum`,
+  `PackedArrayEnum`) and the `ToWXF` / `FromWXF` traits.
+
+### Changed
+
+* **`Failure` derive** (re-exported from `wolfram-serialize-macros`) no
+  longer requires the whole enum to implement `Clone` — see the
+  `wolfram-serialize-macros` changelog for detail.
 
 ### Removed
-
-* **`from_wxf_ref`** — removed. Use `read_wxf(bytes, |r| ...)` to decode
-  borrowed (`&str` / `&[u8]`) fields instead — it covers the same zero-copy
-  case and also handles reading more than one value positionally off a single
-  cursor.
 
 * **Internal modules hidden** — `errors`, `reader`, `to_wxf`, `writer`, and
   `wxf` are now `pub(crate)`. Their public types are unaffected: `Error`,
@@ -47,59 +102,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Corrected a stale doc comment describing the `Option` / `Result` wire
   format (the actual encoding was already correct and is unchanged).
-
-### Changed
-
-* **`Failure` derive** (re-exported from `wolfram-serialize-macros`) no
-  longer requires the whole enum to implement `Clone` — see the
-  `wolfram-serialize-macros` changelog for detail.
-
-### Added
-
-* New runnable doc examples for `to_wxf`, `from_wxf`, and `read_wxf`,
-  including a worked example of hand-decoding a `Function[...]` value
-  positionally — the same pattern `#[export(wxf)]` codegen uses to unpack
-  LibraryLink argument lists.
-
-* Expanded documentation for the WXF wire-format constants (`HeaderEnum`,
-  `ExpressionEnum`, `NumericArrayEnum`, `PackedArrayEnum`) and the
-  `ToWXF` / `FromWXF` traits.
-
-## [0.6.0-alpha.3] — 2026-06-19
-
-### Added
-
-* Initial release. Provides streaming WXF (Wolfram Exchange Format) binary
-  serialization and deserialization for Rust types.
-
-* **`ToWXF` / `FromWXF` traits** — implement on any type to get zero-copy
-  encoding into / decoding from the WXF wire format. `FromWXF<'de>` borrows
-  from the input buffer wherever possible (serde-style lifetime).
-
-* **Top-level entry points** — `to_wxf(value)`, `from_wxf(bytes)`,
-  `from_wxf_ref(bytes)`, `read_wxf(reader)`.
-
-* **`Reader` / `Writer` traits** — byte-level abstraction. `SliceReader` reads
-  straight from an in-memory `&[u8]` without copying; the default writer is
-  `Vec<u8>`.
-
-* **`WxfReader` / `WxfWriter`** — typed sugar over the byte layer, operating on
-  WXF token enums (`WxfToken`, `WxfType`).
-
-* **Compression support** — `to_wxf` accepts a `CompressionLevel`; compressed
-  payloads are written with the `8C:` header and decompressed transparently on
-  read.
-
-* **Numeric support** — `i8`/`i16`/`i32`/`i64`/`f32`/`f64` plus widening
-  casts so WXF integers and reals round-trip to the closest Rust numeric type.
-
-* **`Complex32` / `Complex64`** — complex number types with `ToWXF`/`FromWXF`
-  implementations.
-
-* **`#[derive(ToWXF)]` / `#[derive(FromWXF)]`** — proc-macro derives re-exported
-  from `wolfram-serialize-macros`. Handles named structs, tuple structs, unit
-  structs, and enums. Recognises `Vec<u8>` as `ByteArray`, numeric `Vec`s and
-  fixed-size nested arrays as `NumericArray`.
-
-* **`#[derive(Failure)]`** — derives `From<YourEnum> for Expr`, mapping each
-  variant to a `Failure["VariantName", <|...|>]` expression.

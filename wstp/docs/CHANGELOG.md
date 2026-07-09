@@ -7,23 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0-alpha.4] — 2026-07-01
+## [0.6.0] — 2026-07-09
+
+### Added
+
+* `put_expr` now supports `Association`, `ByteArray`, `BigInteger`, `BigReal`,
+  `NumericArray`, and `PackedArray` `ExprKind` variants. `Association` and
+  `ByteArray` are encoded directly via WSTP; the numeric/big types round-trip
+  through WXF (`BinaryDeserialize[ByteArray[…]]`).
 
 ### Changed
 
-* **`get_expr`'s `Real` handling** now uses `WSGetReal64` as a fast path
-  instead of always round-tripping through the textual representation
-  (`get_number_as_string()` + backtick-marker sniffing introduced in
-  alpha.3). It falls back to the string form (→ `ExprKind::BigReal`) only
-  when `WSGetReal64` itself errors (e.g. a non-finite value).
-
-  **Known limitation:** `WSGetReal64` *succeeds* on an arbitrary-precision
-  real by silently rounding it to `f64` — unlike the integer case, there is
-  no overflow error to trigger the string fallback. As a result, an
-  extended-precision real (e.g. `N[Pi, 50]`) sent over the link is now read
-  back as a machine `Real` rather than an `ExprKind::BigReal`, so its extra
-  precision is truncated without warning. Code that round-trips
-  high-precision reals through `get_expr` should be aware of this.
+* `get_expr`'s numeric reading remains machine-precision only
+  (`WSGetInteger64`/`WSGetReal64`): an integer or real WSTP cannot represent
+  in `i64`/`f64` (overflow, or non-finite) is an `Error`, not an
+  `ExprKind::BigInteger`/`BigReal`. This is an asymmetry with `put_expr`
+  above — writing a `BigInteger`/`BigReal` `Expr` works, reading one back
+  over the same link does not.
 
 ### Fixed
 
@@ -35,29 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error; it now fails fast and tells you to install a Wolfram System SDK for
   the target (or point `wolfram-app-discovery`'s environment variables at
   one).
-
-## [0.6.0-alpha.3] — 2026-06-19
-
-### Added
-
-* Added `Link::get_number_as_string()` for reading any numeric token (integer or
-  real, arbitrary precision) as its decimal string representation. Used
-  internally by `get_expr` to recover `BigInteger` / `BigReal` values whose
-  precision exceeds `i64` / `f64`.
-
-* `put_expr` now supports `Association`, `ByteArray`, `BigInteger`, `BigReal`,
-  `NumericArray`, and `PackedArray` `ExprKind` variants. `Association` and
-  `ByteArray` are encoded directly via WSTP; the numeric/big types round-trip
-  through WXF (`BinaryDeserialize[ByteArray[…]]`).
-
-* `get_expr` now reads `BigInteger` values: integers that overflow `i64` are
-  caught (`WSGetInteger64` errors on overflow), re-read via
-  `get_number_as_string()`, and wrapped as `ExprKind::BigInteger`.
-
-  Reals are read via their textual representation: a WL-side `N[Pi, 50]`
-  arrives with a precision marker (`` ` ``) in its string form, which is
-  preserved as `ExprKind::BigReal` so precision isn't lost; plain reals parse
-  via `f64`. (See alpha.4 for a later change to this Real-reading path.)
 
 
 ## [0.2.9] — 2023-10-07
@@ -413,8 +390,12 @@ Initial release of the [`wstp`](https://crates.io/crates/wstp) crate.
 
 
 <!-- This needs to be updated for each tagged release. -->
-[Unreleased]: https://github.com/WolframResearch/wstp-rs/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/WolframResearch/wolfram-rust-library/compare/v0.6.0...HEAD
 
+<!-- wstp moved into the wolfram-rust-library monorepo as of 0.6.0-alpha.1;
+     see https://github.com/WolframResearch/wolfram-rust-library for that and
+     later tags. -->
+[0.6.0]: https://github.com/WolframResearch/wolfram-rust-library/releases/tag/v0.6.0
 [0.2.9]: https://github.com/WolframResearch/wstp-rs/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/WolframResearch/wstp-rs/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/WolframResearch/wstp-rs/compare/v0.2.7...v0.2.7

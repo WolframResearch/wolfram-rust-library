@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0-alpha.3] — 2026-06-19
+## [0.6.0] — 2026-07-09
 
 ### Added
 
@@ -16,14 +16,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **`cargo wl build`** — compiles the crate's `cdylib` targets and generates a
   Wolfram Language loader package (`Functions.wl`, `Artifacts.wl`,
-  `PacletInfo.wl`). Exported functions are discovered automatically from the
-  `__wolfram_manifest__` symbol emitted by `#[export]`. Supports cross-building
-  for multiple `SystemID`s in a single invocation, content-addressed or named
-  binaries (`--named-exports`), and namespaced function keys
-  (`--namespace-exports`).
+  `PacletInfo.wl`) per resolved output location. Exported functions are
+  discovered automatically from the `__wolfram_manifest__` symbol emitted by
+  `#[export]`. Supports cross-building for multiple `SystemID`s in a single
+  invocation (each target gets its own generated loader package alongside the
+  host's), content-addressed or named binaries (`--named-exports`), and
+  namespaced function keys (`--namespace`).
 
-* **`cargo wl test`** — builds every workspace `cdylib` example, packages them,
-  and runs `.wlt` test files through a Wolfram kernel using `TestReport`.
+  Building spans multiple packages at once (e.g. running from a workspace
+  root with no `-p`): each package's own `[package.metadata.wl.pacletinfo]`
+  is resolved independently, and packages are grouped by their resolved
+  output location (`output` dir + `name`) so building the whole workspace
+  never differs from building each contributing package individually.
+  Packages that share a location (e.g. several small crates meant to merge
+  into one paclet) must agree on every setting, or it's a hard build error
+  rather than one package silently clobbering another's output. Prints one
+  line per generated package directory.
+
+* **`cargo wl test`** — builds and packages `cdylib` targets exactly like
+  `cargo wl build` (same target-selection and
+  `[package.metadata.wl.pacletinfo]` rules), then runs `.wlt` test files
+  through a Wolfram kernel using `TestReport`.
 
 * **`cargo wl evaluate`** — evaluates `.wl` files in a Wolfram kernel using
   `Get`, with the built package on the `LibraryPath`.
@@ -31,3 +44,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Paclet metadata resolution from `[package.metadata.wl.pacletinfo]`, with CLI
   flags taking precedence over `Cargo.toml`, which takes precedence over
   defaults.
+
+### Changed
+
+* Generated `PacletInfo.wl` extension entries are now `"Asset"` (with an
+  `"Assets" -> {...}` rule) rather than `"Resource"`/`"Resources"`.
+
+### Fixed
+
+* Cross-compiled dylibs are now matched against their host-build counterpart
+  by package name rather than filename — Windows `.dll`s aren't `lib`-prefixed
+  the way macOS/Linux dylibs are, so the old filename-based match could fail
+  to find a host match and error out on Windows cross-builds.
+
+* Cross-builds now generate their own `Functions.wl`/`Artifacts.wl`/
+  `PacletInfo.wl` loader files (previously only the host build did).

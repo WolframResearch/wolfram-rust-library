@@ -7,9 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0-alpha.4] — 2026-07-01
+## [0.6.0] — 2026-07-09
 
 ### Added
+
+* Added `#[derive(Failure)]` proc macro. Annotating an error enum with
+  `#[derive(Failure)]` automatically derives `From<YourEnum> for Expr`, mapping
+  each variant to a structured `Failure["VariantName", <|...|>]` WL expression
+  that the kernel can inspect.
+
+* Added new `LibraryError` type that covers all bridge failure modes — ABI
+  error codes, argument extraction failures, WSTP link errors, and loader
+  errors — in one unified enum. All `#[export]`-decorated functions now return
+  `LibraryError` on failure.
+
+* Added `#[export(wxf)]` via `wolfram-export`, enabling typed WXF `ByteArray`
+  transport as a calling convention alongside native `MArgument` and WSTP.
+
+* **Raw native mode, `#[export(margs)]`** — same `MArgument` C ABI as
+  `#[export]`, but received as a raw `&[MArgument]`/`MArgument` instead of
+  having `FromArg`/`IntoArg` applied automatically. Declare the signature by
+  hand with `args = (..)`/`ret = ..` (spliced into `expr!` calls); omitting it
+  still compiles, defaulting to the same `LinkObject`/`LinkObject` placeholder
+  WSTP mode uses, with a compile-time warning. This is also the escape hatch
+  for types with no `FromArg`/`IntoArg` impl, like `SparseArray` — read the
+  raw `MArgument.sparse` (`MSparseArray`) pointer and drive the
+  `MSparseArray_*`/`MTensor_*` functions in `rtl` directly; see
+  `margs_sparse_array_merge` in `wolfram-examples-internal/src/margs.rs` for a
+  worked example.
 
 * Added a new long-form guide, `docs::using_wxf_mode` ("How To: Export typed
   functions using WXF"), covering `#[export(wxf)]`, typed structs via
@@ -19,10 +44,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * `call_and_catch_panic` is now exported at the crate root
   (`wolfram_library_link::call_and_catch_panic`), so custom transport code can
-  reuse the same panic-catching logic as the built-in `native`/`wstp`/`wxf`
-  bridges.
+  reuse the same panic-catching logic as the built-in `native`/`margs`/`wstp`/
+  `wxf` bridges.
 
 ### Changed
+
+* `#[export]` and `#[init]` are now sourced from `wolfram-export-macros` and
+  re-exported here for backwards compatibility. The behaviour is identical for
+  the `native` and `wstp` modes.
+
+* `LibraryError` no longer has `NotInitialized`, `InvalidArgCount`, or
+  `return_code()`. The C-ABI error constants are used directly.
+
+* Panics from Rust functions are now caught and returned as structured
+  `Failure["RustPanic", <|...|>]` expressions rather than crashing the kernel
+  process.
 
 * **Breaking:** the `catch_panic` module (and its `CaughtPanic` type) is no
   longer public. Use the crate-root `call_and_catch_panic` instead, which now
@@ -40,7 +76,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Now depends on `wolfram-serialize` directly for the `#[derive(Failure)]`
   machinery, since `wolfram-expr` no longer re-exports it.
 
+* Panic message extraction now goes through the stable
+  `PanicHookInfo::payload_as_str()` instead of hand-rolled `&str`/`String`
+  downcasting plus a `"nightly"`-feature-gated `#![feature(panic_info_message)]`
+  path. The `"nightly"` Cargo feature is now a no-op, kept only so existing
+  `features = ["nightly"]` dependents don't break their build.
+
 ### Removed
+
+* Removed the `failure!` helper macro (superseded by `#[derive(Failure)]`).
+
+* Removed `CaughtPanic::to_pretty_expr` (logic is now internal to the panic
+  handler).
 
 * **Breaking:** removed the crate-root re-exports of `wolfram-expr`'s
   portable value types — `OwnedNumericArray`, `Association`, `ByteArray`,
@@ -51,43 +98,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   since `wolfram-expr` dropped its `wolfram-serialize` re-export block.
   Depend on `wolfram-serialize` directly to derive/import `Failure`, `ToWXF`,
   and `FromWXF`.
-
-## [0.6.0-alpha.3] — 2026-06-19
-
-### Added
-
-* Added `#[derive(Failure)]` proc macro. Annotating an error enum with
-  `#[derive(Failure)]` automatically derives `From<YourEnum> for Expr`, mapping
-  each variant to a structured `Failure["VariantName", <|...|>]` WL expression
-  that the kernel can inspect.
-
-* Added new `LibraryError` type that covers all bridge failure modes — ABI
-  error codes, argument extraction failures, WSTP link errors, and loader
-  errors — in one unified enum. All `#[export]`-decorated functions now return
-  `LibraryError` on failure.
-
-* Added `#[export(wxf)]` via `wolfram-export`, enabling typed WXF `ByteArray`
-  transport as a third calling convention alongside native `MArgument` and WSTP.
-
-### Changed
-
-* `#[export]` and `#[init]` are now sourced from `wolfram-export-macros` and
-  re-exported here for backwards compatibility. The behaviour is identical for
-  the `native` and `wstp` modes.
-
-* `LibraryError` no longer has `NotInitialized`, `InvalidArgCount`, or
-  `return_code()`. The C-ABI error constants are used directly.
-
-* Panics from Rust functions are now caught and returned as structured
-  `Failure["RustPanic", <|...|>]` expressions rather than crashing the kernel
-  process.
-
-### Removed
-
-* Removed the `failure!` helper macro (superseded by `#[derive(Failure)]`).
-
-* Removed `CaughtPanic::to_pretty_expr` (logic is now internal to the panic
-  handler).
 
 
 ## [0.2.10] – 2023-08-28
@@ -424,8 +434,12 @@ caused by bugs present in early versions of `wolfram-app-discovery` and `wstp-sy
 
 
 <!-- This needs to be updated for each tagged release. -->
-[Unreleased]: https://github.com/WolframResearch/wolfram-library-link-rs/compare/v0.2.10...HEAD
+[Unreleased]: https://github.com/WolframResearch/wolfram-rust-library/compare/v0.6.0...HEAD
 
+<!-- wolfram-library-link moved into the wolfram-rust-library monorepo as of
+     0.6.0-alpha.1; see https://github.com/WolframResearch/wolfram-rust-library
+     for that and later tags. -->
+[0.6.0]: https://github.com/WolframResearch/wolfram-rust-library/releases/tag/v0.6.0
 [0.2.10]: https://github.com/WolframResearch/wolfram-library-link-rs/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/WolframResearch/wolfram-library-link-rs/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/WolframResearch/wolfram-library-link-rs/compare/v0.2.7...v0.2.8

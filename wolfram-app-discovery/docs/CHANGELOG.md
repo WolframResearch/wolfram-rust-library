@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-09
+
+### Changed
+
+* Moved into the `wolfram-rust-library` monorepo (previously the standalone
+  `wolfram-app-discovery-rs` repository) alongside `wolfram-expr`,
+  `wolfram-library-link`, `wstp`, and the rest of the Wolfram Rust crates.
+  `repository` now points at `wolfram-rust-library`; `CONTRIBUTING.md` and the
+  license files are the workspace's shared copies rather than per-crate ones.
+  No functional or API changes.
+
 ## [0.4.9] — 2025-02-23
 
 ### Added
@@ -495,8 +506,12 @@ Initial release of `wolfram-app-discovery`.
 
 
 <!-- This needs to be updated for each tagged release. -->
-[Unreleased]: https://github.com/WolframResearch/wolfram-app-discovery-rs/compare/v0.4.9...HEAD
+[Unreleased]: https://github.com/WolframResearch/wolfram-rust-library/compare/v0.6.0...HEAD
 
+<!-- wolfram-app-discovery moved into the wolfram-rust-library monorepo as of
+     0.6.0-alpha.1; see https://github.com/WolframResearch/wolfram-rust-library
+     for that and later tags. -->
+[0.6.0]: https://github.com/WolframResearch/wolfram-rust-library/releases/tag/v0.6.0
 [0.4.9]: https://github.com/WolframResearch/wolfram-app-discovery-rs/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/WolframResearch/wolfram-app-discovery-rs/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/WolframResearch/wolfram-app-discovery-rs/compare/v0.4.6...v0.4.7

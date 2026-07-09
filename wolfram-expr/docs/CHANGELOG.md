@@ -7,12 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0-alpha.4] — 2026-07-01
+## [0.6.0] — 2026-07-09
 
 ### Added
 
-* Documented every `ExprKind` variant (previously exempt from doc requirements
-  via `#[allow(missing_docs)]`).
+* Added the `expr!` declarative macro for building `Expr` values with WL-like
+  syntax. Supports context-qualified symbols (`System::Times[a, b]`), bare-ident
+  Rust variable heads (`head[a, b]`), context-less symbols (`::Name`),
+  `Rule`/`Association` literals (`{k -> v}`), splice args (`..iter`), boolean
+  shorthands (`true`/`false`), and nested expressions to any depth.
+
+* Extended `ExprKind` with new wire-level variants: `ByteArray`, `Association`,
+  `NumericArray`, `PackedArray`, `BigInteger`, and `BigReal`. Documented every
+  variant (previously exempt from doc requirements via `#[allow(missing_docs)]`).
+
+* Added `From<Vec<Expr>> for Expr` (builds a `System`List[…]` Normal), and
+  `Vec<Expr>` now round-trips through WXF (`ToWXF`/`FromWXF`) as a WL `List`,
+  same wire shape as `Expr::normal(List, items)`.
+
+* `Complex32` / `Complex64` unified with the `wolfram-serialize` complex type.
+
+* **`bool`, `&str`, `&Symbol`, `&Normal`, `i64`, and `f64` now implement
+  `TryFrom<&Expr>`**, failing with the original `&Expr` back (mirroring
+  `TryFrom<Vec<T>> for [T; N]` in std) — e.g. `bool::try_from(&expr)`. This is
+  the direct replacement for the deprecated `try_as_*` accessors below.
 
 * Substantially expanded the `expr!` macro's documentation with new example
   sections covering symbols, function application, associations, and
@@ -21,10 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+* `Symbol::new` no longer validates the context path at runtime. Callers are
+  responsible for passing a valid `` Context`Name `` string.
+
+* `Association` is now a `BTreeMap<Expr, RuleEntry>` type alias; the previous
+  `Vec`-backed implementation is replaced.
+
+* `BigInteger` and `BigReal` are now `String` newtypes (no `num-bigint`
+  dependency).
+
 * **Deprecated `Number`, `Number::real`, and `Expr::number`.** Construct
   numbers with `Expr::from(i64)`, `Expr::from(f64)`, or `Expr::real(f64)`
   instead, and match on `ExprKind::Integer` / `ExprKind::Real` directly
   rather than the `Number` enum.
+
+* **Deprecated `Expr::try_as_normal`/`try_as_bool`/`try_as_str`/`try_as_symbol`/
+  `try_as_number`** (and the older `try_normal`/`try_symbol`/`try_number`
+  aliases) in favor of the new `TryFrom<&Expr>` impls — e.g.
+  `bool::try_from(expr)` instead of `expr.try_as_bool()`.
 
 ### Removed
 
@@ -43,34 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking:** `ArrayBuf::byte_count` has been removed and `ArrayBuf::as_bytes`
   is no longer public. Use the equivalent `NumericArrayRead` trait methods
   instead (still callable, though now hidden from generated docs).
-
-## [0.6.0-alpha.3] — 2026-06-19
-
-### Added
-
-* Added the `expr!` declarative macro for building `Expr` values with WL-like
-  syntax. Supports context-qualified symbols (`System::Times[a, b]`), bare-ident
-  Rust variable heads (`head[a, b]`), context-less symbols (`::Name`),
-  `Rule`/`Association` literals (`{k -> v}`), splice args (`..iter`), boolean
-  shorthands (`true`/`false`), and nested expressions to any depth.
-
-* Extended `ExprKind` with new wire-level variants: `ByteArray`, `Association`,
-  `NumericArray`, `PackedArray`, `BigInteger`, and `BigReal`.
-
-* Added `From<Vec<Expr>> for Expr` (builds a `System`List[…]` Normal).
-
-* `Complex32` / `Complex64` unified with the `wolfram-serialize` complex type.
-
-### Changed
-
-* `Symbol::new` no longer validates the context path at runtime. Callers are
-  responsible for passing a valid `` Context`Name `` string.
-
-* `Association` is now a `BTreeMap<Expr, RuleEntry>` type alias; the previous
-  `Vec`-backed implementation is replaced.
-
-* `BigInteger` and `BigReal` are now `String` newtypes (no `num-bigint`
-  dependency).
 
 
 
@@ -210,8 +214,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 <!-- This needs to be updated for each tagged release. -->
-[Unreleased]: https://github.com/WolframResearch/wolfram-expr-rs/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/WolframResearch/wolfram-rust-library/compare/v0.6.0...HEAD
 
+<!-- wolfram-expr moved into the wolfram-rust-library monorepo as of 0.6.0-alpha.1;
+     see https://github.com/WolframResearch/wolfram-rust-library for that and later tags. -->
+[0.6.0]: https://github.com/WolframResearch/wolfram-rust-library/releases/tag/v0.6.0
 [0.1.4]: https://github.com/WolframResearch/wolfram-expr-rs/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/WolframResearch/wolfram-expr-rs/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/WolframResearch/wolfram-expr-rs/compare/v0.1.1...v0.1.2
