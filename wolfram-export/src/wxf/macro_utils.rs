@@ -18,7 +18,7 @@ use wolfram_library_link::call_and_catch_panic;
 use wolfram_library_link::sys::{self, MArgument};
 use wolfram_library_link::{NativeFunction, NumericArray, UninitNumericArray};
 use wolfram_serialize::{
-    from_wxf, to_wxf_into, wxf_byte_len, ExpressionEnum, SliceReader, WxfReader,
+    from_wxf, ExpressionEnum, HeaderEnum, SliceReader, Writer, WxfReader, WxfWriter,
 };
 /// The WXF (de)serialization traits, re-exported so the `#[export(wxf)]`
 /// proc-macro can name them by path in generated code.
@@ -69,9 +69,15 @@ where
     })
 }
 
-/// `io::Write` sink over an uninitialized byte buffer. Lets `to_wxf_into`
-/// serialize directly into an [`UninitNumericArray`]'s storage — the only
-/// safe way to fill one is element-wise `MaybeUninit::write`, which this
+/// The `8:` WXF header — the two framing bytes `wolfram_serialize::to_wxf`
+/// writes (uncompressed) before the token body, derived from the public
+/// [`HeaderEnum`] so it stays in sync with the wire format.
+const WXF_HEADER: [u8; 2] =
+    [HeaderEnum::Version as u8, HeaderEnum::Separator as u8];
+
+/// `io::Write` sink over an uninitialized byte buffer. Lets the WXF token
+/// stream be written straight into an [`UninitNumericArray`]'s storage — the
+/// only safe way to fill one is element-wise `MaybeUninit::write`, which this
 /// batches per `write` call.
 struct UninitSliceWriter<'a> {
     buf: &'a mut [MaybeUninit<u8>],
@@ -98,11 +104,40 @@ impl std::io::Write for UninitSliceWriter<'_> {
     }
 }
 
+/// Exact byte length of the uncompressed WXF encoding of `value` (header +
+/// token body), via a counting pass over the token stream — no bytes are
+/// buffered, so bulk `write_bytes` calls just add their length. Used to
+/// pre-size the `NumericArray` in [`try_encode`] so the token stream can be
+/// written straight into it with no intermediate `Vec<u8>`.
+fn wxf_byte_len<R: ToWXF>(value: &R) -> Result<usize, wolfram_serialize::Error> {
+    struct ByteCounter(usize);
+
+    impl std::io::Write for ByteCounter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0 += buf.len();
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut counter = ByteCounter(WXF_HEADER.len());
+    let mut w = WxfWriter::new(&mut counter);
+    value.to_wxf(&mut w)?;
+    Ok(counter.0)
+}
+
 /// Serialize `value` as WXF directly into a UInt8 NumericArray: a counting
-/// pass computes the exact byte length, then the token stream is written
-/// straight into the array's (kernel-allocated) storage. No intermediate
-/// `Vec<u8>` and no final copy — for large payloads this halves the
-/// Rust-side memory traffic of the return path.
+/// pass ([`wxf_byte_len`]) computes the exact byte length, then the token
+/// stream is written straight into the array's (kernel-allocated) storage.
+/// No intermediate `Vec<u8>` and no final copy — for large payloads this
+/// avoids doubling the Rust-side memory of the return path.
+///
+/// The kernel owns numeric-array storage and needs its length up front (a
+/// fixed-size array can't grow as bytes are produced), which is why the sizing
+/// pass exists rather than serializing into a growable `Vec` and copying.
 pub fn try_encode<R: ToWXF>(
     value: &R,
 ) -> Result<NumericArray<u8>, wolfram_serialize::Error> {
@@ -113,10 +148,16 @@ pub fn try_encode<R: ToWXF>(
         buf: uninit.as_slice_mut(),
         pos: 0,
     };
-    to_wxf_into(value, &mut sink)?;
+    // Header first (via the `Writer` trait), then the token body through a
+    // `WxfWriter` wrapping the same sink.
+    sink.write_bytes(&WXF_HEADER)?;
+    {
+        let mut w = WxfWriter::new(&mut sink);
+        value.to_wxf(&mut w)?;
+    }
     debug_assert_eq!(sink.pos, len);
-    // Safety: the sizing pass and the write pass emit identical token
-    // streams, and UninitSliceWriter errors rather than leaving gaps, so all
+    // Safety: the sizing pass and the write pass emit an identical token
+    // stream, and UninitSliceWriter errors rather than leaving gaps, so all
     // `len` bytes are initialized.
     Ok(unsafe { uninit.assume_init() })
 }

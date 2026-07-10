@@ -150,48 +150,6 @@ pub fn to_wxf<T: ToWXF + ?Sized>(
     }
 }
 
-/// Serialize `value` as **uncompressed** WXF (`8:` header) into an arbitrary
-/// [`Writer`] sink, without materializing an intermediate `Vec<u8>`.
-///
-/// Combined with [`wxf_byte_len`] this allows serializing straight into a
-/// pre-sized caller-owned buffer (e.g. a LibraryLink `NumericArray<u8>`),
-/// avoiding the allocate-then-copy round trip of [`to_wxf`].
-pub fn to_wxf_into<T: ToWXF + ?Sized, W: Writer>(
-    value: &T,
-    mut sink: W,
-) -> Result<(), Error> {
-    use crate::constants::HeaderEnum;
-
-    sink.write_byte(HeaderEnum::Version as u8)?;
-    sink.write_byte(HeaderEnum::Separator as u8)?;
-    let mut w = WxfWriter::new(sink);
-    value.to_wxf(&mut w)
-}
-
-/// Exact byte length of the **uncompressed** WXF encoding of `value` (i.e.
-/// of `to_wxf(value, None)`), computed by a counting pass over the token
-/// stream — no bytes are buffered, so this is cheap even for large payloads
-/// (bulk `write_bytes` calls just add their length).
-pub fn wxf_byte_len<T: ToWXF + ?Sized>(value: &T) -> Result<usize, Error> {
-    struct ByteCounter(usize);
-
-    impl std::io::Write for ByteCounter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0 += buf.len();
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    let mut counter = ByteCounter(2); // `8:` header
-    let mut w = WxfWriter::new(&mut counter);
-    value.to_wxf(&mut w)?;
-    Ok(counter.0)
-}
-
 /// Strip the WXF header, returning the raw token stream. `8:` payloads are
 /// borrowed; `8C:` payloads are zlib-decompressed into an owned buffer.
 fn strip_header(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, Error> {

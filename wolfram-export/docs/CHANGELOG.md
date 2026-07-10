@@ -44,14 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Enforces `#[warn(missing_docs)]` crate-wide (previously `#![allow(missing_docs)]`);
   the `native`, `wstp`, and `wxf` modules and the `export`/`init` re-exports
   now carry real doc comments.
-* **`wxf::macro_utils`** (used by `#[export(wxf)]` generated code) now
-  serializes return values directly into a UInt8 `NumericArray` — a counting
-  pass computes the exact byte length, then the WXF token stream is written
-  straight into the array's kernel-allocated storage, with no intermediate
-  `Vec<u8>` and no final copy. `macro_utils::to_wxf_bytes` is renamed to
-  `encode_result` (still returns `Result<NumericArray<u8>, wolfram_serialize::Error>`,
-  not raw bytes) and a new `try_encode` is added alongside the panicking
-  `encode`.
 
 ### Removed
 

@@ -23,14 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via `read_wxf(bytes, |r| ...)`, which also handles reading more than one
   value positionally off a single cursor.
 
-* **`to_wxf_into(value, sink)` / `wxf_byte_len(value)`** — serialize straight
-  into a caller-owned [`Writer`] sink (e.g. a pre-sized LibraryLink
-  `NumericArray<u8>`) with no intermediate `Vec<u8>` and no final copy.
-  `wxf_byte_len` computes the exact output length with a counting pass (no
-  bytes buffered), so callers can size the destination up front. Used by
-  `wolfram-export`'s `#[export(wxf)]` bridge to serialize return values
-  directly into the kernel-allocated buffer.
-
 * **`Reader` / `Writer` traits** — byte-level abstraction. `SliceReader` reads
   straight from an in-memory `&[u8]` without copying; the default writer is
   `Vec<u8>`.
