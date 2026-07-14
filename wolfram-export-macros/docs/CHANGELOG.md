@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-14
+
+### Changed
+
+* Rewrote the `#[export(margs)]` section of the `#[export]` macro docs: what
+  raw-`MArgument` mode is for, the `unsafe` union-field access it entails,
+  worked examples (hand-read scalars; reusing `FromArg`/`IntoArg` manually;
+  pointer to the `SparseArray` example), and the `args =`/`ret =` signature
+  annotation — recommended so `cargo wl build` can generate a correct
+  `LibraryFunctionLoad` call, but not required for the function to work
+  (docs only, no behavior change).
+
 ## [0.6.0] — 2026-07-09
 
 ### Added

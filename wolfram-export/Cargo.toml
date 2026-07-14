@@ -15,7 +15,7 @@ include = [
 ]
 
 [dependencies]
-wolfram-export-macros = { version = "=0.6.0", path = "../wolfram-export-macros" }
+wolfram-export-macros = { version = "=0.6.1", path = "../wolfram-export-macros" }
 
 # `wolfram-export-core` is a small workspace-internal crate that owns the
 # `ExportEntry` enum + `inventory::collect!` declaration. It has NO dependency
