@@ -155,16 +155,17 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 ///
 /// # `#[export(margs)]` — raw native mode
 ///
-/// Same C ABI as plain `#[export]`, but the function receives the raw
-/// `&[MArgument]` arguments and `MArgument` return slot directly, with no
-/// `FromArg`/`IntoArg` marshaling performed for you. Use this when you need
-/// full manual control over argument/return conversion.
+/// The function works directly on LibraryLink's C argument type: it receives
+/// the raw `&[MArgument]` slice and the `MArgument` return slot, exactly as
+/// the kernel passed them. `MArgument` is a union of typed pointers
+/// (`integer`, `real`, `tensor`, `sparse`, `numeric`, `utf8string`, …), so
+/// this is the escape hatch for anything plain `#[export]` can't express —
+/// types with no `FromArg`/`IntoArg` impl, like `SparseArray`, or full
+/// control over how each argument is read.
 ///
-/// Since the parameter/return types aren't visible to the macro from the
-/// function signature alone, declare them by hand with `args = (..)`/
-/// `ret = ..` — each fragment is spliced verbatim into a `wolfram_expr::expr!`
-/// call, so `wolfram-expr` must be a direct dependency of your crate to use
-/// them:
+/// Reading a union field is `unsafe`: nothing checks that the field you read
+/// matches what the kernel actually sent — that's up to the signature the
+/// function is loaded with.
 ///
 /// ```
 /// # mod scope {
@@ -177,14 +178,42 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// # }
 /// ```
 ///
-/// This makes `raw_add` show up in `cargo wl build`'s generated
-/// `Functions.wl` with a real, correct `LibraryFunctionLoad` call — same as
-/// if you'd written `LibraryFunctionLoad["...", "raw_add", {Real, Real}, Real]`
-/// by hand. Omitting `args`/`ret` still compiles, but defaults the generated
-/// entry's type spec to the same fixed `LinkObject`/`LinkObject` placeholder
-/// `#[export(wstp)]` uses — which a raw MArgument function does *not* actually
-/// accept, so calling it would misbehave — and emits a compile-time warning
-/// telling you to annotate it.
+/// The `FromArg`/`IntoArg` conversions that plain `#[export]` applies
+/// automatically are still there to call yourself, so only the argument that
+/// actually needs raw handling has to be done by hand:
+///
+/// ```rust,ignore
+/// use wolfram_export::{export, sys::MArgument};
+/// use wolfram_library_link::{FromArg, IntoArg, NumericArray};
+///
+/// #[export(margs,
+///     args = (::List[::LibraryDataType["NumericArray", "Real64"], "Constant"], ::Real),
+///     ret = ::LibraryDataType["NumericArray", "Real64"]
+/// )]
+/// fn scale(args: &[MArgument], ret: MArgument) {
+///     let arr = unsafe { <&NumericArray<f64>>::from_arg(&args[0]) };
+///     let factor = unsafe { f64::from_arg(&args[1]) };
+///     let scaled: Vec<f64> = arr.as_slice().iter().map(|v| v * factor).collect();
+///     unsafe { NumericArray::from_slice(&scaled).into_arg(ret) };
+/// }
+/// ```
+///
+/// For a type with no `FromArg`/`IntoArg` impl at all — reading the raw
+/// `MArgument.sparse` pointer and driving the `MSparseArray_*` C API in `rtl`
+/// directly — see `margs_sparse_array_merge` in
+/// [wolfram-examples-internal](https://github.com/WolframResearch/wolfram-rust-library/blob/master/wolfram-examples-internal/src/margs.rs).
+///
+/// The `args = (..)`/`ret = ..` annotation declares the function's
+/// `LibraryFunctionLoad` type specs — the same `{Real, Real}, Real` you would
+/// write on the Wolfram side, as `expr!` fragments (each is spliced verbatim
+/// into a `wolfram_expr::expr!` call, so `wolfram-expr` must be a direct
+/// dependency of your crate). It is not required for the function to work —
+/// you can always call `LibraryFunctionLoad` yourself with the right types —
+/// but it is what lets `cargo wl build` put a correct load call in the
+/// generated `Functions.wl`. Without it the generated entry defaults to the
+/// same fixed `LinkObject`/`LinkObject` placeholder `#[export(wstp)]` uses,
+/// which a raw `MArgument` function does *not* actually accept, and the macro
+/// emits a compile-time warning telling you to annotate it.
 ///
 /// # `#[export(wstp)]` — WSTP mode
 ///
@@ -220,7 +249,7 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// serializes the return value via `ToWXF` back into a `ByteArray`. Panics
 /// are caught and returned as structured `Failure["RustPanic", …]`
 /// expressions. Use this mode for structured arguments/return values
-/// (structs, enums, `Option`/`Result`) without hand-writing WSTP plumbing.
+/// (structs, enums, `Option`/`Result`) without hand-writing WSTP code.
 ///
 /// ```
 /// # mod scope {
