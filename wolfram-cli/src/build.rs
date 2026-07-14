@@ -57,6 +57,8 @@ struct ParsedBuildArgs {
     system_ids: Vec<SystemID>,
     out: Option<PathBuf>,
     cleanup: bool,
+    named_exports: bool,
+    namespace: Option<String>,
     paclet_name: Option<String>,
     paclet_version: Option<String>,
 }
@@ -218,7 +220,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             parsed.paclet_version.as_deref(),
             parsed.package.as_deref(),
             parsed.out.clone().or_else(|| args.out.clone()),
-            args.named_exports,
+            args.named_exports || parsed.named_exports,
             args.cleanup || parsed.cleanup,
             parsed.system_ids,
         );
@@ -250,8 +252,8 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             parsed.paclet_name.as_deref(),
             parsed.paclet_version.as_deref(),
             Some(&package_name),
-            parsed.out.clone(),
-            args.named_exports,
+            parsed.out.clone().or_else(|| args.out.clone()),
+            args.named_exports || parsed.named_exports,
             args.cleanup || parsed.cleanup,
             parsed.system_ids.clone(),
         );
@@ -310,7 +312,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             .map(|(p, package_id)| {
                 let mut info = collect_dylib_info(p)?;
                 info.namespace = resolve_namespace(
-                    args.namespace.as_deref(),
+                    args.namespace.as_deref().or(parsed.namespace.as_deref()),
                     meta.as_ref(),
                     package_id,
                 );
@@ -750,6 +752,8 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
     let mut system_ids = Vec::new();
     let mut out = None;
     let mut cleanup = false;
+    let mut named_exports = false;
+    let mut namespace = None;
     let mut paclet_name = None;
     let mut paclet_version = None;
     let mut iter = args.into_iter();
@@ -785,6 +789,12 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
             out = Some(PathBuf::from(value));
         } else if arg == "--cleanup" {
             cleanup = true;
+        } else if arg == "--named-exports" {
+            named_exports = true;
+        } else if arg == "--namespace" {
+            namespace = Some(iter.next().ok_or("--namespace requires a value")?);
+        } else if let Some(value) = arg.strip_prefix("--namespace=") {
+            namespace = Some(value.to_owned());
         } else if arg == "--paclet-name" {
             paclet_name = Some(iter.next().ok_or("--paclet-name requires a value")?);
         } else if let Some(value) = arg.strip_prefix("--paclet-name=") {
@@ -810,6 +820,8 @@ fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
         system_ids,
         out,
         cleanup,
+        named_exports,
+        namespace,
         paclet_name,
         paclet_version,
     })
