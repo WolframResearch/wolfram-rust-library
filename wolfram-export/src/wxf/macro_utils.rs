@@ -130,7 +130,7 @@ fn wxf_byte_len<R: ToWXF>(value: &R) -> Result<usize, wolfram_serialize::Error> 
 }
 
 /// Serialize `value` as WXF directly into a UInt8 NumericArray: a counting
-/// pass ([`wxf_byte_len`]) computes the exact byte length, then the token
+/// pass (`wxf_byte_len`) computes the exact byte length, then the token
 /// stream is written straight into the array's (kernel-allocated) storage.
 /// No intermediate `Vec<u8>` and no final copy — for large payloads this
 /// avoids doubling the Rust-side memory of the return path.

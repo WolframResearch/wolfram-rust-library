@@ -1,6 +1,6 @@
 [package]
 name = "math"
-version = "0.6.0-alpha.6"
+version = "0.6.0"
 edition = "2021"
 publish = false
 
@@ -14,7 +14,7 @@ named-exports = false
 crate-type = ["cdylib"]
 
 [dependencies]
-wolfram-export = { version = "=0.6.0-alpha.6", features = ["wxf"] }
-wolfram-expr = { version = "=0.6.0-alpha.6" }
-wolfram-serialize = { version = "=0.6.0-alpha.6" }
-wolfram-library-link = { version = "=0.6.0-alpha.6", default-features = false, features = ["panic-failure-backtraces"] }
+wolfram-export = { version = "=0.6.0", features = ["wxf"] }
+wolfram-expr = { version = "=0.6.0" }
+wolfram-serialize = { version = "=0.6.0" }
+wolfram-library-link = { version = "=0.6.0", default-features = false, features = ["panic-failure-backtraces"] }

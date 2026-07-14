@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-serialize-macros"
-version = "0.6.0-alpha.6"
+version = "0.6.0"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"

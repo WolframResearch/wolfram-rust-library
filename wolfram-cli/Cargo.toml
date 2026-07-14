@@ -1,6 +1,6 @@
 [package]
 name = "cargo-wl"
-version = "0.6.0-alpha.6"
+version = "0.6.0"
 edition = "2021"
 description = "Cargo subcommand for building and packaging Wolfram LibraryLink crates"
 license = "MIT OR Apache-2.0"
@@ -15,8 +15,8 @@ cargo_metadata = "0.23.1"
 clap = { version = "4", features = ["derive"] }
 libloading = "0.8"
 sha2 = "0.10"
-wolfram-app-discovery  = { version = "=0.6.0-alpha.6", path = "../wolfram-app-discovery" }
-wolfram-export-core    = { version = "=0.6.0-alpha.6", path = "../wolfram-export-core", default-features = false }
-wolfram-expr           = { version = "=0.6.0-alpha.6", path = "../wolfram-expr" }
-wolfram-serialize            = { version = "=0.6.0-alpha.6", path = "../wolfram-serialize" }
-wstp                   = { version = "=0.6.0-alpha.6", path = "../wstp" }
+wolfram-app-discovery  = { version = "=0.6.0", path = "../wolfram-app-discovery" }
+wolfram-export-core    = { version = "=0.6.0", path = "../wolfram-export-core", default-features = false }
+wolfram-expr           = { version = "=0.6.0", path = "../wolfram-expr" }
+wolfram-serialize            = { version = "=0.6.0", path = "../wolfram-serialize" }
+wstp                   = { version = "=0.6.0", path = "../wstp" }

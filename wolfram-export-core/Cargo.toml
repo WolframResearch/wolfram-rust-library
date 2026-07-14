@@ -1,6 +1,6 @@
 [package]
 name = "wolfram-export-core"
-version = "0.6.0-alpha.6"
+version = "0.6.0"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 repository = "https://github.com/WolframResearch/wolfram-rust-library"
@@ -15,8 +15,8 @@ include = [
 ]
 
 [dependencies]
-wolfram-expr = { version = "=0.6.0-alpha.6", path = "../wolfram-expr" }
-wolfram-serialize = { version = "=0.6.0-alpha.6", path = "../wolfram-serialize" }
+wolfram-expr = { version = "=0.6.0", path = "../wolfram-expr" }
+wolfram-serialize = { version = "=0.6.0", path = "../wolfram-serialize" }
 inventory = { version = "0.2.1", optional = true }
 process_path = { version = "0.1.3", optional = true }
 
