@@ -182,7 +182,8 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// automatically are still there to call yourself, so only the argument that
 /// actually needs raw handling has to be done by hand:
 ///
-/// ```rust,ignore
+/// ```
+/// # mod scope {
 /// use wolfram_export::{export, sys::MArgument};
 /// use wolfram_library_link::{FromArg, IntoArg, NumericArray};
 ///
@@ -196,6 +197,7 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 ///     let scaled: Vec<f64> = arr.as_slice().iter().map(|v| v * factor).collect();
 ///     unsafe { NumericArray::from_slice(&scaled).into_arg(ret) };
 /// }
+/// # }
 /// ```
 ///
 /// For a type with no `FromArg`/`IntoArg` impl at all — reading the raw

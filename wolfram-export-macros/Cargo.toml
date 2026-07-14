@@ -40,6 +40,7 @@ proc-macro-crate = "3"
 [dev-dependencies]
 wolfram-export = { version = "0.6.0-alpha.3", path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
 wolfram-expr = { version = "0.6.0-alpha.3", path = "../wolfram-expr" }
+wolfram-library-link = { version = "0.6.1", path = "../wolfram-library-link" }
 wolfram-serialize = { version = "0.6.0-alpha.3", path = "../wolfram-serialize" }
 
 [features]
