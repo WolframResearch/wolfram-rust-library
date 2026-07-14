@@ -19,8 +19,8 @@ crate-type = ["cdylib", "rlib"]
 wolfram-expr = { version = "=0.6.0", path = "../wolfram-expr" }
 wolfram-serialize = { version = "=0.6.0", path = "../wolfram-serialize" }
 wolfram-serialize-macros = { version = "=0.6.0", path = "../wolfram-serialize-macros" }
-wolfram-export = { version = "=0.6.0", path = "../wolfram-export", features = ["wxf"] }
-wolfram-library-link = { version = "=0.6.0", path = "../wolfram-library-link", default-features = false, features = ["panic-failure-backtraces", "automate-function-loading-boilerplate"] }
+wolfram-export = { version = "=0.6.1", path = "../wolfram-export", features = ["wxf"] }
+wolfram-library-link = { version = "=0.6.1", path = "../wolfram-library-link", default-features = false, features = ["panic-failure-backtraces", "automate-function-loading-boilerplate"] }
 
 [features]
 # Pulls in wstp-sys, which needs a WSTP SDK for the target platform. Off by

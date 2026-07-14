@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-14
+
+### Changed
+
+* Docs-only release: picks up `wolfram-export-macros` 0.6.1, whose rewritten
+  `#[export(margs)]` section now renders on this crate's re-exported
+  `#[export]` attribute docs. No behavior change.
+
 ## [0.6.0] — 2026-07-09
 
 ### Added
