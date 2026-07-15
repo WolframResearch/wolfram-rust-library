@@ -8,6 +8,12 @@ kernel — no hand-written `LibraryFunctionLoad[…]` glue required.
 ## Install
 
 ```shell
+cargo install cargo-wl
+```
+
+Or, from a checkout of this repository:
+
+```shell
 cargo install --path wolfram-cli
 ```
 
@@ -46,7 +52,7 @@ per line). Cargo and kernel diagnostics are written to stderr.
 | `--out <DIR>` | Destination folder for the package (default: `<dylib_dir>/wl-package/`). |
 | `--cleanup` | Empty the destination folder before writing. |
 | `--named-exports` | Copy each dylib under its original name instead of a content hash. |
-| `--namespace-exports` | Prefix every function key with the library name: `"libname::fnname"`. |
+| `--namespace <NAMESPACE>` | Prefix every function key with this namespace: `"namespace::fnname"`. Overrides each package's own `[package.metadata.wl.pacletinfo] namespace`. |
 
 ## Paclet metadata
 
@@ -58,7 +64,7 @@ are correct without passing flags every time:
 name = "MyLibrary"
 version = "1.0.0"
 output = "../notebooks/"
-namespace-exports = true
+namespace = "MyLibrary"
 system-ids = ["MacOSX-ARM64", "Windows-x86-64"]
 ```
 
