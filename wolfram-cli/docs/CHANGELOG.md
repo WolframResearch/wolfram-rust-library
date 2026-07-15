@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.1] — 2026-07-14
 
+### Added
+
+* `--system-id`, `--paclet-name`, and `--paclet-version` are now declared clap
+  flags: they show up in `cargo wl build --help` and are documented in the
+  README (previously they were only recognized when placed among the forwarded
+  cargo arguments). All wl-specific flags work anywhere on the command line.
+
+### Changed
+
+* Configuration resolution rebuilt around one shape: the CLI, the wl flags
+  recovered from the trailing cargo arguments, and each package's
+  `[package.metadata.wl.pacletinfo]` table all parse into `BuildArgs` and
+  combine via `merge_configs` (options: higher-priority source wins; booleans:
+  OR; vectors: concatenate). An unrecognized `SystemID` in `system-ids`
+  metadata is now a build error instead of being silently dropped.
+
 ### Fixed
 
 * docs.rs can now document the crate: the CLI moved into a `cargo_wl` library
