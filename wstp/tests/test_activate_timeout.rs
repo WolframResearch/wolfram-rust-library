@@ -1,12 +1,9 @@
 //! Tests for `Link::activate_with_timeout` and
 //! `WolframKernelProcess::launch_with_timeout`.
 //!
-//! The kernel-launching test in this file is gated on the
-//! `WSTP_RUN_KERNEL_TESTS` environment variable, because launching a Wolfram
-//! Kernel requires a local Wolfram installation. Set
-//! `WSTP_RUN_KERNEL_TESTS=1` to opt in.
-//!
-//! The two pure-WSTP tests (no kernel needed) run unconditionally.
+//! None of these tests require a Wolfram installation: the `launch_with_timeout`
+//! test deliberately points at a non-Kernel binary that never speaks WSTP, so it
+//! exercises the timeout path directly.
 
 use std::{
     path::PathBuf,
@@ -101,23 +98,12 @@ fn activate_with_timeout_can_be_called_twice_on_same_thread() {
     );
 }
 
-/// Kernel test: when given a path that does not exist (or refuses to start),
-/// `launch_with_timeout` should error within roughly `timeout`, instead of
-/// hanging forever like `launch()` would under the same scenario.
-///
-/// Gated on `WSTP_RUN_KERNEL_TESTS=1` to keep CI configurations that don't
-/// have a Wolfram installation happy, even though this particular test does
-/// not actually require a working kernel.
+/// When pointed at a binary that is spawned but never speaks WSTP,
+/// `launch_with_timeout` should error within roughly `timeout` instead of
+/// hanging forever like `launch()` would. Uses a non-Kernel binary, so no
+/// Wolfram installation is required.
 #[test]
 fn launch_with_timeout_errors_on_missing_kernel_within_window() {
-    if std::env::var("WSTP_RUN_KERNEL_TESTS").ok().as_deref() != Some("1") {
-        eprintln!(
-            "skipping launch_with_timeout_errors_on_missing_kernel_within_window: \
-             set WSTP_RUN_KERNEL_TESTS=1 to enable"
-        );
-        return;
-    }
-
     use wstp::kernel::WolframKernelProcess;
 
     // A path that exists but is not a Wolfram Kernel: /bin/sleep on Unix,
