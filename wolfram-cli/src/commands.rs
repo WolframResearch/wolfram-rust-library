@@ -33,11 +33,8 @@ pub fn cmd_test(args: TestArgs) -> Result<()> {
     }
 
     let lib_dirs = build_and_package(&BuildArgs {
-        out: None,
-        cleanup: false,
-        named_exports: false,
-        namespace: None,
         cargo_args,
+        ..BuildArgs::default()
     })?;
 
     run_wl_script(

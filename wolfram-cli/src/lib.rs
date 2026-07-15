@@ -73,8 +73,14 @@ enum WlScriptCmd {
     Evaluate(EvaluateArgs),
 }
 
-/// Arguments for `cargo wl build`.
-#[derive(Parser)]
+/// Arguments for `cargo wl build` — and the one shape every configuration
+/// source is parsed into: the clap CLI, the wl-specific flags recovered from
+/// the trailing `cargo_args` (see [`build::parse_forwarded_args`]), and each
+/// package's `[package.metadata.wl.pacletinfo]` table (see
+/// [`build::pacletinfo_config`]). Sources combine with
+/// [`build::merge_configs`]: options — higher-priority source wins; booleans —
+/// OR together; vectors — concatenate.
+#[derive(Parser, Clone, Default)]
 pub struct BuildArgs {
     /// Destination folder for the package (default: <dylib_dir>/wl-package/)
     #[arg(long)]
@@ -92,6 +98,21 @@ pub struct BuildArgs {
     /// Overrides each package's own `[package.metadata.wl.pacletinfo] namespace`.
     #[arg(long)]
     pub namespace: Option<String>,
+
+    /// Also cross-compile for this Wolfram SystemID (e.g. MacOSX-ARM64,
+    /// Windows-x86-64); repeatable. The host platform is always built
+    #[arg(long = "system-id", value_name = "SYSTEM_ID")]
+    pub system_id: Vec<String>,
+
+    /// Paclet name for the generated package (default:
+    /// `[package.metadata.wl.pacletinfo] name`, else the crate name)
+    #[arg(long)]
+    pub paclet_name: Option<String>,
+
+    /// Paclet version for the generated package (default:
+    /// `[package.metadata.wl.pacletinfo] version`, else the crate version)
+    #[arg(long)]
+    pub paclet_version: Option<String>,
 
     /// Extra arguments forwarded verbatim to `cargo build`
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

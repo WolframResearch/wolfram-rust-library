@@ -53,6 +53,12 @@ per line). Cargo and kernel diagnostics are written to stderr.
 | `--cleanup` | Empty the destination folder before writing. |
 | `--named-exports` | Copy each dylib under its original name instead of a content hash. |
 | `--namespace <NAMESPACE>` | Prefix every function key with this namespace: `"namespace::fnname"`. Overrides each package's own `[package.metadata.wl.pacletinfo] namespace`. |
+| `--system-id <SYSTEM_ID>` | Also cross-compile for this Wolfram `SystemID` (e.g. `MacOSX-ARM64`); repeatable. The host platform is always built. Use this instead of Cargo's `--target`, which is rejected. |
+| `--paclet-name <NAME>` | Paclet name for the generated package (default: `[package.metadata.wl.pacletinfo] name`, else the crate name). |
+| `--paclet-version <VERSION>` | Paclet version for the generated package (default: `[package.metadata.wl.pacletinfo] version`, else the crate version). |
+
+All of these flags work anywhere on the command line, including interleaved
+with the forwarded cargo arguments.
 
 ## Paclet metadata
 
@@ -61,11 +67,13 @@ are correct without passing flags every time:
 
 ```toml
 [package.metadata.wl.pacletinfo]
-name = "MyLibrary"
-version = "1.0.0"
-output = "../notebooks/"
-namespace = "MyLibrary"
-system-ids = ["MacOSX-ARM64", "Windows-x86-64"]
+name = "MyLibrary"              # --paclet-name (default: crate name)
+version = "1.0.0"               # --paclet-version (default: crate version)
+output = "path/to/out/"         # --out, relative to this Cargo.toml
+named-exports = true            # --named-exports
+cleanup = true                  # --cleanup
+namespace = "MyLibrary"         # --namespace
+system-ids = ["MacOSX-ARM64", "Windows-x86-64"]  # --system-id, repeatable
 ```
 
 CLI flags take precedence over this table, which takes precedence over built-in

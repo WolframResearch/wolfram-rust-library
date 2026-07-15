@@ -47,39 +47,74 @@ pub struct PacletConfig {
     pub cleanup: bool,
     /// Copy each dylib under its original name instead of its content hash.
     pub named_exports: bool,
+    /// Prefix for this package's function keys (`"namespace::fnname"`).
+    /// Unlike the rest of the config, resolved per-package rather than shared
+    /// across an output location — see [`DylibInfo::namespace`].
+    pub namespace: Option<String>,
     /// Extra `SystemID`s to cross-compile for in addition to the host.
     pub system_ids: Vec<SystemID>,
 }
 
-struct ParsedBuildArgs {
-    cargo_args: Vec<String>,
-    package: Option<String>,
-    system_ids: Vec<SystemID>,
-    out: Option<PathBuf>,
-    cleanup: bool,
-    named_exports: bool,
-    namespace: Option<String>,
-    paclet_name: Option<String>,
-    paclet_version: Option<String>,
+/// Merge two configuration sources into one, `high` taking priority:
+/// options — `high`'s value wins, else `low`'s; booleans — OR together;
+/// vectors (`system_id`, `cargo_args`) — concatenate, `high`'s entries first.
+pub fn merge_configs(high: &BuildArgs, low: &BuildArgs) -> BuildArgs {
+    let chain = |a: &[String], b: &[String]| a.iter().chain(b).cloned().collect();
+    BuildArgs {
+        out: high.out.clone().or_else(|| low.out.clone()),
+        cleanup: high.cleanup || low.cleanup,
+        named_exports: high.named_exports || low.named_exports,
+        namespace: high.namespace.clone().or_else(|| low.namespace.clone()),
+        system_id: chain(&high.system_id, &low.system_id),
+        paclet_name: high.paclet_name.clone().or_else(|| low.paclet_name.clone()),
+        paclet_version: high
+            .paclet_version
+            .clone()
+            .or_else(|| low.paclet_version.clone()),
+        cargo_args: chain(&high.cargo_args, &low.cargo_args),
+    }
 }
 
-/// Resolve all paclet config from Cargo.toml `[package.metadata.wl.pacletinfo]`,
-/// with CLI values taking highest priority over Cargo.toml, which takes priority over defaults.
-///
-/// Booleans: CLI flag (true) wins; otherwise Cargo.toml value; otherwise false.
-/// Vecs:     CLI entries and Cargo.toml entries are merged.
-/// Options:  CLI value wins; otherwise Cargo.toml value; otherwise None.
+/// Parse one package's `[package.metadata.wl.pacletinfo]` table into the same
+/// [`BuildArgs`] structure the CLI produces, ready for [`merge_configs`].
+/// Absent keys are `None`/`false`/empty. `output` is resolved relative to the
+/// package's own manifest directory (a CLI `--out` is relative to the cwd).
+pub fn pacletinfo_config(pkg: &cargo_metadata::Package) -> BuildArgs {
+    let pi = &pkg.metadata["wl"]["pacletinfo"];
+    BuildArgs {
+        out: pi["output"].as_str().and_then(|rel| {
+            pkg.manifest_path
+                .parent()
+                .map(|dir| dir.join(rel).into_std_path_buf())
+        }),
+        cleanup: pi["cleanup"].as_bool().unwrap_or(false),
+        named_exports: pi["named-exports"].as_bool().unwrap_or(false),
+        namespace: pi["namespace"].as_str().map(str::to_owned),
+        system_id: pi["system-ids"]
+            .as_array()
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| id.as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        paclet_name: pi["name"].as_str().map(str::to_owned),
+        paclet_version: pi["version"].as_str().map(str::to_owned),
+        cargo_args: vec![],
+    }
+}
+
+/// Resolve the final packaging settings for one package: merge the CLI config
+/// over the package's `[package.metadata.wl.pacletinfo]` over built-in
+/// defaults (paclet name/version fall back to the crate's own), then validate
+/// — `SystemID` strings are parsed here, so a typo'd `--system-id` fails the
+/// build rather than being silently dropped.
 pub fn resolve_paclet_config(
-    name: Option<&str>,
-    version: Option<&str>,
+    meta: Option<&cargo_metadata::Metadata>,
+    cli: &BuildArgs,
     package: Option<&str>,
-    out: Option<PathBuf>,
-    named_exports: bool,
-    cleanup: bool,
-    system_ids: Vec<SystemID>,
-) -> PacletConfig {
-    let meta = cargo_metadata::MetadataCommand::new().exec().ok();
-    let pkg = meta.as_ref().and_then(|m| {
+) -> Result<PacletConfig> {
+    let pkg = meta.and_then(|m| {
         if let Some(pkg_name) = package {
             m.workspace_packages()
                 .into_iter()
@@ -88,89 +123,46 @@ pub fn resolve_paclet_config(
             m.root_package()
         }
     });
-    let pi = pkg.map(|p| &p.metadata["wl"]["pacletinfo"]);
 
-    let resolved_name = name
-        .map(str::to_owned)
-        .or_else(|| pi.and_then(|p| p["name"].as_str()).map(str::to_owned))
-        .or_else(|| pkg.map(|p| p.name.to_string()))
-        .unwrap_or_else(|| "Library".to_owned());
+    let defaults = BuildArgs {
+        paclet_name: pkg.map(|p| p.name.to_string()),
+        paclet_version: pkg.map(|p| p.version.to_string()),
+        ..BuildArgs::default()
+    };
+    let from_toml = pkg.map(pacletinfo_config).unwrap_or_default();
+    let merged = merge_configs(cli, &merge_configs(&from_toml, &defaults));
 
-    let resolved_version = version
-        .map(str::to_owned)
-        .or_else(|| pi.and_then(|p| p["version"].as_str()).map(str::to_owned))
-        .or_else(|| pkg.map(|p| p.version.to_string()))
-        .unwrap_or_else(|| "0.1.0".to_owned());
-
-    let resolved_output = out.or_else(|| {
-        pi.and_then(|p| p["output"].as_str()).and_then(|rel| {
-            pkg?.manifest_path
-                .parent()
-                .map(|dir| dir.join(rel).into_std_path_buf())
-        })
-    });
-
-    let resolved_named_exports = named_exports
-        || pi
-            .and_then(|p| p["named-exports"].as_bool())
-            .unwrap_or(false);
-
-    let resolved_cleanup =
-        cleanup || pi.and_then(|p| p["cleanup"].as_bool()).unwrap_or(false);
-
-    let mut resolved_system_ids = system_ids;
-    if let Some(ids) = pi.and_then(|p| p["system-ids"].as_array()) {
-        for id in ids {
-            if let Some(s) = id.as_str() {
-                if let Ok(sid) = s.parse::<SystemID>() {
-                    if !resolved_system_ids.contains(&sid) {
-                        resolved_system_ids.push(sid);
-                    }
-                }
-            }
+    let mut system_ids: Vec<SystemID> = Vec::new();
+    for value in &merged.system_id {
+        let sid = value
+            .parse::<SystemID>()
+            .map_err(|()| format!("unrecognized Wolfram SystemID: {value:?}"))?;
+        if !system_ids.contains(&sid) {
+            system_ids.push(sid);
         }
     }
 
-    PacletConfig {
-        name: resolved_name,
-        version: resolved_version,
-        output: resolved_output,
-        cleanup: resolved_cleanup,
-        named_exports: resolved_named_exports,
-        system_ids: resolved_system_ids,
-    }
-}
-
-/// Resolve the namespace prefix for one package's exported functions: the
-/// CLI override if given, else this package's own
-/// `[package.metadata.wl.pacletinfo] namespace` string, else `None` (bare
-/// function names). Unlike the rest of `PacletConfig`, this is resolved
-/// per-package rather than shared across a whole build or output location —
-/// see [`DylibInfo::namespace`].
-pub fn resolve_namespace(
-    cli_override: Option<&str>,
-    meta: Option<&cargo_metadata::Metadata>,
-    package_id: &PackageId,
-) -> Option<String> {
-    if let Some(ns) = cli_override {
-        return Some(ns.to_owned());
-    }
-    let pkg = meta?.packages.iter().find(|p| p.id == *package_id)?;
-    pkg.metadata["wl"]["pacletinfo"]["namespace"]
-        .as_str()
-        .map(str::to_owned)
+    Ok(PacletConfig {
+        name: merged.paclet_name.unwrap_or_else(|| "Library".to_owned()),
+        version: merged.paclet_version.unwrap_or_else(|| "0.1.0".to_owned()),
+        output: merged.out,
+        cleanup: merged.cleanup,
+        named_exports: merged.named_exports,
+        namespace: merged.namespace,
+        system_ids,
+    })
 }
 
 /// One resolved output location: every package that ends up writing here
 /// must have agreed on `config`; `dylibs`/`package_names` accumulate as more
-/// agreeing packages are folded in. Each dylib keeps its own package id so
-/// its namespace can be resolved independently later (see
+/// agreeing packages are folded in. Each dylib keeps its own resolved
+/// namespace, the one setting allowed to differ per package (see
 /// [`DylibInfo::namespace`]).
 struct Location {
     /// Name of the package that first claimed this location, for error messages.
     owner: String,
     config: PacletConfig,
-    dylibs: Vec<(PathBuf, PackageId)>,
+    dylibs: Vec<(PathBuf, Option<String>)>,
     package_names: Vec<String>,
 }
 
@@ -203,27 +195,34 @@ pub fn cmd_build(args: BuildArgs) -> Result<()> {
 /// match exactly, or this is almost certainly a misconfiguration, so it's a
 /// hard error rather than one package silently clobbering another's output.
 pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
-    let parsed = parse_forwarded_args(args.cargo_args.clone())?;
+    // The wl-specific flags are declared in clap (so they show in --help) but
+    // also recovered from the trailing cargo_args by parse_forwarded_args:
+    // clap's trailing_var_arg capture swallows anything placed after the first
+    // cargo-only flag (e.g. --release), so both sources are merged for the
+    // flags to work regardless of position. `cli.cargo_args` is the cleaned
+    // pass-through list (wl flags removed).
+    let (forwarded, package) = parse_forwarded_args(args.cargo_args.clone())?;
+    let cli = merge_configs(
+        &forwarded,
+        &BuildArgs {
+            cargo_args: vec![],
+            ..args.clone()
+        },
+    );
+
     let host_system_id = SystemID::try_current_rust_target()
         .map_err(|e| format!("unsupported host platform: {e}"))?;
     rust_target(host_system_id)?;
 
+    let meta = cargo_metadata::MetadataCommand::new().exec().ok();
     let mut generated: Vec<PathBuf> = Vec::new();
 
-    let host_dylibs = run_cargo_build_with_packages(&parsed.cargo_args, None)?;
+    let host_dylibs = run_cargo_build_with_packages(&cli.cargo_args, None)?;
     if host_dylibs.is_empty() {
         eprintln!(
             "cargo wl: warning: no cdylib artifacts found — generating empty package"
         );
-        let config = resolve_paclet_config(
-            parsed.paclet_name.as_deref(),
-            parsed.paclet_version.as_deref(),
-            parsed.package.as_deref(),
-            parsed.out.clone().or_else(|| args.out.clone()),
-            args.named_exports || parsed.named_exports,
-            args.cleanup || parsed.cleanup,
-            parsed.system_ids,
-        );
+        let config = resolve_paclet_config(meta.as_ref(), &cli, package.as_deref())?;
         let out_dir = config
             .output
             .clone()
@@ -238,8 +237,6 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
         return Ok(generated);
     }
 
-    let meta = cargo_metadata::MetadataCommand::new().exec().ok();
-
     let mut locations: Vec<(PathBuf, Location)> = Vec::new();
     for dylib in &host_dylibs {
         let package_name = meta
@@ -248,15 +245,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             .map(|p| p.name.to_string())
             .unwrap_or_default();
 
-        let config = resolve_paclet_config(
-            parsed.paclet_name.as_deref(),
-            parsed.paclet_version.as_deref(),
-            Some(&package_name),
-            parsed.out.clone().or_else(|| args.out.clone()),
-            args.named_exports || parsed.named_exports,
-            args.cleanup || parsed.cleanup,
-            parsed.system_ids.clone(),
-        );
+        let config = resolve_paclet_config(meta.as_ref(), &cli, Some(&package_name))?;
 
         let out_dir = config.output.clone().unwrap_or_else(|| {
             dylib
@@ -273,7 +262,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             Some((_, loc)) => {
                 check_configs_agree(&loc.owner, &loc.config, &package_name, &config)?;
                 loc.dylibs
-                    .push((dylib.path.clone(), dylib.package_id.clone()));
+                    .push((dylib.path.clone(), config.namespace.clone()));
                 if !loc.package_names.contains(&package_name) {
                     loc.package_names.push(package_name);
                 }
@@ -283,8 +272,8 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
                     location_key,
                     Location {
                         owner: package_name.clone(),
+                        dylibs: vec![(dylib.path.clone(), config.namespace.clone())],
                         config,
-                        dylibs: vec![(dylib.path.clone(), dylib.package_id.clone())],
                         package_names: vec![package_name],
                     },
                 ));
@@ -309,13 +298,9 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
         let host_infos: Vec<DylibInfo> = loc
             .dylibs
             .iter()
-            .map(|(p, package_id)| {
+            .map(|(p, namespace)| {
                 let mut info = collect_dylib_info(p)?;
-                info.namespace = resolve_namespace(
-                    args.namespace.as_deref().or(parsed.namespace.as_deref()),
-                    meta.as_ref(),
-                    package_id,
-                );
+                info.namespace = namespace.clone();
                 Ok(info)
             })
             .collect::<Result<_>>()?;
@@ -333,7 +318,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             // Cross-build only the packages contributing to this location,
             // so a cross build spanning several locations can't error out
             // matching one location's host dylibs against another's.
-            let mut cross_args = parsed.cargo_args.clone();
+            let mut cross_args = cli.cargo_args.clone();
             for name in &loc.package_names {
                 cross_args.push("-p".to_string());
                 cross_args.push(name.clone());
@@ -748,85 +733,70 @@ fn rust_target(id: SystemID) -> Result<&'static str> {
     }
 }
 
-fn parse_forwarded_args(args: Vec<String>) -> Result<ParsedBuildArgs> {
-    let mut cargo_args = Vec::new();
+/// Recover the wl-specific flags out of the trailing `cargo_args` into a
+/// [`BuildArgs`] config (its `cargo_args` holding the cleaned pass-through
+/// list for `cargo build`), plus the `-p`/`--package` selection, which is
+/// both kept for cargo *and* used to resolve the paclet config. Needed
+/// because clap's `trailing_var_arg` capture swallows any wl flag placed
+/// after the first cargo-only flag — see [`build_and_package`].
+pub fn parse_forwarded_args(
+    args: Vec<String>,
+) -> Result<(BuildArgs, Option<String>)> {
+    let mut config = BuildArgs::default();
     let mut package = None;
-    let mut system_ids = Vec::new();
-    let mut out = None;
-    let mut cleanup = false;
-    let mut named_exports = false;
-    let mut namespace = None;
-    let mut paclet_name = None;
-    let mut paclet_version = None;
     let mut iter = args.into_iter();
 
     while let Some(arg) = iter.next() {
         if arg == "-p" || arg == "--package" {
             let value = iter.next().ok_or("--package requires a value")?;
             package = Some(value.clone());
-            cargo_args.push(arg);
-            cargo_args.push(value);
+            config.cargo_args.push(arg);
+            config.cargo_args.push(value);
         } else if let Some(value) = arg.strip_prefix("--package=") {
             package = Some(value.to_owned());
-            cargo_args.push(arg);
+            config.cargo_args.push(arg);
         } else if arg == "--system-id" {
             let value = iter
                 .next()
                 .ok_or("--system-id requires a Wolfram SystemID value")?;
-            system_ids.push(
-                value
-                    .parse::<SystemID>()
-                    .map_err(|()| format!("unrecognized Wolfram SystemID: {value:?}"))?,
-            );
+            config.system_id.push(value);
         } else if let Some(value) = arg.strip_prefix("--system-id=") {
-            system_ids.push(
-                value
-                    .parse::<SystemID>()
-                    .map_err(|()| format!("unrecognized Wolfram SystemID: {value:?}"))?,
-            );
+            config.system_id.push(value.to_owned());
         } else if arg == "--out" {
             let value = iter.next().ok_or("--out requires a destination folder")?;
-            out = Some(PathBuf::from(value));
+            config.out = Some(PathBuf::from(value));
         } else if let Some(value) = arg.strip_prefix("--out=") {
-            out = Some(PathBuf::from(value));
+            config.out = Some(PathBuf::from(value));
         } else if arg == "--cleanup" {
-            cleanup = true;
+            config.cleanup = true;
         } else if arg == "--named-exports" {
-            named_exports = true;
+            config.named_exports = true;
         } else if arg == "--namespace" {
-            namespace = Some(iter.next().ok_or("--namespace requires a value")?);
+            config.namespace =
+                Some(iter.next().ok_or("--namespace requires a value")?);
         } else if let Some(value) = arg.strip_prefix("--namespace=") {
-            namespace = Some(value.to_owned());
+            config.namespace = Some(value.to_owned());
         } else if arg == "--paclet-name" {
-            paclet_name = Some(iter.next().ok_or("--paclet-name requires a value")?);
+            config.paclet_name =
+                Some(iter.next().ok_or("--paclet-name requires a value")?);
         } else if let Some(value) = arg.strip_prefix("--paclet-name=") {
-            paclet_name = Some(value.to_owned());
+            config.paclet_name = Some(value.to_owned());
         } else if arg == "--paclet-version" {
-            paclet_version =
+            config.paclet_version =
                 Some(iter.next().ok_or("--paclet-version requires a value")?);
         } else if let Some(value) = arg.strip_prefix("--paclet-version=") {
-            paclet_version = Some(value.to_owned());
+            config.paclet_version = Some(value.to_owned());
         } else if arg == "--target" || arg.starts_with("--target=") {
             return Err(
                 "use --system-id <SystemID> instead of forwarding Cargo --target"
                     .to_string(),
             );
         } else {
-            cargo_args.push(arg);
+            config.cargo_args.push(arg);
         }
     }
 
-    Ok(ParsedBuildArgs {
-        cargo_args,
-        package,
-        system_ids,
-        out,
-        cleanup,
-        named_exports,
-        namespace,
-        paclet_name,
-        paclet_version,
-    })
+    Ok((config, package))
 }
 
 fn target_system_ids(
