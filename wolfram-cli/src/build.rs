@@ -414,7 +414,9 @@ fn check_configs_agree(
 /// `cargo wl build` run across a whole workspace) can look back up each
 /// one's own `pacletinfo` settings.
 pub struct BuiltDylib {
+    /// Path to the built dynamic library on disk.
     pub path: PathBuf,
+    /// Cargo package id of the package whose target produced this dylib.
     pub package_id: PackageId,
 }
 

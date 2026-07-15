@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-14
+
+### Fixed
+
+* docs.rs can now document the crate: the CLI moved into a `cargo_wl` library
+  target (the `cargo-wl` binary is a thin shim over it), so `cargo rustdoc
+  --lib` no longer fails with "no library targets found" — which also made
+  crates.io show no documentation link.
+
+* README: lead the install section with `cargo install cargo-wl` (the
+  from-checkout `--path` variant remains as an alternative), and fix the
+  documented `--namespace-exports` flag / `namespace-exports = true` metadata
+  key to the real interface: `--namespace <NAMESPACE>` and `namespace =
+  "<prefix>"`.
+
 ## [0.6.0] — 2026-07-09
 
 ### Added
