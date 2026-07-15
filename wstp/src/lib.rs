@@ -387,6 +387,10 @@ impl Link {
     }
 
     /// Create a new named WSTP link using `protocol`.
+    ///
+    /// The returned [`Link`] is *unactivated*; the handshake happens in
+    /// [`activate()`][Link::activate], which requires the peer to activate
+    /// concurrently (see [`channel()`] for the canonical pattern).
     pub fn listen(protocol: Protocol, name: &str) -> Result<Self, Error> {
         let protocol_string = protocol.to_string();
 
@@ -407,6 +411,12 @@ impl Link {
     }
 
     /// Connect to an existing named WSTP link.
+    ///
+    /// The returned [`Link`] is *unactivated*; opening the connection does not
+    /// perform the handshake. For [`SharedMemory`][Protocol::SharedMemory] this
+    /// succeeds even when no listener is bound to `name` — a missing peer only
+    /// surfaces when [`activate()`][Link::activate] is called. Use
+    /// [`activate_with_timeout()`][Link::activate_with_timeout] to bound that wait.
     pub fn connect(protocol: Protocol, name: &str) -> Result<Self, Error> {
         Link::connect_with_options(protocol, name, &[])
     }
@@ -558,6 +568,12 @@ impl Link {
         Link { raw_link }
     }
 
+    /// Perform the WSTP handshake on this link.
+    ///
+    /// This blocks **indefinitely** until the peer activates. If the peer never
+    /// appears (e.g. a spawned Kernel fails to start) this hangs forever; use
+    /// [`activate_with_timeout()`][Link::activate_with_timeout] for a bounded wait.
+    ///
     /// *WSTP C API Documentation:* [`WSActivate()`](https://reference.wolfram.com/language/ref/c/WSActivate.html)
     pub fn activate(&mut self) -> Result<(), Error> {
         // Note: WSActivate() returns 0 in the event of an error, and sets an error
@@ -569,11 +585,133 @@ impl Link {
         Ok(())
     }
 
+    /// Like [`activate()`][Link::activate], but returns an error if the handshake
+    /// does not complete within `timeout`.
+    ///
+    /// Implemented via WSTP's yield-function hook: a cooperative-abort callback is
+    /// installed for the duration of the `WSActivate` call and asks WSTP to abort
+    /// once the deadline passes. On timeout the link remains usable (you may retry
+    /// or drop it).
+    pub fn activate_with_timeout(
+        &mut self,
+        timeout: std::time::Duration,
+    ) -> Result<(), Error> {
+        use std::time::Instant;
+
+        let deadline = Instant::now() + timeout;
+
+        // The yield trampoline reads the deadline from a thread-local: WSTP's
+        // yield callback takes no user data and fires synchronously on the
+        // calling thread. `&mut self` guarantees at most one in-flight call per
+        // thread. The guard restores the previous yield function, destroys ours,
+        // and clears the thread-local on every exit path (including unwind).
+        let _guard = YieldGuard::install(self.raw_link, deadline)?;
+
+        let activate_rc = unsafe { sys::WSActivate(self.raw_link) };
+
+        if activate_rc == 0 {
+            if Instant::now() >= deadline {
+                return Err(Error::custom(format!(
+                    "WSActivate timed out after {:?}",
+                    timeout
+                )));
+            }
+            return Err(self.error_or_unknown());
+        }
+
+        Ok(())
+    }
+
     /// Close this end of the link.
     ///
     /// *WSTP C API Documentation:* [`WSClose()`](https://reference.wolfram.com/language/ref/c/WSClose.html)
     pub fn close(self) {
         // Note: The link is closed when `self` is dropped.
+    }
+}
+
+//------------------------------------------------------------------------------
+// Yield-function plumbing for `Link::activate_with_timeout`.
+//------------------------------------------------------------------------------
+
+std::thread_local! {
+    static ACTIVATE_DEADLINE: std::cell::Cell<Option<std::time::Instant>> =
+        const { std::cell::Cell::new(None) };
+}
+
+unsafe extern "C" fn activate_yield_trampoline(
+    _mlp: sys::WSLINK,
+    _yp: sys::WSYieldParameters,
+) -> std::os::raw::c_int {
+    // Return non-zero to ask WSTP to abort the in-progress call.
+    match ACTIVATE_DEADLINE.with(|cell| cell.get()) {
+        Some(deadline) if std::time::Instant::now() >= deadline => 1,
+        _ => 0,
+    }
+}
+
+/// Installs the timeout yield function on a link and guarantees its teardown.
+///
+/// On drop it restores the previously-installed yield function, destroys the
+/// one we created, and clears the deadline thread-local — so every exit path
+/// out of `activate_with_timeout`, including an unwind, is cleaned up once.
+struct YieldGuard {
+    raw_link: sys::WSLINK,
+    prev: sys::WSYieldFunctionObject,
+    ours: sys::WSYieldFunctionObject,
+}
+
+impl YieldGuard {
+    fn install(
+        raw_link: sys::WSLINK,
+        deadline: std::time::Instant,
+    ) -> Result<Self, Error> {
+        ACTIVATE_DEADLINE.with(|cell| cell.set(Some(deadline)));
+
+        // WSTP requires yield functions to be created via WSCreateYieldFunction.
+        let ours = match crate::env::with_raw_stdenv(|stdenv| unsafe {
+            sys::WSCreateYieldFunction(
+                stdenv,
+                Some(activate_yield_trampoline),
+                std::ptr::null_mut(),
+            )
+        }) {
+            Ok(yfo) if yfo.is_some() => yfo,
+            Ok(_) => {
+                ACTIVATE_DEADLINE.with(|cell| cell.set(None));
+                return Err(Error::custom(
+                    "WSCreateYieldFunction() returned a null yield function object"
+                        .to_owned(),
+                ));
+            },
+            Err(err) => {
+                ACTIVATE_DEADLINE.with(|cell| cell.set(None));
+                return Err(err);
+            },
+        };
+
+        // Save the previous yield function (we do not own it) and install ours.
+        let prev = unsafe { sys::WSGetYieldFunction(raw_link) };
+        if unsafe { sys::WSSetYieldFunction(raw_link, ours) } == 0 {
+            unsafe { sys::WSDestroyYieldFunction(ours) };
+            ACTIVATE_DEADLINE.with(|cell| cell.set(None));
+            return Err(Error::custom(
+                "WSSetYieldFunction() failed to install the timeout yield function"
+                    .to_owned(),
+            ));
+        }
+
+        Ok(YieldGuard { raw_link, prev, ours })
+    }
+}
+
+impl Drop for YieldGuard {
+    fn drop(&mut self) {
+        unsafe {
+            sys::WSSetYieldFunction(self.raw_link, self.prev);
+            sys::WSDestroyYieldFunction(self.ours);
+        }
+        ACTIVATE_DEADLINE.with(|cell| cell.set(None));
     }
 }
 
