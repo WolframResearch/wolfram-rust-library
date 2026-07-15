@@ -3,7 +3,7 @@
 //!
 //! Hosts the [`ExportEntry`] enum (the unified inventory entry type used by
 //! all four modes — Native, Margs, Wstp, Wxf), the `inventory::collect!` declaration,
-//! and the [`exported_library_functions_association`] builder that produces
+//! and the `exported_library_functions_association` builder that produces
 //! the WL `Association[name -> LibraryFunctionLoad[...], ...]` Expr used by
 //! both the WSTP-mode `generate_loader!` runtime path and the WXF-mode
 //! build-time manifest path.
@@ -23,7 +23,7 @@ use wolfram_expr::{expr, Association, Expr, ExprKind, RuleEntry, Symbol};
 use wolfram_serialize::{FromWXF, ToWXF};
 
 /// Serializable description of one exported function, embedded in every dylib
-/// via [`__wolfram_manifest__`]. Defined here so the CLI can share the
+/// via `__wolfram_manifest__`. Defined here so the CLI can share the
 /// type and deserialize directly with [`fn@wolfram_serialize::from_wxf`].
 ///
 /// `params`/`ret` carry the real argument/return type `Expr`s for `Native`
@@ -287,7 +287,7 @@ pub fn library_functions_loader(libraries: &[LibraryArtifact]) -> Expr {
 /// Replaces the legacy `LibraryLinkFunction` enum from `wolfram-library-link`.
 /// All three export-mode runtimes (`wolfram-export-native`, `wolfram-export-wstp`,
 /// `wolfram-export-wxf`) submit entries of this single shared type to one
-/// global inventory; [`exported_library_functions_association`] iterates that
+/// global inventory; `exported_library_functions_association` iterates that
 /// inventory regardless of mode.
 pub enum ExportEntry {
     /// Native MArgument-based export.
