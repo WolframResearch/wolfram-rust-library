@@ -97,3 +97,16 @@ fn wxf_resolve_number_error(v: Result<i64, String>) -> i64 {
 fn wxf_summarize(ds: DatasetRef<'_>) -> String {
     crate::core::summarize(ds)
 }
+
+// ── Ad hoc: Vec<T> / tuple args & returns (see GH issue #17) ──────────────────
+
+#[export(wxf)]
+fn collect(rules: Vec<String>, inputs: Vec<String>) -> (Vec<(u64, String)>, bool) {
+    let pairs = inputs
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (i as u64, s.clone()))
+        .collect();
+    let all_matched = inputs.iter().all(|s| rules.contains(s));
+    (pairs, all_matched)
+}
