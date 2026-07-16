@@ -50,6 +50,23 @@ mod ty_classify;
 /// let bytes = to_wxf(&Pair(1, 2), None).unwrap();
 /// ```
 ///
+/// `#[wolfram(symbol = "Ctx`Head")]` on a tuple or named-field struct encodes
+/// it as the positional normal `Head[field0, field1, …]` instead (fields in
+/// declaration order; names, `rename`, and `key_processor` stay off the wire):
+///
+/// ```
+/// use wolfram_serialize::{ToWXF, to_wxf};
+///
+/// #[derive(ToWXF)]
+/// #[wolfram(symbol = "System`Complex")]
+/// struct Complex {
+///     re: f64,
+///     im: f64,
+/// }
+/// // Encodes as Complex[3.0, 4.0]
+/// let bytes = to_wxf(&Complex { re: 3.0, im: 4.0 }, None).unwrap();
+/// ```
+///
 /// # Enums
 ///
 /// Enum variants encode as `<|"Enum" -> "VariantName", "Data" -> {fields…}|>`.
@@ -108,6 +125,11 @@ pub fn derive_to_wxf(input: TokenStream) -> TokenStream {
 ///
 /// Named-field structs decode from a WL `Association`. Missing `Option<T>`
 /// fields default to `None`; all other fields must be present.
+///
+/// With `#[wolfram(symbol = …)]` a struct decodes from the positional normal
+/// form instead (matching what `ToWXF` emits): a `Function` of matching arity,
+/// fields in declaration order. Heads are serialize-only — any head is
+/// accepted and discarded on the way back in.
 ///
 /// ```
 /// use wolfram_serialize::{ToWXF, FromWXF, to_wxf, from_wxf};

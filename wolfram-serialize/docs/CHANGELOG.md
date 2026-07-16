@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* **`ViaWXF` bridge trait + `impl_via_wxf!` macro** — bridge a foreign type to
+  WXF through an intermediate representation that derives `ToWXF`/`FromWXF`:
+  declare `type Via`, convert with `to_via`/`from_via` (fallible on the way
+  back), and `impl_via_wxf!(Type)` generates the delegating trait impls.
+
+* **`vendor` module** — optional WXF conversions for third-party crate types,
+  built on `ViaWXF` and enabled per crate by a `vendor-<crate>` feature:
+  * `vendor-chrono`: `NaiveDate`, `DateTime<Utc>`, `DateTime<FixedOffset>`,
+    and `DateTime<Local>` ⇄ `DateObject[{…}, granularity, calendar, timezone]`.
+  * `vendor-num-bigint`: `BigInt` / `BigUint` ⇄ `BigInteger` atoms.
+  * `vendor-num-complex`: `Complex<f64>` ⇄ `Complex[re, im]`.
+
 ## [0.6.0] — 2026-07-09
 
 ### Added

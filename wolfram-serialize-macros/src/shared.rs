@@ -2,8 +2,10 @@
 //!
 //! The container/variant attribute `#[wolfram(symbol = "MyPkg`Foo")]` overrides
 //! the bare Rust ident name used for a unit struct/variant symbol (no context is
-//! imposed otherwise); the field attribute `#[wolfram(rename = "fieldName")]`
-//! overrides the default snake_case key used in Association entries.
+//! imposed otherwise), and on a tuple/named struct switches the wire form to the
+//! positional normal `Head[field0, field1, …]`; the field attribute
+//! `#[wolfram(rename = "fieldName")]` overrides the default snake_case key used
+//! in Association entries.
 
 use syn::{Attribute, Error, Lit, Meta, NestedMeta, Result};
 
@@ -25,8 +27,10 @@ pub(crate) enum EnumHead {
 #[derive(Default)]
 pub(crate) struct ContainerAttrs {
     /// Override for the symbol/head used to identify this struct or variant on
-    /// the wire (e.g. `"MyPkg`Foo"`). When `None`, the bare Rust ident name is
-    /// used verbatim — no context is imposed.
+    /// the wire (e.g. `"MyPkg`Foo"`). On a unit struct, replaces the bare Rust
+    /// ident name (used verbatim when `None` — no context is imposed); on a
+    /// tuple/named struct, switches the wire form to the positional normal
+    /// `Head[field0, field1, …]`.
     pub symbol: Option<String>,
     /// Head used to wrap enum variants. Defaults to `System`List`;
     /// `#[wolfram(enum_head = "System`Failure")]` emits `Failure["Variant", …]`,

@@ -15,7 +15,37 @@ include = [
     "/docs",
 ]
 
+[features]
+# Conversions between `chrono` date/time types and `DateObject` expressions.
+vendor-chrono = ["dep:chrono"]
+
+# Conversions between `chrono-tz` named IANA time zones (e.g.
+# "America/Chicago") and `DateObject` expressions. Separate from
+# `vendor-chrono` because `chrono-tz` vendors the whole IANA time zone
+# database — only pulled in if you actually need named zones.
+vendor-chrono-tz = ["dep:chrono-tz", "vendor-chrono"]
+
+# Conversions between `num-bigint` arbitrary-precision integers and `BigInteger` atoms.
+vendor-num-bigint = ["dep:num-bigint"]
+
+# Conversions between `num-complex` complex numbers and `Complex[re, im]` expressions.
+vendor-num-complex = ["dep:num-complex"]
+
 [dependencies]
 wolfram-serialize-macros = { version = "=0.6.0", path = "../wolfram-serialize-macros" }
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
 num_enum = "0.7"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"], optional = true }
+chrono-tz = { version = "0.10", optional = true }
+# `num-bigint` 0.5 has already shipped alongside 0.4 (widely used, semver-
+# incompatible per Cargo's caret rules), so accept both rather than forcing a
+# duplicate dependency on whichever major a downstream crate picked.
+num-bigint = { version = ">=0.4, <0.6", optional = true }
+num-complex = { version = "0.4", optional = true }
+
+[dev-dependencies]
+# Used by tests/vendor_shapes.rs to assert the WL wire shapes of the
+# `vendor-*` conversions by decoding into an untyped `Expr`. Not a build
+# cycle: `wolfram-expr` depends on this crate as a regular (non-dev)
+# dependency, so this only creates a test-time cycle, which Cargo allows.
+wolfram-expr = { path = "../wolfram-expr" }
