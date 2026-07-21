@@ -19,6 +19,10 @@ pub fn duplicate(e: Expr) -> Expr {
     e
 }
 
+pub fn concat(strings: Vec<String>) -> String {
+    strings.concat()
+}
+
 // ── Typed structs (used by types_wxf) ────────────────────────────────────────
 
 #[derive(Debug, Clone, FromWXF, ToWXF)]

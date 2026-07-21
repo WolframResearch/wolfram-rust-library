@@ -20,6 +20,12 @@ fn wxf_scale_array(arr: Vec<f64>, factor: f64) -> Vec<f64> {
     crate::core::scale_array(&arr, factor)
 }
 
+// Vec<String> maps to a WL list of strings on the WXF wire.
+#[export(wxf)]
+fn wxf_concat(strings: Vec<String>) -> String {
+    crate::core::concat(strings)
+}
+
 // ── Tier 2: Expr passthrough ─────────────────────────────────────────────────
 
 #[export(wxf)]
