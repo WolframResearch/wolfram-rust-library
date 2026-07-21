@@ -214,6 +214,51 @@ impl<'de> FromWXF<'de> for String {
 }
 
 //==============================================================================
+// Tuples
+//==============================================================================
+
+// Mirrors the `ToWXF` tuple impls: read a `Function[…]` (any head accepted)
+// whose body arity is checked against the tuple's own arity. See the `ToWXF`
+// side (`to_wxf.rs`) for why this stops at arity 12 instead of going further.
+macro_rules! impl_tuple_from_wxf {
+    ($len:expr; $($T:ident),+) => {
+        impl<'de, $($T: FromWXF<'de>),+> FromWXF<'de> for ($($T,)+) {
+            fn from_wxf_with_tag<R: Reader<'de>>(
+                r: &mut WxfReader<R>,
+                tok: ExpressionEnum,
+            ) -> Result<Self, Error> {
+                if tok != ExpressionEnum::Function {
+                    return Err(Error::unexpected_token(&["Function"], tok));
+                }
+                let n = r.read_varint()?;
+                r.skip()?; // discard head (any head accepted)
+                if n != $len as u64 {
+                    return Err(err_at(
+                        "",
+                        concat!("Function with ", stringify!($len), " arguments"),
+                        format!("got {} arguments", n),
+                    ));
+                }
+                Ok(( $( $T::from_wxf(r)?, )+ ))
+            }
+        }
+    };
+}
+
+impl_tuple_from_wxf!(1; A);
+impl_tuple_from_wxf!(2; A, B);
+impl_tuple_from_wxf!(3; A, B, C);
+impl_tuple_from_wxf!(4; A, B, C, D);
+impl_tuple_from_wxf!(5; A, B, C, D, E);
+impl_tuple_from_wxf!(6; A, B, C, D, E, F);
+impl_tuple_from_wxf!(7; A, B, C, D, E, F, G);
+impl_tuple_from_wxf!(8; A, B, C, D, E, F, G, H);
+impl_tuple_from_wxf!(9; A, B, C, D, E, F, G, H, I);
+impl_tuple_from_wxf!(10; A, B, C, D, E, F, G, H, I, J);
+impl_tuple_from_wxf!(11; A, B, C, D, E, F, G, H, I, J, K);
+impl_tuple_from_wxf!(12; A, B, C, D, E, F, G, H, I, J, K, L);
+
+//==============================================================================
 // Containers
 //==============================================================================
 

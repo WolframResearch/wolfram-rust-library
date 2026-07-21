@@ -175,6 +175,20 @@ $Tests = {
       "Messages" -> {},
       "TestID" -> "Examples-wxf-echo_point-wrong_type"|>,
 
+    (* ── wxf: concat (Vec<String> arg) ───────────────────────────────────────── *)
+
+    <|"Export" -> "wxf_concat",
+      "Input"  -> {{"foo", "bar", "baz"}},
+      "Output" -> "foobarbaz",
+      "Messages" -> {},
+      "TestID" -> "Examples-wxf-concat-list"|>,
+
+    <|"Export" -> "wxf_concat",
+      "Input"  -> {{}},
+      "Output" -> "",
+      "Messages" -> {},
+      "TestID" -> "Examples-wxf-concat-empty"|>,
+
     (* ── margs: raw MArgument functions, annotated with args/ret ─────────────── *)
 
     <|"Export" -> "margs_add",
