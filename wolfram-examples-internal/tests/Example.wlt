@@ -228,7 +228,110 @@ $Tests = {
       "Input"  -> {42.0},
       "Output" -> _Failure,
       "Messages" -> {},
-      "TestID" -> "Examples-wxf-force_panic"|>
+      "TestID" -> "Examples-wxf-force_panic"|>,
+
+    (* ── vendor-chrono: chrono_add_seconds ───────────────────────────────────── *)
+    (* `DateTime<Utc>` round-trips as `DateObject[{y,m,d,h,mi,s}, "Instant",
+       "Gregorian", "UTC"]` via wolfram-expr's `ViaWXF` bridge (see
+       wolfram-serialize/src/vendor/chrono.rs) — no library-specific WL glue
+       needed, an ordinary `DateObject` is sent and received. Seconds must be
+       sent as explicit reals (`0.`, not `0`): the wire's seconds slot is `f64`
+       and WXF doesn't widen `Integer` -> `Real`.
+
+       The timezone slot is matched as `"UTC" | 0.`, not a bare `"UTC"`: once
+       any real named zone (e.g. the vendor-chrono-tz tests below) has been
+       evaluated anywhere in this kernel session, the kernel's own `DateObject`
+       starts normalizing `"UTC"` to the numeric offset `0.` for everything
+       evaluated afterward — including our library's return value, which
+       TestReport evaluates lazily, after every DateObject literal in this
+       file has already run once. Both forms name the same zone, so accept
+       either. *)
+
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject[{2024, 1, 1, 0, 0, 0.}, "Instant", "Gregorian", "UTC"], 30.},
+      "Output" -> DateObject[{2024, 1, 1, 0, 0, 30.}, "Instant", "Gregorian", "UTC" | 0.],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-whole"|>,
+
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject[{2024, 1, 1, 23, 59, 59.}, "Instant", "Gregorian", "UTC"], 1.5},
+      "Output" -> DateObject[{2024, 1, 2, 0, 0, 0.5}, "Instant", "Gregorian", "UTC" | 0.],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-fractional_carries_day"|>,
+
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject[{2024, 1, 1, 0, 0, 10.}, "Instant", "Gregorian", "UTC"], -10.},
+      "Output" -> DateObject[{2024, 1, 1, 0, 0, 0.}, "Instant", "Gregorian", "UTC" | 0.],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-negative"|>,
+
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject[{2024, 1, 1, 0, 0, 0.}, "Instant", "Gregorian", "UTC"], "not a number"},
+      "Output" -> _Failure,
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-wrong_type"|>,
+
+    (* 2 days, 3 hours, 12 seconds = 183612 s — large enough to roll the day
+       past the end of the month (and, in the second case, past the end of
+       the year), verifying carry propagates through day/month/year, not just
+       the seconds slot. *)
+
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject[{2024, 1, 30, 23, 0, 0.}, "Instant", "Gregorian", "UTC"], 183612.},
+      "Output" -> DateObject[{2024, 2, 2, 2, 0, 12.}, "Instant", "Gregorian", "UTC" | 0.],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-rolls_over_month"|>,
+
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject[{2024, 12, 30, 23, 0, 0.}, "Instant", "Gregorian", "UTC"], 183612.},
+      "Output" -> DateObject[{2025, 1, 2, 2, 0, 12.}, "Instant", "Gregorian", "UTC" | 0.],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-rolls_over_year"|>,
+
+    (* `DateObject["TimeZone" -> "UTC"]` (like `DateObject[]`/`Now`) carries the
+       current instant with a *precision-annotated* seconds value, e.g.
+       `34.358312`8.29`, not a plain machine real. On the wire that's a
+       `BigReal` token, not `Real64` — the seconds slot's `f64` bridge
+       (wolfram-serialize/src/vendor/chrono.rs) narrows it to a machine double
+       the same way reading a `BigReal` over WSTP does (see the legacy_wstp
+       big_real case above), rather than rejecting it outright. Since "now" is
+       different every run, this only checks the call succeeds and returns a
+       `DateObject`, not an exact value. *)
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject["TimeZone" -> "UTC"], 30.},
+      "Output" -> _DateObject,
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-current_time_precision_real"|>,
+
+    (* ── vendor-chrono-tz: chrono_tz_add_seconds ─────────────────────────────── *)
+    (* Same bridge, but the timezone slot carries an IANA zone name instead of
+       "UTC"/a numeric offset (see wolfram-serialize/src/vendor/chrono_tz.rs).
+       The result keeps the same named zone, so its wall-clock offset can
+       differ before and after the add across a DST transition. *)
+
+    <|"Export" -> "chrono_tz_add_seconds",
+      "Input"  -> {DateObject[{2026, 4, 14, 9, 30, 0.}, "Instant", "Gregorian", "America/Chicago"], 30.},
+      "Output" -> DateObject[{2026, 4, 14, 9, 30, 30.}, "Instant", "Gregorian", "America/Chicago"],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono_tz-add_seconds-whole"|>,
+
+    (* 2025-03-09 is the US spring-forward date: clocks jump 02:00 -> 03:00
+       local (CST -> CDT) at 08:00 UTC. Adding exactly 1 hour of elapsed time
+       to 01:30 CST lands at 03:30 CDT — the wall clock jumps 2 hours even
+       though only 1 hour actually passed, because the offset itself shifted
+       by an hour partway through. *)
+
+    <|"Export" -> "chrono_tz_add_seconds",
+      "Input"  -> {DateObject[{2025, 3, 9, 1, 30, 0.}, "Instant", "Gregorian", "America/Chicago"], 3600.},
+      "Output" -> DateObject[{2025, 3, 9, 3, 30, 0.}, "Instant", "Gregorian", "America/Chicago"],
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono_tz-add_seconds-crosses_spring_forward"|>,
+
+    <|"Export" -> "chrono_tz_add_seconds",
+      "Input"  -> {DateObject[{2026, 4, 14, 9, 30, 0.}, "Instant", "Gregorian", "Not/AZone"], 30.},
+      "Output" -> _Failure,
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono_tz-add_seconds-unknown_zone"|>
 
 };
 
