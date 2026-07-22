@@ -288,6 +288,21 @@ $Tests = {
       "Messages" -> {},
       "TestID" -> "Examples-vendor_chrono-add_seconds-rolls_over_year"|>,
 
+    (* `DateObject["TimeZone" -> "UTC"]` (like `DateObject[]`/`Now`) carries the
+       current instant with a *precision-annotated* seconds value, e.g.
+       `34.358312`8.29`, not a plain machine real. On the wire that's a
+       `BigReal` token, not `Real64` — the seconds slot's `f64` bridge
+       (wolfram-serialize/src/vendor/chrono.rs) narrows it to a machine double
+       the same way reading a `BigReal` over WSTP does (see the legacy_wstp
+       big_real case above), rather than rejecting it outright. Since "now" is
+       different every run, this only checks the call succeeds and returns a
+       `DateObject`, not an exact value. *)
+    <|"Export" -> "chrono_add_seconds",
+      "Input"  -> {DateObject["TimeZone" -> "UTC"], 30.},
+      "Output" -> _DateObject,
+      "Messages" -> {},
+      "TestID" -> "Examples-vendor_chrono-add_seconds-current_time_precision_real"|>,
+
     (* ── vendor-chrono-tz: chrono_tz_add_seconds ─────────────────────────────── *)
     (* Same bridge, but the timezone slot carries an IANA zone name instead of
        "UTC"/a numeric offset (see wolfram-serialize/src/vendor/chrono_tz.rs).

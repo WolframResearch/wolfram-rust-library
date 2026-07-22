@@ -151,7 +151,11 @@ macro_rules! read_wire {
     };
 }
 
-macro_rules! impl_numeric_from_wxf {
+// Integers additionally accept `BigInteger` (an arbitrary-precision integer
+// carried on the wire as its decimal digit string — same length-prefixed
+// shape as `Symbol`), parsing the digits directly into the target width and
+// erroring if they don't fit rather than silently truncating.
+macro_rules! impl_int_from_wxf {
     ($t:ty, [$($tok:ident),+]) => {
         impl<'de> FromWXF<'de> for $t {
             fn from_wxf_with_tag<R: Reader<'de>>(
@@ -160,8 +164,17 @@ macro_rules! impl_numeric_from_wxf {
             ) -> Result<Self, Error> {
                 match tok {
                     $(ExpressionEnum::$tok => Ok(read_wire!($tok, r)),)+
+                    ExpressionEnum::BigInteger => {
+                        let digits = r.read_symbol_name()?;
+                        digits.parse::<$t>().map_err(|_| {
+                            Error::invalid(format!(
+                                "BigInteger {digits:?} does not fit in {}",
+                                stringify!($t),
+                            ))
+                        })
+                    },
                     other => Err(Error::unexpected_token(
-                        &[$(stringify!($tok)),+],
+                        &[$(stringify!($tok)),+, "BigInteger"],
                         other,
                     )),
                 }
@@ -170,19 +183,66 @@ macro_rules! impl_numeric_from_wxf {
     };
 }
 
-// Signed integers: accept only wire tokens whose values always fit (same or
-// smaller width). No runtime range check — the type of the wire read guarantees it.
-impl_numeric_from_wxf!(i8, [Integer8]);
-impl_numeric_from_wxf!(i16, [Integer8, Integer16]);
-impl_numeric_from_wxf!(i32, [Integer8, Integer16, Integer32]);
-impl_numeric_from_wxf!(i64, [Integer8, Integer16, Integer32, Integer64]);
+// Floats additionally accept `BigReal` (an arbitrary-precision real carried on
+// the wire as its WL textual form, e.g. `"3.14159`50."` or `"1.`20.*^30"`),
+// parsed and narrowed to a machine double/single — this loses precision, same
+// as reading a `BigReal` over WSTP does, but never errors just for carrying
+// more digits or a precision/accuracy mark than a machine float can hold.
+macro_rules! impl_float_from_wxf {
+    ($t:ty, [$($tok:ident),+]) => {
+        impl<'de> FromWXF<'de> for $t {
+            fn from_wxf_with_tag<R: Reader<'de>>(
+                r: &mut WxfReader<R>,
+                tok: ExpressionEnum,
+            ) -> Result<Self, Error> {
+                match tok {
+                    $(ExpressionEnum::$tok => Ok(read_wire!($tok, r)),)+
+                    ExpressionEnum::BigReal => {
+                        let digits = r.read_symbol_name()?;
+                        parse_big_real(&digits).map(|v| v as $t)
+                    },
+                    other => Err(Error::unexpected_token(
+                        &[$(stringify!($tok)),+, "BigReal"],
+                        other,
+                    )),
+                }
+            }
+        }
+    };
+}
 
-// Floats: accept integer wire tokens whose bit width fits in the mantissa, plus
-// Real64 (the only real wire type — f32 narrows it, unavoidably).
+/// Parse a WXF `BigReal` digit string into an `f64`. The wire form is WL's
+/// `BigReal` textual representation: a mantissa, a backtick, then a
+/// precision/accuracy mark that may itself carry a `*^exponent` suffix, e.g.
+/// `"3.14`50."` (mantissa `3.14`, precision `50.`) or `"1.`20.*^30"`
+/// (mantissa `1.`, exponent `30`, i.e. `1e30`). The precision/accuracy digits
+/// themselves are discarded — only the mantissa and exponent affect the value.
+fn parse_big_real(s: &str) -> Result<f64, Error> {
+    let (mantissa, rest) = s.split_once('`').unwrap_or((s, ""));
+    let combined = match rest.find("*^") {
+        Some(idx) => format!("{mantissa}e{}", &rest[idx + 2..]),
+        None => mantissa.to_string(),
+    };
+    combined
+        .parse::<f64>()
+        .map_err(|_| Error::invalid(format!("invalid BigReal {s:?}")))
+}
+
+// Signed integers: accept wire tokens whose values always fit (same or
+// smaller width) with no runtime range check, plus `BigInteger` (range-checked
+// above).
+impl_int_from_wxf!(i8, [Integer8]);
+impl_int_from_wxf!(i16, [Integer8, Integer16]);
+impl_int_from_wxf!(i32, [Integer8, Integer16, Integer32]);
+impl_int_from_wxf!(i64, [Integer8, Integer16, Integer32, Integer64]);
+
+// Floats: accept integer wire tokens whose bit width fits in the mantissa,
+// `Real64` (the only machine-real wire type — f32 narrows it, unavoidably),
+// and `BigReal` (narrowed above).
 // f32 mantissa = 23 bits: i8 (7-bit) and i16 (15-bit) fit; i32 (31-bit) does not.
 // f64 mantissa = 52 bits: i8, i16, i32 (31-bit) fit; i64 (63-bit) does not.
-impl_numeric_from_wxf!(f32, [Integer8, Integer16]);
-impl_numeric_from_wxf!(f64, [Integer8, Integer16, Integer32, Real64]);
+impl_float_from_wxf!(f32, [Integer8, Integer16]);
+impl_float_from_wxf!(f64, [Integer8, Integer16, Integer32, Real64]);
 
 impl<'de> FromWXF<'de> for bool {
     fn from_wxf_with_tag<R: Reader<'de>>(
