@@ -103,6 +103,11 @@ impl ToWXF for String {
     }
 }
 
+// Not a numeric-`Vec` specialization, so opt into the generic
+// `Vec<T: WxfStruct>` blanket List impl below — this is what makes
+// `Vec<String>` (and `Vec<Vec<String>>`, etc.) encode as `Function[List, …]`.
+impl WxfStruct for String {}
+
 impl<T: ToWXF + ?Sized> ToWXF for &T {
     fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
         (*self).to_wxf(w)
@@ -181,6 +186,44 @@ impl<T: ToWXF + WxfStruct> ToWXF for Vec<T> {
         Ok(())
     }
 }
+
+//==============================================================================
+// Tuples
+//==============================================================================
+
+// Rust tuples map to a heterogeneous WXF List (`Function[List, …]`) — the same
+// shape `#[derive(ToWXF)]` already uses for tuple-struct fields. Implemented up
+// to arity 12, matching the range the standard library itself implements common
+// traits (`Debug`, `Default`, …) for: Rust code essentially never needs bigger
+// tuples than that, and this isn't a derive macro that could silently cover a
+// missed size — hitting the ceiling here is a compile error, not a wire bug.
+macro_rules! impl_tuple_to_wxf {
+    ($len:expr; $($T:ident $idx:tt),+) => {
+        impl<$($T: ToWXF),+> ToWXF for ($($T,)+) {
+            fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
+                w.write_function($len)?;
+                w.write_symbol("System`List")?;
+                $( self.$idx.to_wxf(w)?; )+
+                Ok(())
+            }
+        }
+
+        impl<$($T),+> WxfStruct for ($($T,)+) {}
+    };
+}
+
+impl_tuple_to_wxf!(1; A 0);
+impl_tuple_to_wxf!(2; A 0, B 1);
+impl_tuple_to_wxf!(3; A 0, B 1, C 2);
+impl_tuple_to_wxf!(4; A 0, B 1, C 2, D 3);
+impl_tuple_to_wxf!(5; A 0, B 1, C 2, D 3, E 4);
+impl_tuple_to_wxf!(6; A 0, B 1, C 2, D 3, E 4, F 5);
+impl_tuple_to_wxf!(7; A 0, B 1, C 2, D 3, E 4, F 5, G 6);
+impl_tuple_to_wxf!(8; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7);
+impl_tuple_to_wxf!(9; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8);
+impl_tuple_to_wxf!(10; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9);
+impl_tuple_to_wxf!(11; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10);
+impl_tuple_to_wxf!(12; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11);
 
 //==============================================================================
 // Option / unit / maps
