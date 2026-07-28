@@ -189,6 +189,26 @@ $Tests = {
       "Messages" -> {},
       "TestID" -> "Examples-wxf-concat-empty"|>,
 
+    (* ── wxf: collect (Vec<tuple> arg/return) ────────────────────────────────── *)
+
+    <|"Export" -> "collect",
+      "Input"  -> {{"foo", "bar"}, {"foo", "bar"}},
+      "Output" -> {{{0, "foo"}, {1, "bar"}}, True},
+      "Messages" -> {},
+      "TestID" -> "Examples-wxf-collect-all_matched"|>,
+
+    <|"Export" -> "collect",
+      "Input"  -> {{"foo"}, {"foo", "bar"}},
+      "Output" -> {{{0, "foo"}, {1, "bar"}}, False},
+      "Messages" -> {},
+      "TestID" -> "Examples-wxf-collect-not_all_matched"|>,
+
+    <|"Export" -> "collect",
+      "Input"  -> {{}, {}},
+      "Output" -> {{}, True},
+      "Messages" -> {},
+      "TestID" -> "Examples-wxf-collect-empty"|>,
+
     (* ── margs: raw MArgument functions, annotated with args/ret ─────────────── *)
 
     <|"Export" -> "margs_add",
