@@ -73,6 +73,20 @@ fn expand_struct(
         Fields::Named(named) => {
             let fields: Vec<&syn::Field> = named.named.iter().collect();
             let arity = fields.len();
+            // `#[wolfram(symbol = "Ctx`Head")]` switches a named struct from the
+            // Association form to a positional Normal `Head[field0, field1, …]`
+            // in declaration order (field names stay off the wire).
+            if let Some(symbol) = &attrs.symbol {
+                let writes = fields.iter().map(|f| {
+                    let ident = f.ident.as_ref().expect("named field");
+                    emit_write_field(&quote! { self.#ident }, &f.ty, f.ty.span())
+                });
+                return Ok(quote! {
+                    __w.write_function(#arity)?;
+                    __w.write_symbol(#symbol)?;
+                    #(#writes)*
+                });
+            }
             let writes = emit_named_entries(
                 &fields,
                 &|id| quote! { self.#id },
@@ -84,16 +98,18 @@ fn expand_struct(
             })
         },
         Fields::Unnamed(unnamed) => {
-            let _ = attrs; // `#[wolfram(symbol = ...)]` ignored for tuple structs.
             let fields: Vec<&syn::Field> = unnamed.unnamed.iter().collect();
             let arity = fields.len();
+            // `#[wolfram(symbol = "Ctx`Head")]` overrides the `List` head with a
+            // custom one: `Head[field0, field1, …]`.
+            let head = attrs.symbol.clone().unwrap_or_else(|| "System`List".to_string());
             let writes = fields.iter().enumerate().map(|(i, f)| {
                 let idx = syn::Index::from(i);
                 emit_write_field(&quote! { self.#idx }, &f.ty, f.ty.span())
             });
             Ok(quote! {
                 __w.write_function(#arity)?;
-                __w.write_symbol("System`List")?;
+                __w.write_symbol(#head)?;
                 #(#writes)*
             })
         },

@@ -169,6 +169,45 @@ fn expand_struct(
         Fields::Named(named) => {
             let fields: Vec<&syn::Field> = named.named.iter().collect();
             let arity = fields.len();
+
+            // `#[wolfram(symbol = "Ctx`Head")]` — the wire form is the positional
+            // Normal `Head[field0, field1, …]`: require a Function of that arity
+            // (the head itself is serialize-only and discarded), no Association
+            // fallback.
+            if attrs.symbol.is_some() {
+                let pos_extracts = fields.iter().map(|f| {
+                    let id = f.ident.as_ref().expect("named field");
+                    let path = format!("{}.{}", name_str, id);
+                    let span = f.ty.span();
+                    let extract = expand_field_extract(&f.ty, &path, span);
+                    quote_spanned! { span => let #id = #extract; }
+                });
+                let field_idents: Vec<&syn::Ident> =
+                    fields.iter().map(|f| f.ident.as_ref().unwrap()).collect();
+                return Ok(quote! {
+                    if __tok != ::wolfram_serialize::ExpressionEnum::Function {
+                        return ::core::result::Result::Err(
+                            ::wolfram_serialize::from_wxf::err_at(
+                                #name_str, "Function", __tok.name().to_string(),
+                            ),
+                        );
+                    }
+                    let __arity = __c.read_varint()?;
+                    if __arity != #arity as u64 {
+                        return ::core::result::Result::Err(
+                            ::wolfram_serialize::from_wxf::err_at(
+                                #name_str,
+                                concat!("Function with ", stringify!(#arity), " arguments"),
+                                format!("Function with {} arguments", __arity),
+                            ),
+                        );
+                    }
+                    __c.skip()?; // discard head
+                    #(#pos_extracts)*
+                    ::core::result::Result::Ok(#name { #(#field_idents),* })
+                });
+            }
+
             let NamedFieldsAssoc {
                 slot_decls,
                 key_arms,
@@ -257,7 +296,6 @@ fn expand_struct(
             })
         },
         Fields::Unnamed(unnamed) => {
-            let _ = attrs;
             let fields: Vec<&syn::Field> = unnamed.unnamed.iter().collect();
             let arity = fields.len();
             let extracts = fields.iter().enumerate().map(|(i, f)| {
@@ -286,7 +324,7 @@ fn expand_struct(
                         ),
                     );
                 }
-                __c.skip()?; // discard head
+                __c.skip()?; // discard head — heads are serialize-only, any is accepted
                 #(#extracts)*
                 ::core::result::Result::Ok(#name(#(#bindings),*))
             })

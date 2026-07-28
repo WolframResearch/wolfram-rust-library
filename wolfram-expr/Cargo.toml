@@ -18,6 +18,18 @@ default = []
 # expression parsing on top of it.
 unstable_parse = []
 
+# Conversions between `chrono` date/time types and `DateObject` expressions.
+vendor-chrono = ["wolfram-serialize/vendor-chrono"]
+
+# Conversions between `chrono-tz` named IANA time zones and `DateObject` expressions.
+vendor-chrono-tz = ["wolfram-serialize/vendor-chrono-tz"]
+
+# Conversions between `num-bigint` arbitrary-precision integers and `BigInteger` expressions.
+vendor-num-bigint = ["wolfram-serialize/vendor-num-bigint"]
+
+# Conversions between `num-complex` complex numbers and `Complex[re, im]` expressions.
+vendor-num-complex = ["wolfram-serialize/vendor-num-complex"]
+
 [dependencies]
 ordered-float = "3.4.0"
 wolfram-serialize = { version = "=0.6.0", path = "../wolfram-serialize" }

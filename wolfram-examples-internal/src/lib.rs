@@ -1,5 +1,7 @@
 pub mod core;
 
+#[cfg(feature = "vendor-chrono")]
+mod chrono_dates;
 mod legacy_native;
 #[cfg(feature = "wstp")]
 mod legacy_wstp;

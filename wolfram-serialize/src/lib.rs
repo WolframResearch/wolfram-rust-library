@@ -31,10 +31,27 @@ pub mod numeric_in;
 pub(crate) mod reader;
 pub mod strategy;
 pub(crate) mod to_wxf;
+pub mod vendor;
+#[cfg(any(
+    feature = "vendor-chrono",
+    feature = "vendor-num-bigint",
+    feature = "vendor-num-complex"
+))]
+pub(crate) mod via;
 pub(crate) mod writer;
 pub(crate) mod wxf;
 
 pub use crate::errors::Error;
+// `ViaWXF`/`impl_via_wxf!` are internal plumbing for the `vendor` bridges, not
+// public API — crate-visible only, so `crate::impl_via_wxf!(...)` resolves
+// from the `vendor::*` submodules that use it. Only compiled when a vendor
+// bridge feature is enabled; otherwise nothing uses it and it'd be dead code.
+#[cfg(any(
+    feature = "vendor-chrono",
+    feature = "vendor-num-bigint",
+    feature = "vendor-num-complex"
+))]
+pub(crate) use crate::via::{impl_via_wxf, ViaWXF};
 
 /// Upper bound on container capacity pre-allocated from an untrusted
 /// length/count prefix. Deserialization reads counts (array rank, association

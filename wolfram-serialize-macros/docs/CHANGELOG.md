@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+* `#[wolfram(symbol = "Ctx`Head")]` now also applies to tuple and named-field
+  structs, switching their wire form from `List[…]` / `Association` to the
+  positional normal `Head[field0, field1, …]` (field names, `rename`, and
+  `key_processor` don't apply in this form). Heads are serialize-only —
+  `#[derive(FromWXF)]` accepts and discards any head, checking only arity and
+  field types.
+
 ## [0.6.0] — 2026-07-09
 
 ### Added
