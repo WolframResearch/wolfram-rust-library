@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.1] — 2026-07-14
+## [0.6.2] — 2026-07-31
+
+### Fixed
+
+* `--cleanup` no longer deletes the entire output directory. It previously ran
+  `remove_dir_all` on the `--out` directory itself, so pointing a build at a
+  directory shared with anything else (`--out ../somefolder`) destroyed those
+  unrelated files. It now removes only the `<name>-<SystemID>/` paclet
+  subdirectories that the build itself writes.
+* Paclet names are sanitized before being used as a directory name, so a name
+  containing `/` (e.g. `WolframResearch/MyPaclet`) produces one flat directory
+  instead of silently nesting. Sanitizing matches the existing Java/WL
+  `CreatePacletArchive` logic — `/` becomes `__`, then the name is
+  form-urlencoded — and is shared from the new `paclet_name` module. The `Name`
+  written into `PacletInfo.wl` is unaffected.
 
 ### Added
 
