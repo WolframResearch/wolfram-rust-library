@@ -1,6 +1,6 @@
 [package]
 name = "cargo-wl"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 description = "Cargo subcommand for building and packaging Wolfram LibraryLink crates"
 license = "MIT OR Apache-2.0"

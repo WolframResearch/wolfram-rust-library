@@ -33,6 +33,9 @@ pub mod build;
 /// `cargo wl test` / `cargo wl evaluate`: run `.wlt`/`.wl` files through a
 /// Wolfram kernel against the built package.
 pub mod commands;
+/// Paclet name sanitizing and qualified-name construction, matching the
+/// existing Java/WL `CreatePacletArchive` tooling.
+pub mod paclet_name;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;

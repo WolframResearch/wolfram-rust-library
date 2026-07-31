@@ -7,6 +7,7 @@ use wolfram_app_discovery::SystemID;
 use wolfram_export_core::{library_functions_loader, FunctionEntry, LibraryArtifact};
 use wolfram_expr::{expr, Expr};
 
+use crate::paclet_name::sanitize_paclet_name;
 use crate::{BuildArgs, Result};
 
 /// A compiled `cdylib` plus the LibraryLink functions it exports, as read from
@@ -508,6 +509,7 @@ pub fn collect_dylib_info(dylib: &Path) -> Result<DylibInfo> {
 /// an `--output ../somefolder` pointing at a directory the user also uses for
 /// other things).
 fn clean_paclet_dir(out_dir: &Path, name: &str, system_id: SystemID) -> Result<()> {
+    let name = sanitize_paclet_name(name);
     let paclet_dir = out_dir.join(format!("{name}-{}", system_id.as_str()));
     if paclet_dir.exists() {
         std::fs::remove_dir_all(&paclet_dir)
@@ -524,7 +526,11 @@ pub fn generate_package(
     out_dir: &Path,
     config: &PacletConfig,
 ) -> Result<PathBuf> {
-    let lib_dir = out_dir.join(format!("{}-{}", config.name, system_id.as_str()));
+    let lib_dir = out_dir.join(format!(
+        "{}-{}",
+        sanitize_paclet_name(&config.name),
+        system_id.as_str()
+    ));
     std::fs::create_dir_all(&lib_dir)
         .map_err(|e| format!("failed to create {}: {e}", lib_dir.display()))?;
 
@@ -672,7 +678,11 @@ pub fn copy_cross_dylibs(
     out_dir: &Path,
     config: &PacletConfig,
 ) -> Result<PathBuf> {
-    let lib_dir = out_dir.join(format!("{}-{}", config.name, system_id.as_str()));
+    let lib_dir = out_dir.join(format!(
+        "{}-{}",
+        sanitize_paclet_name(&config.name),
+        system_id.as_str()
+    ));
     std::fs::create_dir_all(&lib_dir)
         .map_err(|e| format!("failed to create {}: {e}", lib_dir.display()))?;
 
@@ -754,9 +764,7 @@ fn rust_target(id: SystemID) -> Result<&'static str> {
 /// both kept for cargo *and* used to resolve the paclet config. Needed
 /// because clap's `trailing_var_arg` capture swallows any wl flag placed
 /// after the first cargo-only flag — see [`build_and_package`].
-pub fn parse_forwarded_args(
-    args: Vec<String>,
-) -> Result<(BuildArgs, Option<String>)> {
+pub fn parse_forwarded_args(args: Vec<String>) -> Result<(BuildArgs, Option<String>)> {
     let mut config = BuildArgs::default();
     let mut package = None;
     let mut iter = args.into_iter();
@@ -787,8 +795,7 @@ pub fn parse_forwarded_args(
         } else if arg == "--named-exports" {
             config.named_exports = true;
         } else if arg == "--namespace" {
-            config.namespace =
-                Some(iter.next().ok_or("--namespace requires a value")?);
+            config.namespace = Some(iter.next().ok_or("--namespace requires a value")?);
         } else if let Some(value) = arg.strip_prefix("--namespace=") {
             config.namespace = Some(value.to_owned());
         } else if arg == "--paclet-name" {
