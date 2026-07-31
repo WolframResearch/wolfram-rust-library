@@ -227,9 +227,8 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             .output
             .clone()
             .unwrap_or_else(|| PathBuf::from("wl-package"));
-        if config.cleanup && out_dir.exists() {
-            std::fs::remove_dir_all(&out_dir)
-                .map_err(|e| format!("failed to clear {}: {e}", out_dir.display()))?;
+        if config.cleanup {
+            clean_paclet_dir(&out_dir, &config.name, host_system_id)?;
         }
         let lib_dir = generate_package(&[], host_system_id, &out_dir, &config)?;
         let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
@@ -290,9 +289,11 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
                 .unwrap_or_else(|| PathBuf::from("wl-package"))
         });
 
-        if loc.config.cleanup && out_dir.exists() {
-            std::fs::remove_dir_all(&out_dir)
-                .map_err(|e| format!("failed to clear {}: {e}", out_dir.display()))?;
+        let system_ids = target_system_ids(host_system_id, loc.config.system_ids.clone());
+        if loc.config.cleanup {
+            for system_id in system_ids.iter().copied() {
+                clean_paclet_dir(&out_dir, &loc.config.name, system_id)?;
+            }
         }
 
         let host_infos: Vec<DylibInfo> = loc
@@ -310,7 +311,6 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
         let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
         generated.push(lib_dir);
 
-        let system_ids = target_system_ids(host_system_id, loc.config.system_ids.clone());
         for system_id in system_ids.iter().copied() {
             if system_id == host_system_id {
                 continue;
@@ -499,6 +499,21 @@ pub fn collect_dylib_info(dylib: &Path) -> Result<DylibInfo> {
         entries,
         namespace: None,
     })
+}
+
+/// Removes `out_dir/<name>-<SystemID>/` (the exact directory `generate_package`
+/// and `copy_cross_dylibs` write to), if it exists. `--cleanup` must only ever
+/// clear the paclet subdirectory this build owns, never the user-supplied
+/// `out_dir` itself — that directory may be shared with unrelated files (e.g.
+/// an `--output ../somefolder` pointing at a directory the user also uses for
+/// other things).
+fn clean_paclet_dir(out_dir: &Path, name: &str, system_id: SystemID) -> Result<()> {
+    let paclet_dir = out_dir.join(format!("{name}-{}", system_id.as_str()));
+    if paclet_dir.exists() {
+        std::fs::remove_dir_all(&paclet_dir)
+            .map_err(|e| format!("failed to clear {}: {e}", paclet_dir.display()))?;
+    }
+    Ok(())
 }
 
 /// Write Functions.wl, Artifacts.wl, and PacletInfo.wl into `out_dir/<name>-<SystemID>/`.
