@@ -253,10 +253,10 @@ impl<'de> FromWXF<'de> for bool {
             return Err(Error::unexpected_token(&["Symbol"], tok));
         }
         match r.read_str()? {
-            "System`True" => Ok(true),
-            "System`False" => Ok(false),
+            "True" | "System`True" => Ok(true),
+            "False" | "System`False" => Ok(false),
             other => Err(Error::UnexpectedSymbol {
-                expected: vec!["System`True", "System`False"],
+                expected: vec!["True", "False", "System`True", "System`False"],
                 got: other.to_owned(),
             }),
         }
