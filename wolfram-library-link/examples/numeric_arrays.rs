@@ -1,4 +1,4 @@
-use wolfram_library_link::{self as wll, NumericArray, NumericArrayKind};
+use wolfram_library_link::{self as wll, ByteArray, NumericArray, NumericArrayKind};
 
 /// This function is loaded by evaluating:
 ///
@@ -53,4 +53,16 @@ fn sum_real_numeric_array(na: &NumericArray) -> f64 {
     };
 
     sum
+}
+
+#[wll::export]
+fn sum_byte_array(ba: &ByteArray) -> u32 {
+    let sum: u32 = ba.as_slice().into_iter().copied().map(u32::from).sum();
+    sum
+}
+
+#[wll::export]
+fn return_byte_array(n: i64) -> ByteArray {
+    let n: u8 = n.try_into().unwrap_or_default();
+    NumericArray::<u8>::from_slice(vec![n; 5].as_slice()).into()
 }

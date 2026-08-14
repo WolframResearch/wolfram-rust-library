@@ -2,6 +2,7 @@ use std::ffi::c_void;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem::{self, MaybeUninit};
+use std::ops::Deref;
 
 use static_assertions::assert_not_impl_any;
 
@@ -52,9 +53,18 @@ pub struct NumericArray<T = ()>(sys::MNumericArray, PhantomData<T>);
 /// elements of this [`UninitNumericArray`].
 pub struct UninitNumericArray<T: NumericArrayType>(sys::MNumericArray, PhantomData<T>);
 
+/// Newtype wrapper around [`NumericArray<u8>`], corresponding to [`LibraryDataType["ByteArray"]`]
+/// when used as a function argument/return type.
+/// Supports all of [`NumericArray`]'s methods, as well as seamless conversion
+/// between the two types with From/Into.
+#[repr(transparent)]
+#[derive(ref_cast::RefCast)]
+pub struct ByteArray(NumericArray<u8>);
+
 // Guard against accidental `derive(Copy)` annotations.
 assert_not_impl_any!(NumericArray: Copy);
 assert_not_impl_any!(UninitNumericArray<i64>: Copy);
+assert_not_impl_any!(ByteArray: Copy);
 
 //======================================
 // Traits
@@ -908,6 +918,36 @@ impl<T> fmt::Debug for NumericArray<T> {
             .field("raw", &self.0)
             .field("data_type", &self.data_type())
             .finish()
+    }
+}
+
+impl Deref for ByteArray {
+    type Target = NumericArray<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> AsRef<T> for ByteArray
+where
+    T: ?Sized,
+    <ByteArray as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl From<NumericArray<u8>> for ByteArray {
+    fn from(value: NumericArray<u8>) -> Self {
+        ByteArray(value)
+    }
+}
+
+impl From<ByteArray> for NumericArray<u8> {
+    fn from(value: ByteArray) -> Self {
+        value.0
     }
 }
 

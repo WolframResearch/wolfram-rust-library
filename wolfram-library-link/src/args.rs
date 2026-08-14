@@ -17,7 +17,7 @@ use crate::{
     expr::{expr, Expr},
     rtl,
     sys::{self, mint, mreal, MArgument},
-    DataStore, Image, NumericArray,
+    ByteArray, DataStore, Image, NumericArray,
 };
 
 /// Trait implemented for types that can be passed via an [`MArgument`].
@@ -28,13 +28,17 @@ pub trait FromArg<'a> {
     /// Return the *LibraryLink* parameter type as a Wolfram Language expression.
     ///
     /// ```
-    /// use wolfram_library_link::{FromArg, NumericArray};
+    /// use wolfram_library_link::{FromArg, ByteArray, NumericArray};
     ///
     /// assert_eq!(&bool::parameter_type().to_string(), "\"Boolean\"");
     /// assert_eq!(&i64::parameter_type().to_string(), "System`Integer");
     /// assert_eq!(
     ///     &<&NumericArray<i8>>::parameter_type().to_string(),
     ///     r#"{System`LibraryDataType["NumericArray", "Integer8"], "Constant"}"#
+    /// );
+    /// assert_eq!(
+    ///     &<&ByteArray>::parameter_type().to_string(),
+    ///     r#"{System`LibraryDataType["ByteArray"], "Constant"}"#
     /// );
     /// ```
     ///
@@ -259,7 +263,7 @@ impl<'a> FromArg<'a> for &'a str {
 }
 
 //--------------------------------------
-// NumericArray
+// NumericArray and ByteArray
 //--------------------------------------
 
 // TODO: Add FromArg for NumericArray which just clones the numeric array? Or disclaims
@@ -339,6 +343,30 @@ impl<'a> FromArg<'a> for NumericArray<()> {
     fn parameter_type() -> Expr {
         // {NumericArray, "Shared"}
         crate::expr::expr!(System::List["NumericArray", "Shared"])
+    }
+}
+
+impl<'a> FromArg<'a> for &'a ByteArray {
+    unsafe fn from_arg(arg: &'a MArgument) -> &'a ByteArray {
+        ByteArray::ref_cast(NumericArray::ref_cast(&*arg.numeric))
+    }
+
+    fn parameter_type() -> Expr {
+        // {LibraryDataType[ByteArray], "Constant"}
+        let ldt = crate::expr::expr!(System::LibraryDataType["ByteArray"]);
+        crate::expr::expr!(System::List[ldt, "Constant"])
+    }
+}
+
+impl<'a> FromArg<'a> for ByteArray {
+    unsafe fn from_arg(arg: &'a MArgument) -> ByteArray {
+        NumericArray::from_raw(*arg.numeric).into()
+    }
+
+    fn parameter_type() -> Expr {
+        // {LibraryDataType[ByteArray], "Shared"}
+        let ldt = crate::expr::expr!(System::LibraryDataType["ByteArray"]);
+        crate::expr::expr!(System::List[ldt, "Shared"])
     }
 }
 
@@ -612,7 +640,7 @@ impl IntoArg for String {
 }
 
 //---------------------------------------
-// NumericArray, Image, DataStore
+// NumericArray, ByteArray, Image, DataStore
 //---------------------------------------
 
 impl<T: crate::NumericArrayType> IntoArg for NumericArray<T> {
@@ -635,6 +663,17 @@ impl IntoArg for NumericArray<()> {
     fn return_type() -> Expr {
         // NumericArray
         crate::expr::expr!("NumericArray")
+    }
+}
+
+impl IntoArg for ByteArray {
+    unsafe fn into_arg(self, arg: MArgument) {
+        *arg.numeric = NumericArray::<u8>::from(self).into_raw();
+    }
+
+    fn return_type() -> Expr {
+        // LibraryDataType[ByteArray]
+        crate::expr::expr!(System::LibraryDataType["ByteArray"])
     }
 }
 
