@@ -18,12 +18,14 @@ members = [
     "xtask",
 ]
 
-# `wolfram-examples` is its own standalone workspace (see
-# wolfram-examples/Cargo.toml): it depends on the published crates.io releases
-# of this repo's crates (not local paths), so it isn't a member here and has
-# its own Cargo.lock. Unlike `wolfram-test-lib`, its crates are meant
-# to be copy-pasted as standalone starting points, not built from this repo.
-exclude = ["wolfram-examples"]
+# `WolframExample` is a self-contained Wolfram paclet, not part of this
+# workspace. Its Rust crates live in WolframExample/libs and form their own
+# standalone workspace (see WolframExample/libs/Cargo.toml): they depend on the
+# published crates.io releases of this repo's crates (not local paths), so they
+# aren't members here and have their own Cargo.lock. Unlike `wolfram-test-lib`,
+# they're meant to be copy-pasted as standalone starting points, not built from
+# this repo.
+exclude = ["WolframExample"]
 
 # default-members excludes the -sys crates so contributors without a local
 # Wolfram installation can still run `cargo check` / `cargo test` from the

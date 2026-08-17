@@ -4,6 +4,10 @@ resolver = "2"
 # A standalone workspace — not part of the main repo workspace (see the root
 # Cargo.toml's `exclude`). These are copy-paste-able sample crates: they depend
 # on the published crates.io releases of this repo's crates, not local paths.
+#
+# Every member packages into the same paclet, `WolframExampleLib`, written next
+# to the `WolframExample` paclet that consumes it (see each member's
+# `[package.metadata.wl.pacletinfo]`).
 members = [
     "duckdb",
     "math",

@@ -10,7 +10,7 @@ cargo = FileNameJoin[{$HomeDirectory, ".cargo", "bin", "cargo"}];
    benchmark, when in fact WSTP just wasn't running at all.
 
    Uses `wolfram-test-lib` (the in-repo test/benchmark crate, built via
-   local path deps) rather than the standalone `wolfram-examples` workspace —
+   local path deps) rather than the standalone `WolframExample/libs` workspace —
    that one only holds copy-paste sample crates (duckdb, math) and depends on
    published crates.io releases, not this checkout's code. Functions here have
    no namespace prefix (namespace-exports is off); native_/wstp_/wxf_ prefixes

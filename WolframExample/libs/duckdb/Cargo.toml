@@ -8,10 +8,14 @@ edition = "2021"
 publish = false
 
 [package.metadata.wl.pacletinfo]
-name = "WolframExamples"
+name = "WolframExampleLib"
 version = "1.0.0"
 namespace = "duckdb"
 named-exports = false
+# See the note in ../math/Cargo.toml: both members write into the same
+# `WolframExampleLib-<SystemID>/` next to the `WolframExample` paclet, so every
+# setting here except `namespace` must match math's.
+output = "../../../"
 
 [lib]
 # Keeps the built dylib (and so the WL function namespace, `duckdb::fn_name`)

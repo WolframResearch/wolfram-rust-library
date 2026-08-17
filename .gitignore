@@ -8,3 +8,4 @@ Cargo.lock
 /notebooks/MacOSX-ARM64
 /notebooks/Windows-x86-64
 /notebooks/WolframExamples-MacOSX-ARM64
+/WolframExampleLib-*

@@ -5,10 +5,15 @@ edition = "2021"
 publish = false
 
 [package.metadata.wl.pacletinfo]
-name = "WolframExamples"
+name = "WolframExampleLib"
 version = "1.0.0"
 namespace = "math"
 named-exports = false
+# Relative to this manifest's directory (WolframExample/libs/math), so the
+# generated `WolframExampleLib-<SystemID>/` lands next to the `WolframExample`
+# paclet — both are then picked up by one `PacletDirectoryLoad` of that parent
+# directory, which is how `WolframExample`'s kernel code finds this library.
+output = "../../../"
 
 [lib]
 crate-type = ["cdylib"]
