@@ -66,6 +66,18 @@ $Tests = {
       "Output"   -> _Failure,
       "Messages" -> {}|>,
 
+    (* an unrecognized shape is reported as a Failure, not a bare $Failed *)
+    <|"TestID"   -> "WolframExample-area-unknown-shape",
+      "Input"    -> WolframExample`ExampleArea[<|"Bogus" -> 1|>],
+      "Output"   -> _Failure,
+      "Messages" -> {}|>,
+
+    (* the loaded library is handed back as-is *)
+    <|"TestID"   -> "WolframExample-functions-association",
+      "Input"    -> AssociationQ[WolframExample`WolframExampleFunctions[]],
+      "Output"   -> True,
+      "Messages" -> {}|>,
+
     (* ── duckdb ────────────────────────────────────────────────────────────── *)
 
     (* DuckDBExecute opens, runs, and closes; the query result is a Tabular,

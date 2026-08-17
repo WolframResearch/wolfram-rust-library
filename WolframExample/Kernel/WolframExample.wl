@@ -11,7 +11,7 @@
 
 BeginPackage["WolframExample`"];
 
-WolframExampleFunctions::usage = "WolframExampleFunctions[] gives the association of raw LibraryFunction objects exported by the WolframExampleLib paclet, keyed by \"namespace::name\".";
+WolframExampleFunctions::usage = "WolframExampleFunctions[] gives the association of raw LibraryFunction objects exported by the WolframExampleLib paclet, keyed by \"namespace::name\", or a Failure if that paclet cannot be loaded.";
 
 (* math *)
 ExampleAdd::usage = "ExampleAdd[a, b] adds two reals in Rust.";
@@ -31,6 +31,7 @@ DuckDBExecute::usage = "DuckDBExecute[url, f] opens a connection to url, applies
 WolframExample::nolib = "The `1` paclet was not found. Build it by running \"cargo wl build\" in WolframExample, then make its directory known with PacletDirectoryLoad.";
 WolframExample::nofunc = "`1` is not exported by the `2` paclet; the library may be built without the corresponding feature.";
 WolframExample::divide = "`1`";
+WolframExample::shape = "An area needs either a \"Radius\" or a \"Width\" and a \"Height\"; got `1`.";
 WolframExample::badasset = "The `1` paclet does not provide a readable \"Functions\" asset (looked at `2`).";
 
 Begin["`Private`"];
@@ -44,6 +45,15 @@ $libraryPaclet = "WolframExampleLib";
    this machine. (The property is singular — "AssetsLocation" is not one of
    PacletObject's properties and evaluates to an unevaluated part access.) *)
 
+(* Everything that can go wrong here is reported as a Failure carrying the
+   message template rather than as $Failed plus a Message: the object formats
+   itself with the same text, survives being stored in a variable, and can be
+   returned straight to the caller. *)
+failure[tag_String, template_, params_List] := Failure[tag, <|
+    "MessageTemplate" :> template,
+    "MessageParameters" -> params
+|>];
+
 (* Each With sequence sees the previous one's bindings, so the three stages —
    find the paclet, resolve the asset, read it — chain without any mutable
    state; every stage guards on the one before it, and a single Which reports
@@ -54,11 +64,11 @@ loadFunctions[] := With[
     {functions = If[StringQ[file] && FileExistsQ[file], Get[file], $Failed]},
     Which[
         !PacletObjectQ[paclet],
-            Message[WolframExample::nolib, $libraryPaclet]; $Failed,
+            failure["MissingPaclet", WolframExample::nolib, {$libraryPaclet}],
         (* covers both an unusable asset path and a file that did not read
            back as an association: neither leaves `functions` one *)
         !AssociationQ[functions],
-            Message[WolframExample::badasset, $libraryPaclet, file]; $Failed,
+            failure["UnreadableAsset", WolframExample::badasset, {$libraryPaclet, file}],
         True,
             functions
     ]
@@ -70,18 +80,19 @@ $functions := With[{loaded = loadFunctions[]},
     If[AssociationQ[loaded], $functions = loaded, loaded]
 ];
 
-WolframExampleFunctions[] := Replace[$functions, Except[_?AssociationQ] :> <||>];
+WolframExampleFunctions[] := $functions;
 
-(* `libraryFunction["duckdb::db_query"][args]` — resolves lazily on each call
-   and messages once if the key is absent (e.g. a Cargo feature was off when
-   the library was built). *)
+(* `libraryFunction["duckdb::db_query"][args]` — resolves lazily on each call.
+   A library that failed to load, or a key that isn't in it (e.g. a Cargo
+   feature was off when it was built), comes back as a Failure the caller can
+   inspect — the load Failure is passed through unchanged rather than
+   re-wrapped, so the original cause survives. *)
 libraryFunction[key_String][args___] := With[
     {functions = $functions},
-    {f = If[AssociationQ[functions], Lookup[functions, key, $Failed], $Failed]},
+    {f = If[AssociationQ[functions], Lookup[functions, key, Missing[key]], functions]},
     Which[
-        (* the load already messaged — stay quiet here *)
-        !AssociationQ[functions], $Failed,
-        f === $Failed, Message[WolframExample::nofunc, key, $libraryPaclet]; $Failed,
+        !AssociationQ[functions], functions,
+        MissingQ[f], failure["UnknownFunction", WolframExample::nofunc, {key, $libraryPaclet}],
         True, f[args]
     ]
 ];
@@ -103,7 +114,7 @@ toReal64[list_List] := NumericArray[N[list], "Real64"];
    "Circle" -> <|"radius" -> 1|> would do just as well. Struct fields keep
    their Rust names ("width", "radius", ...). *)
 ExampleArea[assoc_?AssociationQ] := With[{shape = shapeFor[assoc]},
-    If[shape === $Failed, $Failed, libraryFunction["math::area_shape"][shape]]
+    If[FailureQ[shape], shape, libraryFunction["math::area_shape"][shape]]
 ];
 
 shapeFor[assoc_] := Which[
@@ -112,7 +123,7 @@ shapeFor[assoc_] := Which[
     KeyExistsQ[assoc, "Width"] && KeyExistsQ[assoc, "Height"],
         {"Rect", <|"width" -> N[assoc["Width"]], "height" -> N[assoc["Height"]]|>},
     True,
-        $Failed
+        failure["UnknownShape", WolframExample::shape, {Keys[assoc]}]
 ];
 
 ExampleSymmetricPoint[assoc_?AssociationQ] := With[
@@ -129,11 +140,7 @@ ExampleSafeDivide[a_?NumericQ, b_?NumericQ] := Replace[
     libraryFunction["math::safe_divide"][N[a], N[b]],
     {
         {"Ok", value_} :> value,
-        {"Err", message_} :> Failure["DivisionError", <|
-            "MessageTemplate" :> WolframExample::divide,
-            "MessageParameters" -> {message},
-            "Message" -> message
-        |>]
+        {"Err", message_} :> failure["DivisionError", WolframExample::divide, {message}]
     }
 ];
 
