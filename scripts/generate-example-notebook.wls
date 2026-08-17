@@ -1,5 +1,5 @@
 #!/usr/bin/env wolframscript
-(* Generate notebooks/WolframExampleTour.nb — a runnable tour of the
+(* Generate notebooks/WolframExampleTour.nb - a runnable tour of the
    WolframExample paclet, one section per Rust library.
 
    Usage:
@@ -7,7 +7,7 @@
      wolframscript -file scripts/generate-example-notebook.wls --check
      wolframscript -file scripts/generate-example-notebook.wls --out /tmp/Tour.nb
 
-   The notebook is written unevaluated — open it and press Evaluate Notebook.
+   The notebook is written unevaluated - open it and press Evaluate Notebook.
    --check additionally evaluates every input cell in this kernel and reports
    the ones that fail, which is how you tell that a tour cell went stale after
    an API change. It needs the library built first:
@@ -18,9 +18,14 @@
    The cell text lives in $sections below: edit there, re-run, done. Keeping it
    in a script rather than hand-editing the .nb means the tour can be
    regenerated whenever the paclet's API changes, and stays reviewable as a
-   diff. *)
+   diff.
 
-(* ── Arguments ─────────────────────────────────────────────────────────────── *)
+   Keep this file 7-bit ASCII. wolframscript does not read .wls source as UTF-8
+   by default, so a literal em dash here arrives as its three raw bytes and
+   lands in the notebook as \[AHat]\.80\.94. Write \[LongDash] (or any other
+   long name) in the cell strings instead \[LongDash] it survives either way. *)
+
+(* -- Arguments --------------------------------------------------------------- *)
 
 $args = Rest[$ScriptCommandLine];
 $check = MemberQ[$args, "--check"];
@@ -32,7 +37,7 @@ $outArg = Replace[
 $repoRoot = ParentDirectory[DirectoryName[$InputFileName]];
 $out = Replace[$outArg, None :> FileNameJoin[{$repoRoot, "notebooks", "WolframExampleTour.nb"}]];
 
-(* ── Cell constructors ─────────────────────────────────────────────────────── *)
+(* -- Cell constructors ------------------------------------------------------- *)
 
 title[text_] := Cell[text, "Title"];
 text[body_] := Cell[body, "Text"];
@@ -42,7 +47,7 @@ code[input_] := Cell[input, "Input"];
 section[heading_, cells___] := Cell[CellGroupData[{Cell[heading, "Section"], cells}, Open]];
 subsection[heading_, cells___] := Cell[CellGroupData[{Cell[heading, "Subsection"], cells}, Open]];
 
-(* ── The tour ──────────────────────────────────────────────────────────────── *)
+(* -- The tour ---------------------------------------------------------------- *)
 
 $sections = {
 
@@ -56,8 +61,8 @@ If the setup section reports a missing paclet, build the library first:
 
 section["Setup",
 
-    text["Both paclets — the hand-written WolframExample and the generated \
-WolframExampleLib — sit in this notebook's parent directory, so one \
+    text["Both paclets \[LongDash] the hand-written WolframExample and the generated \
+WolframExampleLib \[LongDash] sit in this notebook's parent directory, so one \
 PacletDirectoryLoad registers both."],
 
     code["PacletDirectoryLoad[ParentDirectory[NotebookDirectory[]]]"],
@@ -81,7 +86,7 @@ section["Math",
     subsection["Scalars and arrays",
 
         text["A plain Rust function over two f64s. Arguments and result cross \
-as raw MArgument scalars — no serialization at all."],
+as raw MArgument scalars \[LongDash] no serialization at all."],
 
         code["ExampleAdd[2, 3]"],
 
@@ -106,7 +111,7 @@ Wolfram-style capitalized keys."],
 
         code["ExampleSymmetricPoint[<|\"X\" -> 10, \"Y\" -> 20|>]"],
 
-        text["ExampleArea goes through a Rust enum — one function, one \
+        text["ExampleArea goes through a Rust enum \[LongDash] one function, one \
 match, two shapes:"],
 
         code["ExampleArea[<|\"Radius\" -> 1|>]"],
@@ -133,14 +138,14 @@ match, two shapes:"],
 
 section["DuckDB",
 
-    text["An entire embedded SQL engine, statically linked into the library — \
+    text["An entire embedded SQL engine, statically linked into the library \[LongDash] \
 nothing to install. Query results come back as Arrow and are decoded into a \
 Tabular."],
 
     subsection["Scoped connections",
 
         text["DuckDBExecute opens a connection, applies the function to it, \
-and closes it again — even if the body fails."],
+and closes it again \[LongDash] even if the body fails."],
 
         code["DuckDBExecute[\"duckdb://\", DuckDBQuery[#, \"SELECT 42 AS answer\"] &]"],
 
@@ -211,7 +216,7 @@ unevaluated:"],
     code["Activate[WolframExampleFunctions[][\"math::inactive_sum\"][{1, 2, 3}]]"],
 
     text["A panic on the Rust side is caught at the boundary and returned as \
-a Failure — it does not take the kernel down:"],
+a Failure \[LongDash] it does not take the kernel down:"],
 
     code["WolframExampleFunctions[][\"math::panic\"][]"],
 
@@ -224,7 +229,7 @@ the generated Artifacts.wl asset:"],
 section["Rebuilding",
 
     text["After editing the Rust source, rebuild from the paclet directory. \
-The dylibs are content-hashed, so a rebuilt library gets a new file name — \
+The dylibs are content-hashed, so a rebuilt library gets a new file name \[LongDash] \
 quit the kernel to pick it up."],
 
     code["ExternalEvaluate[{\"Shell\",\n    \"ProcessDirectory\" -> FileNameJoin[{ParentDirectory[NotebookDirectory[]], \"WolframExample\"}],\n    \"ProcessEnvironment\" -> <|\"PATH\" -> Environment[\"PATH\"]|>},\n   \"cargo wl build --release\"]"]
@@ -232,7 +237,7 @@ quit the kernel to pick it up."],
 
 };
 
-(* ── Write ─────────────────────────────────────────────────────────────────── *)
+(* -- Write ------------------------------------------------------------------- *)
 
 $notebook = Notebook[$sections,
     StyleDefinitions -> "Default.nb",
@@ -244,7 +249,7 @@ If[!DirectoryQ[DirectoryName[$out]], CreateDirectory[DirectoryName[$out], Create
 Export[$out, $notebook, "NB"];
 Print["wrote ", $out];
 
-(* ── --check: evaluate every input cell here in the kernel ─────────────────── *)
+(* -- --check: evaluate every input cell here in the kernel ------------------- *)
 
 (* NotebookDirectory[] only exists with a front end, so the cells that call it
    are evaluated against the real notebook location instead. *)
@@ -258,7 +263,7 @@ label[input_String] := First[StringSplit[input, "\n"]];
 (* A cell counts as failed when it emits a message (Check turns that into
    $Failed). A Failure *object* is not a failure of the cell: several cells
    demonstrate error handling and are meant to return one. *)
-(* The rebuild cell shells out to cargo — checked cells must not have side
+(* The rebuild cell shells out to cargo - checked cells must not have side
    effects outside the kernel, so it is skipped before it is ever evaluated. *)
 checkCell[input_String] /; StringContainsQ[input, "ExternalEvaluate"] := (
     Print["skip ", label[input]];
@@ -287,7 +292,7 @@ If[$check,
     If[!MemberQ[$Packages, "WolframExample`"],
         Print["cannot check: WolframExample` did not load from ", DirectoryName[$out]];
         Print["build the library first (cd WolframExample && cargo wl build), and"];
-        Print["check the notebook where it will live — --out must stay next to the paclet"];
+        Print["check the notebook where it will live \[LongDash] --out must stay next to the paclet"];
         Exit[1]
     ];
     With[{failed = Count[checkCell /@ Drop[$inputs, $setupCells], False]},
