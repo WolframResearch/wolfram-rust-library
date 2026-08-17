@@ -55,8 +55,8 @@ loadFunctions[] := With[
     Which[
         !PacletObjectQ[paclet],
             Message[WolframExample::nolib, $libraryPaclet]; $Failed,
-        !StringQ[file] || !FileExistsQ[file],
-            Message[WolframExample::badasset, $libraryPaclet, file]; $Failed,
+        (* covers both an unusable asset path and a file that did not read
+           back as an association: neither leaves `functions` one *)
         !AssociationQ[functions],
             Message[WolframExample::badasset, $libraryPaclet, file]; $Failed,
         True,
