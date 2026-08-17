@@ -166,3 +166,31 @@ VerificationTest[
 	positiveQ[NumericArray[{0, 1, -2, 3, 4,	-5}, "Integer64"]],
 	NumericArray[{0, 1, 0, 1, 1, 0}, "UnsignedInteger8"]
 ]
+
+(*----------------*)
+(* ByteArrays *)
+(*----------------*)
+
+VerificationTest[
+	xorByteArray = LibraryFunctionLoad[
+		"liblibrary_tests",
+		"xor_bytearray",
+		{LibraryDataType[ByteArray]},
+		Integer
+	];
+
+	xorByteArray[ByteArray[{2, 9, 19, 29, 42}]],
+	47
+]
+
+VerificationTest[
+	mostSignificantBitsByteArray = LibraryFunctionLoad[
+		"liblibrary_tests",
+		"msb_bytearray",
+		{LibraryDataType[ByteArray]},
+		LibraryDataType[ByteArray]
+	];
+
+	mostSignificantBitsByteArray[ByteArray[{0, 1, 127, 128, 254, 255}]],
+	ByteArray[{0, 0, 0, 1, 1, 1}]
+]

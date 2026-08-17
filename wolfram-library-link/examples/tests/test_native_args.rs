@@ -3,7 +3,7 @@ use std::ffi::CString;
 use wolfram_library_link::{
     self as wll,
     sys::{mint, mreal},
-    NumericArray, UninitNumericArray,
+    ByteArray, NumericArray, UninitNumericArray,
 };
 
 //======================================
@@ -123,4 +123,30 @@ fn positive_i64(list: &NumericArray<i64>) -> NumericArray<u8> {
     }
 
     unsafe { bools.assume_init() }
+}
+
+//======================================
+// ByteArrays
+//======================================
+
+#[wll::export]
+fn xor_bytearray(list: &ByteArray) -> u8 {
+    use std::ops::BitXor;
+    list.as_slice().into_iter().fold(0, u8::bitxor)
+}
+
+/// Returns most-significant bit of each byte as a ByteArray.
+#[wll::export]
+fn msb_bytearray(list: &ByteArray) -> ByteArray {
+    use std::ops::BitAnd;
+    let mut msbs: UninitNumericArray<u8> =
+        UninitNumericArray::from_dimensions(list.dimensions());
+
+    for pair in list.as_slice().into_iter().zip(msbs.as_slice_mut()) {
+        let (elem, entry): (&u8, &mut std::mem::MaybeUninit<u8>) = pair;
+
+        entry.write(u8::from(elem.bitand(128) > 0));
+    }
+
+    unsafe { msbs.assume_init() }.into()
 }
