@@ -236,6 +236,38 @@ the generated Artifacts.wl asset:"],
     code["Get[PacletObject[\"WolframExampleLib\"][\"AssetLocation\", \"Artifacts\"]] //\n    Map[Query[{\"Name\", \"Signatures\"}]] // Dataset"]
 ],
 
+section["Licensing",
+
+    text["Everything the library links is compiled into the dylib, so the \
+paclet has to carry its own attribution. cargo wl build writes that out as a \
+third asset, License.wl: one entry per Rust package in the resolved dependency \
+graph, dev-dependencies excluded."],
+
+    code["licenses = Get[PacletObject[\"WolframExampleLib\"][\"AssetLocation\", \"License\"]];\nLength[licenses]"],
+
+    text["Each entry carries what the crate's own Cargo.toml declared \
+\[LongDash] undeclared fields come back as Missing[\"NotAvailable\"]:"],
+
+    code["Dataset[Take[licenses, 8]]"],
+
+    text["Which licenses the paclet actually ships under, most common first. \
+The values are SPDX expressions, so an OR means the crate lets you pick:"],
+
+    code["ReverseSort[Counts[licenses[[All, \"License\"]]]] // Dataset"],
+
+    text["The entries worth a human's attention \[LongDash] anything that \
+declared no license at all. Here that is the two example crates themselves: \
+neither Libs/math nor Libs/duckdb sets a license field, which a paclet you \
+actually shipped would want to fix:"],
+
+    code["Select[licenses, MissingQ[#[\"License\"]] &] // Dataset"],
+
+    text["And the direct dependencies of the two example crates, as opposed to \
+the whole transitive graph:"],
+
+    code["Select[licenses,\n    MemberQ[{\"duckdb\", \"arrow-ipc\", \"uuid\", \"wolfram-expr\",\n             \"wolfram-export\", \"wolfram-serialize\", \"wolfram-library-link\"},\n        #[\"Name\"]] &] // Dataset"]
+],
+
 section["Rebuilding",
 
     text["After editing the Rust source, rebuild from the paclet directory. \
