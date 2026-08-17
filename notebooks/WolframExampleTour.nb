@@ -10,16 +10,16 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       154,          7]
-NotebookDataLength[     19723,        439]
-NotebookOptionsPosition[     12422,        331]
-NotebookOutlinePosition[     12774,        346]
-CellTagsIndexPosition[     12731,        343]
+NotebookDataLength[     19935,        444]
+NotebookOptionsPosition[     12633,        336]
+NotebookOutlinePosition[     12985,        351]
+CellTagsIndexPosition[     12942,        348]
 WindowTitle->WolframExample Tour
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
 Notebook[{
-Cell["WolframExample: Rust libraries from the Wolfram Language", "Title",ExpressionUUID->"383222bb-428e-4ebe-b875-a9667fe3c81b"],
+Cell["WolframExample: Rust libraries from the Wolfram Language", "Title",ExpressionUUID->"f9a0facd-edfc-497b-b5c4-58497030c7d7"],
 
 Cell["\<\
 This notebook exercises the WolframExample paclet, whose functions are \
@@ -27,67 +27,72 @@ implemented in Rust (see WolframExample/Libs). Evaluate it top to bottom.
 
 If the setup section reports a missing paclet, build the library first:
     cd WolframExample && cargo wl build\
-\>", "Text",ExpressionUUID->"8050a19c-28ae-438f-8199-9296e8aa831e"],
+\>", "Text",ExpressionUUID->"a8beb327-f852-45b5-bbda-e82698c19731"],
 
 Cell[CellGroupData[{
 
-Cell["Setup", "Section",ExpressionUUID->"6a217766-ad84-44b1-9b0f-fe370bca88c9"],
+Cell["Setup", "Section",ExpressionUUID->"e9e4d3c1-3500-40c1-a4e7-ad6dda022a89"],
 
 Cell["\<\
 Both paclets \[LongDash] the hand-written WolframExample and the generated \
 WolframExampleLib \[LongDash] sit in this notebook's parent directory, so one \
 PacletDirectoryLoad registers both.\
-\>", "Text",ExpressionUUID->"25cb9acd-c5d2-4aa3-a21b-529343b226f1"],
+\>", "Text",ExpressionUUID->"3df0cb26-66d7-4cc7-9259-c242e128712c"],
 
-Cell["PacletDirectoryLoad[ParentDirectory[NotebookDirectory[]]]", "Input",ExpressionUUID->"c9c6df11-ffc9-40c1-ab70-b22ba796a92a"],
+Cell["PacletDirectoryLoad[ParentDirectory[NotebookDirectory[]]]", "Input",ExpressionUUID->"60bfaf2a-5e1a-406c-98f9-5ecfb8839183"],
 
-Cell["PacletObject[\"WolframExample\"]", "Input",ExpressionUUID->"9dbd754e-d5c1-4c78-8419-9fbc7c9c4993"],
+Cell["PacletObject[\"WolframExample\"]", "Input",ExpressionUUID->"6f88d58e-558d-4f14-86e2-fc77022e16e0"],
 
 Cell["\<\
 The library paclet holds nothing but the compiled dylibs and a generated \
 Functions.wl loader:\
-\>", "Text",ExpressionUUID->"2656b324-0219-4b36-9b79-ad2ccf86e23d"],
+\>", "Text",ExpressionUUID->"f98933f0-c9ec-424f-a4f8-824fd91a5dc4"],
 
-Cell["PacletObject[\"WolframExampleLib\"]", "Input",ExpressionUUID->"852f4c8b-5b8a-4ab7-b017-0ff6d953169f"],
+Cell["PacletObject[\"WolframExampleLib\"]", "Input",ExpressionUUID->"cd33684b-c4fa-4ad4-b521-cf8ce512ab1e"],
 
-Cell["Needs[\"WolframExample`\"]", "Input",ExpressionUUID->"95eec9a3-da0a-4dee-ad2f-5e1a89d47011"],
+Cell["Needs[\"WolframExample`\"]", "Input",ExpressionUUID->"f1d8769a-c9a7-4f08-8d48-2e4096959b45"],
 
-Cell["Everything the package exports:", "Text",ExpressionUUID->"855d2100-a95a-43e4-a934-c2703f17f01c"],
+Cell["Everything the package exports:", "Text",ExpressionUUID->"ef636153-3fae-4e48-a9d3-3d37b881e623"],
 
-Cell["?WolframExample`*", "Input",ExpressionUUID->"11c6bc49-4aed-4088-9b49-d5d60632ddb9"]
+Cell["?WolframExample`*", "Input",ExpressionUUID->"a3754aab-5152-44c6-adb8-0a1a6f21a3a7"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Math", "Section",ExpressionUUID->"8d2f498e-0484-4bf4-aa4d-21c698ab30d7"],
+Cell["Math", "Section",ExpressionUUID->"e15042ac-4a99-4093-893c-92e4aaa18016"],
 
 Cell[CellGroupData[{
 
-Cell["Scalars and arrays", "Subsection",ExpressionUUID->"8aa93e2d-596f-4e68-8ecb-087a7fe1b1ba"],
+Cell["Scalars and arrays", "Subsection",ExpressionUUID->"051a075d-d90f-4117-ac2d-9a60003a3166"],
 
 Cell["\<\
 A plain Rust function over two f64s. Arguments and result cross as raw \
 MArgument scalars \[LongDash] no serialization at all.\
-\>", "Text",ExpressionUUID->"36ae3e12-93b3-4ad1-a7f0-456edc5ac052"],
+\>", "Text",ExpressionUUID->"96618bd1-5b59-45ce-b532-b3a297cf8159"],
 
-Cell["ExampleAdd[2, 3]", "Input",ExpressionUUID->"16455868-f7b0-481e-8703-5e97274bf63b"],
+Cell["ExampleAdd[2, 3]", "Input",ExpressionUUID->"4c8b9b64-60f4-4a1d-8386-709659c08c41"],
 
 Cell["\<\
 NumericArrays are read zero-copy: Rust sees the kernel's own memory, no copy \
 and no conversion. Lists are packed into a Real64 NumericArray by the wrapper \
 first.\
-\>", "Text",ExpressionUUID->"241b8627-03b7-413f-9a7a-5ef2a987fbf1"],
+\>", "Text",ExpressionUUID->"78883b17-70ff-446c-bf14-2b01a36026e5"],
 
-Cell["ExampleDot[{1, 2, 3}, {4, 5, 6}]", "Input",ExpressionUUID->"5f8694b9-60c6-4b5e-83fa-a94f7b970d41"],
+Cell["ExampleDot[{1, 2, 3}, {4, 5, 6}]", "Input",ExpressionUUID->"fd9cc0c5-2564-4aa1-b716-a3fb283927e4"],
 
 Cell["\<\
 ExampleDot[
     NumericArray[Range[1., 100000.], \"Real64\"],
     NumericArray[Range[100000., 1., -1.], \"Real64\"]
 ]\
-\>", "Input",ExpressionUUID->"e1ec51aa-2790-441d-a67f-d0b319e870cc"],
+\>", "Input",ExpressionUUID->"dea09be5-47f4-42a1-a544-dfa57ba14168"],
 
-Cell["Same call, timed against the kernel's own Dot:", "Text",ExpressionUUID->"b774456c-2f5b-41b2-b92b-a2b89f34ef85"],
+Cell["\<\
+The Rust side accumulates into 8 independent lanes so that LLVM can vectorize \
+the loop (see Libs/math/src/lib.rs) \[LongDash] about twice the throughput of \
+the naive left-to-right sum. Timed against the kernel's own Dot, which calls \
+into BLAS:\
+\>", "Text",ExpressionUUID->"e4804338-be21-4ad1-b091-5b4d24fb9e81"],
 
 Cell["\<\
 With[{a = Range[1., 100000.], b = Range[100000., 1., -1.]},
@@ -96,75 +101,75 @@ With[{a = Range[1., 100000.], b = Range[100000., 1., -1.]},
         \"Kernel\" -> First @ RepeatedTiming @ Dot[a, b]
     }
 ]\
-\>", "Input",ExpressionUUID->"ed962bda-d1ec-4357-a833-2769dffa323b"]
+\>", "Input",ExpressionUUID->"4bbfc85e-6d9a-4974-a321-7ef1d7921c3c"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Structs and enums", "Subsection",ExpressionUUID->"4f863aab-1297-40fb-a51b-75275a786ce8"],
+Cell["Structs and enums", "Subsection",ExpressionUUID->"18d7634b-fbe7-4b9f-92ac-9fc7bc5933ad"],
 
 Cell["\<\
 Structured arguments cross as WXF. A Rust struct is an Association keyed by \
 its field names; the wrapper here presents Wolfram-style capitalized keys.\
-\>", "Text",ExpressionUUID->"9296dba1-569f-4484-a633-99a3541c083c"],
+\>", "Text",ExpressionUUID->"6f0e2a9d-ca15-4f1b-b8c6-c5cba07dd2ef"],
 
-Cell["ExampleSymmetricPoint[<|\"X\" -> 10, \"Y\" -> 20|>]", "Input",ExpressionUUID->"5a4971b8-0271-4478-92cf-824265994834"],
+Cell["ExampleSymmetricPoint[<|\"X\" -> 10, \"Y\" -> 20|>]", "Input",ExpressionUUID->"73e09635-493d-4b4b-97d9-88934dc39708"],
 
 Cell["\<\
 ExampleArea goes through a Rust enum \[LongDash] one function, one match, two \
 shapes:\
-\>", "Text",ExpressionUUID->"a0e62ab7-1b6f-48e3-bdb5-eef1dcd4de32"],
+\>", "Text",ExpressionUUID->"a85e3945-fbb9-49df-8b3f-7d7fe0e7310b"],
 
-Cell["ExampleArea[<|\"Radius\" -> 1|>]", "Input",ExpressionUUID->"a8800c1b-074e-4f26-bd2d-a04174be6505"],
+Cell["ExampleArea[<|\"Radius\" -> 1|>]", "Input",ExpressionUUID->"98ceb03c-4a27-4ec3-a1d7-9c45b83ccc33"],
 
-Cell["ExampleArea[<|\"Width\" -> 10, \"Height\" -> 20|>]", "Input",ExpressionUUID->"646df835-baf5-47f5-9109-781dfbfe0a07"],
+Cell["ExampleArea[<|\"Width\" -> 10, \"Height\" -> 20|>]", "Input",ExpressionUUID->"9b5584d4-238c-4d90-a41d-429c53c24aaa"],
 
-Cell["Table[ExampleArea[<|\"Radius\" -> r|>], {r, 1, 5}]", "Input",ExpressionUUID->"ef94f4ea-b927-4d12-8a24-d97e1f20b40d"]
+Cell["Table[ExampleArea[<|\"Radius\" -> r|>], {r, 1, 5}]", "Input",ExpressionUUID->"605c4b14-44e4-429e-8839-308e08f88877"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Errors", "Subsection",ExpressionUUID->"66c32edc-c949-45d3-8cf0-7e758aa549f8"],
+Cell["Errors", "Subsection",ExpressionUUID->"8c040be1-07a4-4059-932d-11f93f807388"],
 
 Cell["\<\
 A Rust Result<f64, String> comes back as {\"Ok\", value} or {\"Err\", \
 message}; the wrapper turns the error branch into a Failure.\
-\>", "Text",ExpressionUUID->"d746d3cf-a1d2-45c5-b3a1-2cdf22b416cc"],
+\>", "Text",ExpressionUUID->"677e8bdf-09f3-4337-b21b-267519d96c8f"],
 
-Cell["ExampleSafeDivide[10, 4]", "Input",ExpressionUUID->"56e5e05f-0501-4f0b-b32d-fbe85c33c606"],
+Cell["ExampleSafeDivide[10, 4]", "Input",ExpressionUUID->"92b49cad-0e9d-4dea-b80d-4bd798333bc2"],
 
-Cell["ExampleSafeDivide[1, 0]", "Input",ExpressionUUID->"cf823aa1-4857-4324-9cbd-58ff1e723e97"],
+Cell["ExampleSafeDivide[1, 0]", "Input",ExpressionUUID->"c6306c3a-3651-442d-ad7a-587805f191e1"],
 
-Cell["So the usual Failure handling applies:", "Text",ExpressionUUID->"98fdf6b4-1ccc-4206-88a7-afced4894a4c"],
+Cell["So the usual Failure handling applies:", "Text",ExpressionUUID->"d5a0df2f-2532-44d5-9bfc-7307ed7f7615"],
 
 Cell["\<\
 FailureQ /@ {ExampleSafeDivide[1, 2], ExampleSafeDivide[1, 0]}\
-\>", "Input",ExpressionUUID->"8b7b40bf-8c8a-4aed-88b0-882d004496f0"]
+\>", "Input",ExpressionUUID->"a8ea56d4-d8cd-44e6-aab3-10234653ac4f"]
 }, Open  ]]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["DuckDB", "Section",ExpressionUUID->"03048775-a585-4acf-a4f2-980b6d430489"],
+Cell["DuckDB", "Section",ExpressionUUID->"ae1d6a8c-b1e5-4f03-a9aa-5483d8ade56f"],
 
 Cell["\<\
 An entire embedded SQL engine, statically linked into the library \[LongDash] \
 nothing to install. Query results come back as Arrow and are decoded into a \
 Tabular.\
-\>", "Text",ExpressionUUID->"5d37f4ae-69ca-48bd-a362-1bad20ebfe24"],
+\>", "Text",ExpressionUUID->"39cfd04b-58b6-4399-a5ae-aedc7d73b78d"],
 
 Cell[CellGroupData[{
 
-Cell["Scoped connections", "Subsection",ExpressionUUID->"6f6c1da5-fdcb-4eea-bdb8-bb57d6bae4f0"],
+Cell["Scoped connections", "Subsection",ExpressionUUID->"d9652627-c6f6-4f31-bef1-52d5feb34412"],
 
 Cell["\<\
 DuckDBExecute opens a connection, applies the function to it, and closes it \
 again \[LongDash] even if the body fails.\
-\>", "Text",ExpressionUUID->"909a57d8-5ac0-427f-8438-89db6f919f7f"],
+\>", "Text",ExpressionUUID->"479a367c-8a7e-4a7a-b1ee-7a1d2beb7c61"],
 
 Cell["\<\
 DuckDBExecute[\"duckdb://\", DuckDBQuery[#, \"SELECT 42 AS answer\"] &]\
-\>", "Input",ExpressionUUID->"b0e036e0-29b7-4bf7-85c5-58d33316250b"],
+\>", "Input",ExpressionUUID->"635b9a2b-7bee-4b6b-aecf-6fb2db405925"],
 
 Cell["\<\
 DuckDBExecute[\"duckdb://\", DuckDBQuery[#,
@@ -173,152 +178,152 @@ DuckDBExecute[\"duckdb://\", DuckDBQuery[#,
             'item_' || n AS label,
             n % 2 = 0 AS is_even
      FROM generate_series(1, 5) t(n)\"] &]\
-\>", "Input",ExpressionUUID->"2c9d1eae-adfe-4414-b7e2-e42153c63e01"],
+\>", "Input",ExpressionUUID->"f74467cf-086e-440a-8a2e-46b64ec61b11"],
 
 Cell["\<\
 The result is an ordinary Tabular, so the usual operations work:\
-\>", "Text",ExpressionUUID->"e145c63c-07c8-4d32-b0ba-cfa18e393a62"],
+\>", "Text",ExpressionUUID->"dfad40a4-08af-4d9f-a6e1-31764734047f"],
 
 Cell["\<\
 tab = DuckDBExecute[\"duckdb://\", DuckDBQuery[#,
     \"SELECT n FROM generate_series(1, 100) t(n)\"] &];
 {Length[tab], Total[tab[[All, \"n\"]]]}\
-\>", "Input",ExpressionUUID->"51ca526f-e33a-4d40-b682-66f6b45b5e0a"]
+\>", "Input",ExpressionUUID->"3bffafa5-315c-44fd-9da8-ceb0e03478c8"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Parameters", "Subsection",ExpressionUUID->"32206d56-9422-441c-96a0-65b29450b930"],
+Cell["Parameters", "Subsection",ExpressionUUID->"b6a39aff-c423-415b-8456-296b294e00a9"],
 
 Cell["\<\
 Values are bound to the ? placeholders in order, so nothing is interpolated \
 into the SQL string.\
-\>", "Text",ExpressionUUID->"baf03626-8e30-404c-9d58-1f828e806952"],
+\>", "Text",ExpressionUUID->"73be5657-51b8-485b-b262-2607f40ce3bd"],
 
 Cell["\<\
 DuckDBExecute[\"duckdb://\", DuckDBQuery[#,
     \"SELECT n FROM generate_series(1, 5) t(n) WHERE n > ?\", {2}] &]\
-\>", "Input",ExpressionUUID->"534145eb-acb7-4342-8936-112e2c7c48c1"],
+\>", "Input",ExpressionUUID->"641f43c7-e740-47f0-bd22-db81c464df55"],
 
 Cell["\<\
 DuckDBExecute[\"duckdb://\", DuckDBQuery[#,
     \"SELECT ?::INTEGER + ?::INTEGER AS total\", {20, 22}] &]\
-\>", "Input",ExpressionUUID->"195d9d0f-df46-4637-9244-06b6dee8ea73"]
+\>", "Input",ExpressionUUID->"c056339c-7eae-4dac-9df2-d551033c6e04"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Explicit connections", "Subsection",ExpressionUUID->"b43a1535-3710-4e48-9914-da4a890ee3c1"],
+Cell["Explicit connections", "Subsection",ExpressionUUID->"2ab6171e-c212-4948-a2b3-7569eee6af51"],
 
 Cell["\<\
 For several statements against the same database, hold the handle yourself. \
 Here an on-disk file, which persists after disconnecting.\
-\>", "Text",ExpressionUUID->"d5342da2-bba7-46cf-b6bf-7a61cf3b23fe"],
+\>", "Text",ExpressionUUID->"bfc47cd9-52d8-4b5c-852d-b5c760115dc1"],
 
 Cell["\<\
 file = FileNameJoin[{$TemporaryDirectory, \"wolfram-example.duckdb\"}];
 Quiet[DeleteFile[file]];
 conn = DuckDBConnect[\"duckdb:///\" <> file]\
-\>", "Input",ExpressionUUID->"58fe05b9-f330-4c6f-a93d-f6d0863c6756"],
+\>", "Input",ExpressionUUID->"9260a7d8-39b7-4832-99d9-2da9122c7709"],
 
 Cell["\<\
 DuckDBQuery[conn,
     \"CREATE TABLE fruit AS SELECT * FROM (VALUES (1, 'apple'), (2, 'pear')) \
 v(id, name)\"]\
-\>", "Input",ExpressionUUID->"e87d1655-5746-4756-8d68-720e6ba8a9bc"],
+\>", "Input",ExpressionUUID->"9473a0c6-d58e-4b83-87bc-aa9a606aa6d0"],
 
 Cell["\<\
 DuckDBQuery[conn, \"INSERT INTO fruit VALUES (?, ?)\", {3, \"plum\"}]\
-\>", "Input",ExpressionUUID->"7053ced8-5541-4c30-b0f1-3cfae0df44fc"],
+\>", "Input",ExpressionUUID->"35c389a7-1ced-49d7-ac24-a4442a0d86ed"],
 
-Cell["DuckDBQuery[conn, \"SELECT * FROM fruit ORDER BY id\"]", "Input",ExpressionUUID->"451e098d-1b46-4a04-8293-912cc712e422"],
+Cell["DuckDBQuery[conn, \"SELECT * FROM fruit ORDER BY id\"]", "Input",ExpressionUUID->"9031ff69-6159-4eea-a15b-787f253cd7b8"],
 
-Cell["DuckDBDisconnect[conn]", "Input",ExpressionUUID->"fa6e2ed6-e398-405c-aa77-d27acab7637f"],
+Cell["DuckDBDisconnect[conn]", "Input",ExpressionUUID->"14ade425-8673-461f-9511-8f225d8990a8"],
 
-Cell["Reopening the same file shows the rows are still there:", "Text",ExpressionUUID->"b6e39a11-7436-44d0-899d-4da81c46f6fe"],
+Cell["Reopening the same file shows the rows are still there:", "Text",ExpressionUUID->"b96c40c4-b7f6-4fc5-97cb-41a0e27b4def"],
 
 Cell["\<\
 DuckDBExecute[\"duckdb:///\" <> file,
     DuckDBQuery[#, \"SELECT count(*) AS rows FROM fruit\"] &]\
-\>", "Input",ExpressionUUID->"9d27c6fa-8f2d-48f5-a1a0-b6ab2b1dfc82"]
+\>", "Input",ExpressionUUID->"41e6344e-023e-4772-aeee-1ad7beab7eaf"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Failures", "Subsection",ExpressionUUID->"ac254b44-b37f-4c8d-b2fb-1ab313651a38"],
+Cell["Failures", "Subsection",ExpressionUUID->"9361446e-5a8a-481a-a7c3-77a3bbd6c424"],
 
 Cell["\<\
 Errors from the engine arrive as Failure objects carrying DuckDB's own \
 message, and propagate on their own.\
-\>", "Text",ExpressionUUID->"7798b574-da48-476e-9a83-15c2d88a43f5"],
+\>", "Text",ExpressionUUID->"18f0a3af-e43e-4477-9bae-37f947c6c88f"],
 
 Cell["\<\
 DuckDBExecute[\"duckdb://\", DuckDBQuery[#, \"SELECT * FROM no_such_table\"] \
 &]\
-\>", "Input",ExpressionUUID->"0a8f6709-654d-4a6c-aff1-14138932b6b7"],
+\>", "Input",ExpressionUUID->"a297cacf-3997-4163-8cc7-d486778ea02c"],
 
 Cell["\<\
 A handle that has been closed is no longer in the Rust-side registry:\
-\>", "Text",ExpressionUUID->"e007224d-49b8-4141-9d09-d4fdfda71e5f"],
+\>", "Text",ExpressionUUID->"0737ed73-bed1-4891-9722-98f912413852"],
 
 Cell["\<\
 With[{c = DuckDBConnect[]},
     DuckDBDisconnect[c];
     DuckDBQuery[c, \"SELECT 1\"]
 ]\
-\>", "Input",ExpressionUUID->"f9112e4f-e5f2-4fdb-bfeb-3edea77e8ae5"]
+\>", "Input",ExpressionUUID->"f0d27302-eaf4-436f-9bad-477d17ff75f1"]
 }, Open  ]]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["The raw library", "Section",ExpressionUUID->"2e2b434a-b079-4fc2-a5d2-a0980cb53b9a"],
+Cell["The raw library", "Section",ExpressionUUID->"ba3879a4-84d6-4325-9622-bb565f85a717"],
 
 Cell["\<\
 The wrappers in Kernel/WolframExample.wl are a thin layer over an association \
 of LibraryFunctions, keyed \"namespace::rust_name\". Anything without a \
 wrapper is still one lookup away.\
-\>", "Text",ExpressionUUID->"461e3839-eff5-4171-8444-7517147be0f5"],
+\>", "Text",ExpressionUUID->"7f843d56-f0ca-48f4-8a3a-a153901cc633"],
 
-Cell["Keys[WolframExampleFunctions[]]", "Input",ExpressionUUID->"42f4ecf7-e610-4f1e-a5e6-685f71192060"],
+Cell["Keys[WolframExampleFunctions[]]", "Input",ExpressionUUID->"4e3e3c0a-fb12-4062-a6ef-db1051e5be42"],
 
 Cell["\<\
 inactive_sum builds an expression in Rust and returns it unevaluated:\
-\>", "Text",ExpressionUUID->"ee496304-97bc-4987-b220-4e74211f7726"],
+\>", "Text",ExpressionUUID->"b86cefbe-5876-4704-a141-a370015a94d4"],
 
-Cell["WolframExampleFunctions[][\"math::inactive_sum\"][{1, 2, 3}]", "Input",ExpressionUUID->"1d88b1c2-12a1-4603-b60d-102b220d712e"],
+Cell["WolframExampleFunctions[][\"math::inactive_sum\"][{1, 2, 3}]", "Input",ExpressionUUID->"ec9c6f8a-403f-47fa-addf-07cef8ffb726"],
 
 Cell["\<\
 Activate[WolframExampleFunctions[][\"math::inactive_sum\"][{1, 2, 3}]]\
-\>", "Input",ExpressionUUID->"9cbb5c73-ed3d-40fa-9c90-13890a5317e8"],
+\>", "Input",ExpressionUUID->"153ab626-57f5-49c1-9c0c-b518fb1c2373"],
 
 Cell["\<\
 A panic on the Rust side is caught at the boundary and returned as a Failure \
 \[LongDash] it does not take the kernel down:\
-\>", "Text",ExpressionUUID->"46a329f3-13cc-47f2-a298-9f8377167a78"],
+\>", "Text",ExpressionUUID->"4d4d31c4-183c-46f1-bb5b-913c240599a0"],
 
-Cell["WolframExampleFunctions[][\"math::panic\"][]", "Input",ExpressionUUID->"482df834-9ecd-4029-a285-fb460e7b48e1"],
+Cell["WolframExampleFunctions[][\"math::panic\"][]", "Input",ExpressionUUID->"ad8850b3-9b4d-48bb-a79e-d2bc90046709"],
 
 Cell["\<\
 And the signatures of everything that was packaged, straight from the \
 generated Artifacts.wl asset:\
-\>", "Text",ExpressionUUID->"bf57807b-cecd-42e7-84c0-059f13787161"],
+\>", "Text",ExpressionUUID->"170d25ba-cfda-4f03-906e-f85dc6293956"],
 
 Cell["\<\
 Get[PacletObject[\"WolframExampleLib\"][\"AssetLocation\", \"Artifacts\"]] //
     Map[Query[{\"Name\", \"Signatures\"}]] // Dataset\
-\>", "Input",ExpressionUUID->"e4f1a59e-d543-46c5-a85f-3a4dba64ca63"]
+\>", "Input",ExpressionUUID->"7b68650f-ec59-42a7-b196-db90cb9b3120"]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Rebuilding", "Section",ExpressionUUID->"a3b2fe7c-17f6-46f6-87f0-064a7d633d14"],
+Cell["Rebuilding", "Section",ExpressionUUID->"16eedd93-0bd5-4b4c-9170-3a8118fc8b49"],
 
 Cell["\<\
 After editing the Rust source, rebuild from the paclet directory. The dylibs \
 are content-hashed, so a rebuilt library gets a new file name \[LongDash] \
 quit the kernel to pick it up.\
-\>", "Text",ExpressionUUID->"cf1657b5-1a03-42e5-9f76-d2ae16105436"],
+\>", "Text",ExpressionUUID->"c27204a9-6ff9-4446-a010-0027e7090675"],
 
 Cell["\<\
 ExternalEvaluate[{\"Shell\",
@@ -326,13 +331,13 @@ ExternalEvaluate[{\"Shell\",
 FileNameJoin[{ParentDirectory[NotebookDirectory[]], \"WolframExample\"}],
     \"ProcessEnvironment\" -> <|\"PATH\" -> Environment[\"PATH\"]|>},
    \"cargo wl build --release\"]\
-\>", "Input",ExpressionUUID->"75225890-da12-4a4b-9665-b610ebbbb4ac"]
+\>", "Input",ExpressionUUID->"2480edb2-5e06-4e20-8592-af7f0cbaee71"]
 }, Open  ]]
 },
 WindowTitle->"WolframExample Tour",
 FrontEndVersion->"15.0 for Mac OS X ARM (64-bit) (May 6, 2026)",
 StyleDefinitions->"Default.nb",
-ExpressionUUID->"913badbc-3a5c-4b27-9daf-1544278ea03d"
+ExpressionUUID->"615a22aa-a471-42b3-987f-d8f9fcd59897"
 ]
 (* End of Notebook Content *)
 
@@ -345,101 +350,101 @@ CellTagsIndex->{}
 *)
 (*NotebookFileOutline
 Notebook[{
-Cell[587, 21, 128, 0, 70, "Title",ExpressionUUID->"383222bb-428e-4ebe-b875-a9667fe3c81b"],
-Cell[718, 23, 338, 6, 70, "Text",ExpressionUUID->"8050a19c-28ae-438f-8199-9296e8aa831e"],
+Cell[587, 21, 128, 0, 70, "Title",ExpressionUUID->"f9a0facd-edfc-497b-b5c4-58497030c7d7"],
+Cell[718, 23, 338, 6, 70, "Text",ExpressionUUID->"a8beb327-f852-45b5-bbda-e82698c19731"],
 Cell[CellGroupData[{
-Cell[1081, 33, 79, 0, 70, "Section",ExpressionUUID->"6a217766-ad84-44b1-9b0f-fe370bca88c9"],
-Cell[1163, 35, 271, 4, 70, "Text",ExpressionUUID->"25cb9acd-c5d2-4aa3-a21b-529343b226f1"],
-Cell[1437, 41, 129, 0, 70, "Input",ExpressionUUID->"c9c6df11-ffc9-40c1-ab70-b22ba796a92a"],
-Cell[1569, 43, 104, 0, 70, "Input",ExpressionUUID->"9dbd754e-d5c1-4c78-8419-9fbc7c9c4993"],
-Cell[1676, 45, 174, 3, 70, "Text",ExpressionUUID->"2656b324-0219-4b36-9b79-ad2ccf86e23d"],
-Cell[1853, 50, 107, 0, 70, "Input",ExpressionUUID->"852f4c8b-5b8a-4ab7-b017-0ff6d953169f"],
-Cell[1963, 52, 98, 0, 70, "Input",ExpressionUUID->"95eec9a3-da0a-4dee-ad2f-5e1a89d47011"],
-Cell[2064, 54, 102, 0, 70, "Text",ExpressionUUID->"855d2100-a95a-43e4-a934-c2703f17f01c"],
-Cell[2169, 56, 89, 0, 70, "Input",ExpressionUUID->"11c6bc49-4aed-4088-9b49-d5d60632ddb9"]
+Cell[1081, 33, 79, 0, 70, "Section",ExpressionUUID->"e9e4d3c1-3500-40c1-a4e7-ad6dda022a89"],
+Cell[1163, 35, 271, 4, 70, "Text",ExpressionUUID->"3df0cb26-66d7-4cc7-9259-c242e128712c"],
+Cell[1437, 41, 129, 0, 70, "Input",ExpressionUUID->"60bfaf2a-5e1a-406c-98f9-5ecfb8839183"],
+Cell[1569, 43, 104, 0, 70, "Input",ExpressionUUID->"6f88d58e-558d-4f14-86e2-fc77022e16e0"],
+Cell[1676, 45, 174, 3, 70, "Text",ExpressionUUID->"f98933f0-c9ec-424f-a4f8-824fd91a5dc4"],
+Cell[1853, 50, 107, 0, 70, "Input",ExpressionUUID->"cd33684b-c4fa-4ad4-b521-cf8ce512ab1e"],
+Cell[1963, 52, 98, 0, 70, "Input",ExpressionUUID->"f1d8769a-c9a7-4f08-8d48-2e4096959b45"],
+Cell[2064, 54, 102, 0, 70, "Text",ExpressionUUID->"ef636153-3fae-4e48-a9d3-3d37b881e623"],
+Cell[2169, 56, 89, 0, 70, "Input",ExpressionUUID->"a3754aab-5152-44c6-adb8-0a1a6f21a3a7"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[2295, 61, 78, 0, 70, "Section",ExpressionUUID->"8d2f498e-0484-4bf4-aa4d-21c698ab30d7"],
+Cell[2295, 61, 78, 0, 70, "Section",ExpressionUUID->"e15042ac-4a99-4093-893c-92e4aaa18016"],
 Cell[CellGroupData[{
-Cell[2398, 65, 95, 0, 70, "Subsection",ExpressionUUID->"8aa93e2d-596f-4e68-8ecb-087a7fe1b1ba"],
-Cell[2496, 67, 206, 3, 70, "Text",ExpressionUUID->"36ae3e12-93b3-4ad1-a7f0-456edc5ac052"],
-Cell[2705, 72, 88, 0, 70, "Input",ExpressionUUID->"16455868-f7b0-481e-8703-5e97274bf63b"],
-Cell[2796, 74, 244, 4, 70, "Text",ExpressionUUID->"241b8627-03b7-413f-9a7a-5ef2a987fbf1"],
-Cell[3043, 80, 104, 0, 70, "Input",ExpressionUUID->"5f8694b9-60c6-4b5e-83fa-a94f7b970d41"],
-Cell[3150, 82, 197, 5, 70, "Input",ExpressionUUID->"e1ec51aa-2790-441d-a67f-d0b319e870cc"],
-Cell[3350, 89, 117, 0, 70, "Text",ExpressionUUID->"b774456c-2f5b-41b2-b92b-a2b89f34ef85"],
-Cell[3470, 91, 273, 7, 70, "Input",ExpressionUUID->"ed962bda-d1ec-4357-a833-2769dffa323b"]
+Cell[2398, 65, 95, 0, 70, "Subsection",ExpressionUUID->"051a075d-d90f-4117-ac2d-9a60003a3166"],
+Cell[2496, 67, 206, 3, 70, "Text",ExpressionUUID->"96618bd1-5b59-45ce-b532-b3a297cf8159"],
+Cell[2705, 72, 88, 0, 70, "Input",ExpressionUUID->"4c8b9b64-60f4-4a1d-8386-709659c08c41"],
+Cell[2796, 74, 244, 4, 70, "Text",ExpressionUUID->"78883b17-70ff-446c-bf14-2b01a36026e5"],
+Cell[3043, 80, 104, 0, 70, "Input",ExpressionUUID->"fd9cc0c5-2564-4aa1-b716-a3fb283927e4"],
+Cell[3150, 82, 197, 5, 70, "Input",ExpressionUUID->"dea09be5-47f4-42a1-a544-dfa57ba14168"],
+Cell[3350, 89, 328, 5, 70, "Text",ExpressionUUID->"e4804338-be21-4ad1-b091-5b4d24fb9e81"],
+Cell[3681, 96, 273, 7, 70, "Input",ExpressionUUID->"4bbfc85e-6d9a-4974-a321-7ef1d7921c3c"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[3780, 103, 94, 0, 70, "Subsection",ExpressionUUID->"4f863aab-1297-40fb-a51b-75275a786ce8"],
-Cell[3877, 105, 231, 3, 70, "Text",ExpressionUUID->"9296dba1-569f-4484-a633-99a3541c083c"],
-Cell[4111, 110, 123, 0, 70, "Input",ExpressionUUID->"5a4971b8-0271-4478-92cf-824265994834"],
-Cell[4237, 112, 166, 3, 70, "Text",ExpressionUUID->"a0e62ab7-1b6f-48e3-bdb5-eef1dcd4de32"],
-Cell[4406, 117, 104, 0, 70, "Input",ExpressionUUID->"a8800c1b-074e-4f26-bd2d-a04174be6505"],
-Cell[4513, 119, 122, 0, 70, "Input",ExpressionUUID->"646df835-baf5-47f5-9109-781dfbfe0a07"],
-Cell[4638, 121, 122, 0, 70, "Input",ExpressionUUID->"ef94f4ea-b927-4d12-8a24-d97e1f20b40d"]
+Cell[3991, 108, 94, 0, 70, "Subsection",ExpressionUUID->"18d7634b-fbe7-4b9f-92ac-9fc7bc5933ad"],
+Cell[4088, 110, 231, 3, 70, "Text",ExpressionUUID->"6f0e2a9d-ca15-4f1b-b8c6-c5cba07dd2ef"],
+Cell[4322, 115, 123, 0, 70, "Input",ExpressionUUID->"73e09635-493d-4b4b-97d9-88934dc39708"],
+Cell[4448, 117, 166, 3, 70, "Text",ExpressionUUID->"a85e3945-fbb9-49df-8b3f-7d7fe0e7310b"],
+Cell[4617, 122, 104, 0, 70, "Input",ExpressionUUID->"98ceb03c-4a27-4ec3-a1d7-9c45b83ccc33"],
+Cell[4724, 124, 122, 0, 70, "Input",ExpressionUUID->"9b5584d4-238c-4d90-a41d-429c53c24aaa"],
+Cell[4849, 126, 122, 0, 70, "Input",ExpressionUUID->"605c4b14-44e4-429e-8839-308e08f88877"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[4797, 126, 83, 0, 70, "Subsection",ExpressionUUID->"66c32edc-c949-45d3-8cf0-7e758aa549f8"],
-Cell[4883, 128, 211, 3, 70, "Text",ExpressionUUID->"d746d3cf-a1d2-45c5-b3a1-2cdf22b416cc"],
-Cell[5097, 133, 96, 0, 70, "Input",ExpressionUUID->"56e5e05f-0501-4f0b-b32d-fbe85c33c606"],
-Cell[5196, 135, 95, 0, 70, "Input",ExpressionUUID->"cf823aa1-4857-4324-9cbd-58ff1e723e97"],
-Cell[5294, 137, 109, 0, 70, "Text",ExpressionUUID->"98fdf6b4-1ccc-4206-88a7-afced4894a4c"],
-Cell[5406, 139, 142, 2, 70, "Input",ExpressionUUID->"8b7b40bf-8c8a-4aed-88b0-882d004496f0"]
+Cell[5008, 131, 83, 0, 70, "Subsection",ExpressionUUID->"8c040be1-07a4-4059-932d-11f93f807388"],
+Cell[5094, 133, 211, 3, 70, "Text",ExpressionUUID->"677e8bdf-09f3-4337-b21b-267519d96c8f"],
+Cell[5308, 138, 96, 0, 70, "Input",ExpressionUUID->"92b49cad-0e9d-4dea-b80d-4bd798333bc2"],
+Cell[5407, 140, 95, 0, 70, "Input",ExpressionUUID->"c6306c3a-3651-442d-ad7a-587805f191e1"],
+Cell[5505, 142, 109, 0, 70, "Text",ExpressionUUID->"d5a0df2f-2532-44d5-9bfc-7307ed7f7615"],
+Cell[5617, 144, 142, 2, 70, "Input",ExpressionUUID->"a8ea56d4-d8cd-44e6-aab3-10234653ac4f"]
 }, Open  ]]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[5597, 147, 80, 0, 70, "Section",ExpressionUUID->"03048775-a585-4acf-a4f2-980b6d430489"],
-Cell[5680, 149, 245, 4, 70, "Text",ExpressionUUID->"5d37f4ae-69ca-48bd-a362-1bad20ebfe24"],
+Cell[5808, 152, 80, 0, 70, "Section",ExpressionUUID->"ae1d6a8c-b1e5-4f03-a9aa-5483d8ade56f"],
+Cell[5891, 154, 245, 4, 70, "Text",ExpressionUUID->"39cfd04b-58b6-4399-a5ae-aedc7d73b78d"],
 Cell[CellGroupData[{
-Cell[5950, 157, 95, 0, 70, "Subsection",ExpressionUUID->"6f6c1da5-fdcb-4eea-bdb8-bb57d6bae4f0"],
-Cell[6048, 159, 198, 3, 70, "Text",ExpressionUUID->"909a57d8-5ac0-427f-8438-89db6f919f7f"],
-Cell[6249, 164, 151, 2, 70, "Input",ExpressionUUID->"b0e036e0-29b7-4bf7-85c5-58d33316250b"],
-Cell[6403, 168, 305, 7, 70, "Input",ExpressionUUID->"2c9d1eae-adfe-4414-b7e2-e42153c63e01"],
-Cell[6711, 177, 143, 2, 70, "Text",ExpressionUUID->"e145c63c-07c8-4d32-b0ba-cfa18e393a62"],
-Cell[6857, 181, 225, 4, 70, "Input",ExpressionUUID->"51ca526f-e33a-4d40-b682-66f6b45b5e0a"]
+Cell[6161, 162, 95, 0, 70, "Subsection",ExpressionUUID->"d9652627-c6f6-4f31-bef1-52d5feb34412"],
+Cell[6259, 164, 198, 3, 70, "Text",ExpressionUUID->"479a367c-8a7e-4a7a-b1ee-7a1d2beb7c61"],
+Cell[6460, 169, 151, 2, 70, "Input",ExpressionUUID->"635b9a2b-7bee-4b6b-aecf-6fb2db405925"],
+Cell[6614, 173, 305, 7, 70, "Input",ExpressionUUID->"f74467cf-086e-440a-8a2e-46b64ec61b11"],
+Cell[6922, 182, 143, 2, 70, "Text",ExpressionUUID->"dfad40a4-08af-4d9f-a6e1-31764734047f"],
+Cell[7068, 186, 225, 4, 70, "Input",ExpressionUUID->"3bffafa5-315c-44fd-9da8-ceb0e03478c8"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[7119, 190, 87, 0, 70, "Subsection",ExpressionUUID->"32206d56-9422-441c-96a0-65b29450b930"],
-Cell[7209, 192, 177, 3, 70, "Text",ExpressionUUID->"baf03626-8e30-404c-9d58-1f828e806952"],
-Cell[7389, 197, 193, 3, 70, "Input",ExpressionUUID->"534145eb-acb7-4342-8936-112e2c7c48c1"],
-Cell[7585, 202, 185, 3, 70, "Input",ExpressionUUID->"195d9d0f-df46-4637-9244-06b6dee8ea73"]
+Cell[7330, 195, 87, 0, 70, "Subsection",ExpressionUUID->"b6a39aff-c423-415b-8456-296b294e00a9"],
+Cell[7420, 197, 177, 3, 70, "Text",ExpressionUUID->"73be5657-51b8-485b-b262-2607f40ce3bd"],
+Cell[7600, 202, 193, 3, 70, "Input",ExpressionUUID->"641f43c7-e740-47f0-bd22-db81c464df55"],
+Cell[7796, 207, 185, 3, 70, "Input",ExpressionUUID->"c056339c-7eae-4dac-9df2-d551033c6e04"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[7807, 210, 97, 0, 70, "Subsection",ExpressionUUID->"b43a1535-3710-4e48-9914-da4a890ee3c1"],
-Cell[7907, 212, 214, 3, 70, "Text",ExpressionUUID->"d5342da2-bba7-46cf-b6bf-7a61cf3b23fe"],
-Cell[8124, 217, 221, 4, 70, "Input",ExpressionUUID->"58fe05b9-f330-4c6f-a93d-f6d0863c6756"],
-Cell[8348, 223, 191, 4, 70, "Input",ExpressionUUID->"e87d1655-5746-4756-8d68-720e6ba8a9bc"],
-Cell[8542, 229, 149, 2, 70, "Input",ExpressionUUID->"7053ced8-5541-4c30-b0f1-3cfae0df44fc"],
-Cell[8694, 233, 126, 0, 70, "Input",ExpressionUUID->"451e098d-1b46-4a04-8293-912cc712e422"],
-Cell[8823, 235, 94, 0, 70, "Input",ExpressionUUID->"fa6e2ed6-e398-405c-aa77-d27acab7637f"],
-Cell[8920, 237, 126, 0, 70, "Text",ExpressionUUID->"b6e39a11-7436-44d0-899d-4da81c46f6fe"],
-Cell[9049, 239, 179, 3, 70, "Input",ExpressionUUID->"9d27c6fa-8f2d-48f5-a1a0-b6ab2b1dfc82"]
+Cell[8018, 215, 97, 0, 70, "Subsection",ExpressionUUID->"2ab6171e-c212-4948-a2b3-7569eee6af51"],
+Cell[8118, 217, 214, 3, 70, "Text",ExpressionUUID->"bfc47cd9-52d8-4b5c-852d-b5c760115dc1"],
+Cell[8335, 222, 221, 4, 70, "Input",ExpressionUUID->"9260a7d8-39b7-4832-99d9-2da9122c7709"],
+Cell[8559, 228, 191, 4, 70, "Input",ExpressionUUID->"9473a0c6-d58e-4b83-87bc-aa9a606aa6d0"],
+Cell[8753, 234, 149, 2, 70, "Input",ExpressionUUID->"35c389a7-1ced-49d7-ac24-a4442a0d86ed"],
+Cell[8905, 238, 126, 0, 70, "Input",ExpressionUUID->"9031ff69-6159-4eea-a15b-787f253cd7b8"],
+Cell[9034, 240, 94, 0, 70, "Input",ExpressionUUID->"14ade425-8673-461f-9511-8f225d8990a8"],
+Cell[9131, 242, 126, 0, 70, "Text",ExpressionUUID->"b96c40c4-b7f6-4fc5-97cb-41a0e27b4def"],
+Cell[9260, 244, 179, 3, 70, "Input",ExpressionUUID->"41e6344e-023e-4772-aeee-1ad7beab7eaf"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[9265, 247, 85, 0, 70, "Subsection",ExpressionUUID->"ac254b44-b37f-4c8d-b2fb-1ab313651a38"],
-Cell[9353, 249, 188, 3, 70, "Text",ExpressionUUID->"7798b574-da48-476e-9a83-15c2d88a43f5"],
-Cell[9544, 254, 161, 3, 70, "Input",ExpressionUUID->"0a8f6709-654d-4a6c-aff1-14138932b6b7"],
-Cell[9708, 259, 148, 2, 70, "Text",ExpressionUUID->"e007224d-49b8-4141-9d09-d4fdfda71e5f"],
-Cell[9859, 263, 167, 5, 70, "Input",ExpressionUUID->"f9112e4f-e5f2-4fdb-bfeb-3edea77e8ae5"]
+Cell[9476, 252, 85, 0, 70, "Subsection",ExpressionUUID->"9361446e-5a8a-481a-a7c3-77a3bbd6c424"],
+Cell[9564, 254, 188, 3, 70, "Text",ExpressionUUID->"18f0a3af-e43e-4477-9bae-37f947c6c88f"],
+Cell[9755, 259, 161, 3, 70, "Input",ExpressionUUID->"a297cacf-3997-4163-8cc7-d486778ea02c"],
+Cell[9919, 264, 148, 2, 70, "Text",ExpressionUUID->"0737ed73-bed1-4891-9722-98f912413852"],
+Cell[10070, 268, 167, 5, 70, "Input",ExpressionUUID->"f0d27302-eaf4-436f-9bad-477d17ff75f1"]
 }, Open  ]]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[10075, 274, 89, 0, 70, "Section",ExpressionUUID->"2e2b434a-b079-4fc2-a5d2-a0980cb53b9a"],
-Cell[10167, 276, 266, 4, 70, "Text",ExpressionUUID->"461e3839-eff5-4171-8444-7517147be0f5"],
-Cell[10436, 282, 103, 0, 70, "Input",ExpressionUUID->"42f4ecf7-e610-4f1e-a5e6-685f71192060"],
-Cell[10542, 284, 148, 2, 70, "Text",ExpressionUUID->"ee496304-97bc-4987-b220-4e74211f7726"],
-Cell[10693, 288, 132, 0, 70, "Input",ExpressionUUID->"1d88b1c2-12a1-4603-b60d-102b220d712e"],
-Cell[10828, 290, 150, 2, 70, "Input",ExpressionUUID->"9cbb5c73-ed3d-40fa-9c90-13890a5317e8"],
-Cell[10981, 294, 203, 3, 70, "Text",ExpressionUUID->"46a329f3-13cc-47f2-a298-9f8377167a78"],
-Cell[11187, 299, 116, 0, 70, "Input",ExpressionUUID->"482df834-9ecd-4029-a285-fb460e7b48e1"],
-Cell[11306, 301, 180, 3, 70, "Text",ExpressionUUID->"bf57807b-cecd-42e7-84c0-059f13787161"],
-Cell[11489, 306, 211, 3, 70, "Input",ExpressionUUID->"e4f1a59e-d543-46c5-a85f-3a4dba64ca63"]
+Cell[10286, 279, 89, 0, 70, "Section",ExpressionUUID->"ba3879a4-84d6-4325-9622-bb565f85a717"],
+Cell[10378, 281, 266, 4, 70, "Text",ExpressionUUID->"7f843d56-f0ca-48f4-8a3a-a153901cc633"],
+Cell[10647, 287, 103, 0, 70, "Input",ExpressionUUID->"4e3e3c0a-fb12-4062-a6ef-db1051e5be42"],
+Cell[10753, 289, 148, 2, 70, "Text",ExpressionUUID->"b86cefbe-5876-4704-a141-a370015a94d4"],
+Cell[10904, 293, 132, 0, 70, "Input",ExpressionUUID->"ec9c6f8a-403f-47fa-addf-07cef8ffb726"],
+Cell[11039, 295, 150, 2, 70, "Input",ExpressionUUID->"153ab626-57f5-49c1-9c0c-b518fb1c2373"],
+Cell[11192, 299, 203, 3, 70, "Text",ExpressionUUID->"4d4d31c4-183c-46f1-bb5b-913c240599a0"],
+Cell[11398, 304, 116, 0, 70, "Input",ExpressionUUID->"ad8850b3-9b4d-48bb-a79e-d2bc90046709"],
+Cell[11517, 306, 180, 3, 70, "Text",ExpressionUUID->"170d25ba-cfda-4f03-906e-f85dc6293956"],
+Cell[11700, 311, 211, 3, 70, "Input",ExpressionUUID->"7b68650f-ec59-42a7-b196-db90cb9b3120"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[11737, 314, 84, 0, 70, "Section",ExpressionUUID->"a3b2fe7c-17f6-46f6-87f0-064a7d633d14"],
-Cell[11824, 316, 264, 4, 70, "Text",ExpressionUUID->"cf1657b5-1a03-42e5-9f76-d2ae16105436"],
-Cell[12091, 322, 315, 6, 70, "Input",ExpressionUUID->"75225890-da12-4a4b-9665-b610ebbbb4ac"]
+Cell[11948, 319, 84, 0, 70, "Section",ExpressionUUID->"16eedd93-0bd5-4b4c-9170-3a8118fc8b49"],
+Cell[12035, 321, 264, 4, 70, "Text",ExpressionUUID->"c27204a9-6ff9-4446-a010-0027e7090675"],
+Cell[12302, 327, 315, 6, 70, "Input",ExpressionUUID->"2480edb2-5e06-4e20-8592-af7f0cbaee71"]
 }, Open  ]]
 }
 ]

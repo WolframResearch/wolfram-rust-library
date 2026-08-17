@@ -98,7 +98,10 @@ NumericArray by the wrapper first."],
 
         code["ExampleDot[\n    NumericArray[Range[1., 100000.], \"Real64\"],\n    NumericArray[Range[100000., 1., -1.], \"Real64\"]\n]"],
 
-        text["Same call, timed against the kernel's own Dot:"],
+        text["The Rust side accumulates into 8 independent lanes so that LLVM \
+can vectorize the loop (see Libs/math/src/lib.rs) \[LongDash] about twice the \
+throughput of the naive left-to-right sum. Timed against the kernel's own \
+Dot, which calls into BLAS:"],
 
         code["With[{a = Range[1., 100000.], b = Range[100000., 1., -1.]},\n    {\n        \"Rust\" -> First @ RepeatedTiming @ ExampleDot[a, b],\n        \"Kernel\" -> First @ RepeatedTiming @ Dot[a, b]\n    }\n]"]
     ],
