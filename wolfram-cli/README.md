@@ -24,7 +24,7 @@ The binary is named `cargo-wl`, so once it is on `PATH` Cargo dispatches
 
 | Command | What it does |
 |---------|--------------|
-| `cargo wl build` | Compile the crate's `cdylib`s and emit a WL loader package (`Functions.wl`, `Artifacts.wl`, `PacletInfo.wl`) next to each binary. Optionally cross-compiles for several `SystemID`s. |
+| `cargo wl build` | Compile the crate's `cdylib`s and emit a WL loader package (`Functions.wl`, `Artifacts.wl`, `License.wl`, `PacletInfo.wl`) next to each binary. Optionally cross-compiles for several `SystemID`s. |
 | `cargo wl test` | Build every workspace `cdylib` example, package them, and run `.wlt` files through a Wolfram kernel using `TestReport`. |
 | `cargo wl evaluate` | Evaluate `.wl` files in a Wolfram kernel using `Get`, with the package on the `LibraryPath`. |
 
@@ -44,6 +44,19 @@ cargo wl build --release -- --features fast-path
 
 On success, `build` prints the generated package directory to stdout (one path
 per line). Cargo and kernel diagnostics are written to stderr.
+
+### Generated assets
+
+Each `<name>-<SystemID>/` package directory contains, besides the binaries:
+
+| File | Asset name | Contents |
+|------|-----------|----------|
+| `Functions.wl` | `Functions` | Association of function key → loaded `LibraryFunction`. |
+| `Artifacts.wl` | `Artifacts` | One association per shipped dylib: name, kind, path, hash, and the signatures it exports. |
+| `License.wl` | `License` | One association per Rust package linked into the paclet — `"Name"`, `"Version"`, `"License"` (SPDX expression), `"LicenseFile"`, `"Authors"`, `"Repository"` — covering the crates being packaged and their whole dependency graph (dev-dependencies excluded). Undeclared fields are `Missing["NotAvailable"]`. |
+
+Read them from a paclet with `PacletObject[…]["AssetLocation", "License"]` (or
+`PacletFindFile`), then `Get` the file.
 
 ### Options
 

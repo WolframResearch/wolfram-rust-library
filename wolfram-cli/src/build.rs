@@ -1,5 +1,6 @@
-use cargo_metadata::{Message, PackageId};
+use cargo_metadata::{DependencyKind, Message, PackageId};
 use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -32,6 +33,86 @@ pub struct DylibInfo {
     /// two packages sharing the same location may use a different (or no)
     /// namespace, so it's the one setting exempt from `check_configs_agree`.
     pub namespace: Option<String>,
+}
+
+/// The license metadata of one Rust package contributing to the paclet, as
+/// declared in its `Cargo.toml`. Collected for every package in the resolved
+/// (non-dev) dependency graph of the crates that make up an output location
+/// and written to `License.wl`.
+pub struct LicenseEntry {
+    /// Package name as it appears on crates.io / in the workspace.
+    pub name: String,
+    /// The exact resolved version that was linked into the build.
+    pub version: String,
+    /// SPDX license expression from `license = "…"`, when declared.
+    pub license: Option<String>,
+    /// Path to a bundled license file from `license-file = "…"`, relative to
+    /// that package's own manifest directory. Set by packages whose terms
+    /// aren't expressible as an SPDX expression.
+    pub license_file: Option<String>,
+    /// Declared `authors = […]`, for attribution notices.
+    pub authors: Vec<String>,
+    /// Declared `repository = "…"`, where the full license text can be read.
+    pub repository: Option<String>,
+}
+
+/// Collect the license metadata of `roots` and everything they depend on,
+/// walking the resolved dependency graph. Dev-dependencies are excluded —
+/// they are never linked into the shipped `cdylib`s, so they carry no
+/// distribution obligations; build-dependencies are kept, since their output
+/// can end up in the binary. The result is deduplicated (a package reached
+/// through several paths appears once) and sorted by name then version, so
+/// the generated `License.wl` is stable across builds.
+///
+/// Returns an empty list if cargo produced no resolve graph (e.g. metadata
+/// was unavailable) — a missing graph must not fail an otherwise fine build.
+pub fn collect_licenses(
+    meta: &cargo_metadata::Metadata,
+    roots: &[PackageId],
+) -> Vec<LicenseEntry> {
+    let Some(resolve) = meta.resolve.as_ref() else {
+        return Vec::new();
+    };
+    let nodes: HashMap<&PackageId, &cargo_metadata::Node> =
+        resolve.nodes.iter().map(|n| (&n.id, n)).collect();
+
+    let mut reached: HashSet<PackageId> = HashSet::new();
+    let mut stack: Vec<PackageId> = roots.to_vec();
+    while let Some(id) = stack.pop() {
+        if !reached.insert(id.clone()) {
+            continue;
+        }
+        let Some(node) = nodes.get(&id) else { continue };
+        for dep in &node.deps {
+            // An empty `dep_kinds` means cargo didn't report kinds (older
+            // metadata formats); treat that as a normal dependency rather
+            // than dropping it.
+            let linked = dep.dep_kinds.is_empty()
+                || dep
+                    .dep_kinds
+                    .iter()
+                    .any(|k| k.kind != DependencyKind::Development);
+            if linked {
+                stack.push(dep.pkg.clone());
+            }
+        }
+    }
+
+    let mut entries: Vec<LicenseEntry> = meta
+        .packages
+        .iter()
+        .filter(|pkg| reached.contains(&pkg.id))
+        .map(|pkg| LicenseEntry {
+            name: pkg.name.to_string(),
+            version: pkg.version.to_string(),
+            license: pkg.license.clone(),
+            license_file: pkg.license_file.as_ref().map(|p| p.to_string()),
+            authors: pkg.authors.clone(),
+            repository: pkg.repository.clone(),
+        })
+        .collect();
+    entries.sort_by(|a, b| (&a.name, &a.version).cmp(&(&b.name, &b.version)));
+    entries
 }
 
 /// Fully resolved packaging settings, merged from CLI flags, the crate's
@@ -105,6 +186,21 @@ pub fn pacletinfo_config(pkg: &cargo_metadata::Package) -> BuildArgs {
     }
 }
 
+/// The package a build is about: the one named by `-p`/`--package`, else the
+/// workspace root package (`None` in a virtual workspace with no root).
+fn selected_package<'a>(
+    meta: &'a cargo_metadata::Metadata,
+    package: Option<&str>,
+) -> Option<&'a cargo_metadata::Package> {
+    match package {
+        Some(pkg_name) => meta
+            .workspace_packages()
+            .into_iter()
+            .find(|p| p.name.as_str() == pkg_name),
+        None => meta.root_package(),
+    }
+}
+
 /// Resolve the final packaging settings for one package: merge the CLI config
 /// over the package's `[package.metadata.wl.pacletinfo]` over built-in
 /// defaults (paclet name/version fall back to the crate's own), then validate
@@ -115,15 +211,7 @@ pub fn resolve_paclet_config(
     cli: &BuildArgs,
     package: Option<&str>,
 ) -> Result<PacletConfig> {
-    let pkg = meta.and_then(|m| {
-        if let Some(pkg_name) = package {
-            m.workspace_packages()
-                .into_iter()
-                .find(|p| p.name.as_str() == pkg_name)
-        } else {
-            m.root_package()
-        }
-    });
+    let pkg = meta.and_then(|m| selected_package(m, package));
 
     let defaults = BuildArgs {
         paclet_name: pkg.map(|p| p.name.to_string()),
@@ -165,6 +253,9 @@ struct Location {
     config: PacletConfig,
     dylibs: Vec<(PathBuf, Option<String>)>,
     package_names: Vec<String>,
+    /// Ids of the packages contributing dylibs here — the roots of the
+    /// dependency graph walked to build this location's `License.wl`.
+    package_ids: Vec<PackageId>,
 }
 
 /// Implements `cargo wl build`: builds the host `cdylib`s, generates the WL
@@ -231,7 +322,19 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
         if config.cleanup {
             clean_paclet_dir(&out_dir, &config.name, host_system_id)?;
         }
-        let lib_dir = generate_package(&[], host_system_id, &out_dir, &config)?;
+        // No dylib was built, so there is no package id to root the graph at;
+        // fall back to the selected (or workspace root) package.
+        let licenses = meta
+            .as_ref()
+            .map(|m| {
+                let roots: Vec<PackageId> = selected_package(m, package.as_deref())
+                    .map(|p| vec![p.id.clone()])
+                    .unwrap_or_default();
+                collect_licenses(m, &roots)
+            })
+            .unwrap_or_default();
+        let lib_dir =
+            generate_package(&[], &licenses, host_system_id, &out_dir, &config)?;
         let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
         generated.push(lib_dir);
         return Ok(generated);
@@ -266,6 +369,9 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
                 if !loc.package_names.contains(&package_name) {
                     loc.package_names.push(package_name);
                 }
+                if !loc.package_ids.contains(&dylib.package_id) {
+                    loc.package_ids.push(dylib.package_id.clone());
+                }
             },
             None => {
                 locations.push((
@@ -275,6 +381,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
                         dylibs: vec![(dylib.path.clone(), config.namespace.clone())],
                         config,
                         package_names: vec![package_name],
+                        package_ids: vec![dylib.package_id.clone()],
                     },
                 ));
             },
@@ -307,8 +414,18 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
             })
             .collect::<Result<_>>()?;
 
-        let lib_dir =
-            generate_package(&host_infos, host_system_id, &out_dir, &loc.config)?;
+        let licenses = meta
+            .as_ref()
+            .map(|m| collect_licenses(m, &loc.package_ids))
+            .unwrap_or_default();
+
+        let lib_dir = generate_package(
+            &host_infos,
+            &licenses,
+            host_system_id,
+            &out_dir,
+            &loc.config,
+        )?;
         let lib_dir = std::fs::canonicalize(&lib_dir).unwrap_or(lib_dir);
         generated.push(lib_dir);
 
@@ -328,6 +445,7 @@ pub fn build_and_package(args: &BuildArgs) -> Result<Vec<PathBuf>> {
                 run_cargo_build(&cross_args, Some(rust_target(system_id)?))?;
             let lib_dir = copy_cross_dylibs(
                 &host_infos,
+                &licenses,
                 &cross_dylibs,
                 system_id,
                 &out_dir,
@@ -518,10 +636,11 @@ fn clean_paclet_dir(out_dir: &Path, name: &str, system_id: SystemID) -> Result<(
     Ok(())
 }
 
-/// Write Functions.wl, Artifacts.wl, and PacletInfo.wl into `out_dir/<name>-<SystemID>/`.
-/// Returns the output subdirectory path.
+/// Write Functions.wl, Artifacts.wl, License.wl, and PacletInfo.wl into
+/// `out_dir/<name>-<SystemID>/`. Returns the output subdirectory path.
 pub fn generate_package(
     infos: &[DylibInfo],
+    licenses: &[LicenseEntry],
     system_id: SystemID,
     out_dir: &Path,
     config: &PacletConfig,
@@ -553,17 +672,19 @@ pub fn generate_package(
         })
         .collect();
 
-    write_package_wl_files(&placed, system_id, &lib_dir, config)?;
+    write_package_wl_files(&placed, licenses, system_id, &lib_dir, config)?;
 
     Ok(lib_dir)
 }
 
-/// Write Functions.wl, Artifacts.wl, and PacletInfo.wl into `lib_dir` from
-/// already-placed `(info, dest-filename)` pairs. Shared by [`generate_package`]
-/// (host build) and [`copy_cross_dylibs`] (cross builds), so every platform's
-/// package directory ends up with the same loader scaffolding.
+/// Write Functions.wl, Artifacts.wl, License.wl, and PacletInfo.wl into
+/// `lib_dir` from already-placed `(info, dest-filename)` pairs. Shared by
+/// [`generate_package`] (host build) and [`copy_cross_dylibs`] (cross builds),
+/// so every platform's package directory ends up with the same loader
+/// scaffolding.
 fn write_package_wl_files(
     placed: &[(&DylibInfo, String)],
+    licenses: &[LicenseEntry],
     system_id: SystemID,
     lib_dir: &Path,
     config: &PacletConfig,
@@ -575,6 +696,13 @@ fn write_package_wl_files(
         .collect();
     write_wl(lib_dir.join("Artifacts.wl"), &expr!(sigs))?;
 
+    // ── License.wl
+    // One association per Rust package linked into this paclet (the crates
+    // themselves plus their whole non-dev dependency graph), so the shipped
+    // paclet carries its own attribution data.
+    let license_entries: Vec<Expr> = licenses.iter().map(license_assoc).collect();
+    write_wl(lib_dir.join("License.wl"), &expr!(license_entries))?;
+
     // ── PacletInfo.wl
     let paclet_info = expr!(::PacletObject[{
         "Name"       -> (config.name.as_str()),
@@ -585,7 +713,8 @@ fn write_package_wl_files(
             ::Rule["Root", "."],
             ::Rule["Assets", ::List[
                 ::List["Functions", "Functions.wl"],
-                ::List["Artifacts", "Artifacts.wl"]
+                ::List["Artifacts", "Artifacts.wl"],
+                ::List["License", "License.wl"]
             ]]
         ]]
     }]);
@@ -665,6 +794,25 @@ fn artifact_assoc(info: &DylibInfo, dest: &str) -> Expr {
     })
 }
 
+/// One package descriptor `<|"Name" -> …, "Version" -> …, "License" -> …,
+/// "LicenseFile" -> …, "Authors" -> {…}, "Repository" -> …|>` for
+/// `License.wl`. Fields a package didn't declare are `Missing["NotAvailable"]`,
+/// matching how `Artifacts.wl` reports unknown values.
+fn license_assoc(entry: &LicenseEntry) -> Expr {
+    let optional = |value: &Option<String>| match value {
+        Some(text) => Expr::from(text.as_str()),
+        None => expr!(::Missing["NotAvailable"]),
+    };
+    expr!({
+        "Name"        -> (entry.name.as_str()),
+        "Version"     -> (entry.version.as_str()),
+        "License"     -> (optional(&entry.license)),
+        "LicenseFile" -> (optional(&entry.license_file)),
+        "Authors"     -> ::List[..(&entry.authors)],
+        "Repository"  -> (optional(&entry.repository))
+    })
+}
+
 /// One per-function signature association for the `"Signatures"` list. Known
 /// kinds carry typed `"Params"`/`"Return"` specs; an unknown kind reports
 /// `Missing[]` for both.
@@ -698,6 +846,7 @@ fn signature_assoc(e: &FunctionEntry) -> Expr {
 /// loader keys stay identical across platforms.
 pub fn copy_cross_dylibs(
     host_infos: &[DylibInfo],
+    licenses: &[LicenseEntry],
     cross_dylibs: &[PathBuf],
     system_id: SystemID,
     out_dir: &Path,
@@ -737,7 +886,7 @@ pub fn copy_cross_dylibs(
         })
         .collect::<Result<_>>()?;
 
-    write_package_wl_files(&placed, system_id, &lib_dir, config)?;
+    write_package_wl_files(&placed, licenses, system_id, &lib_dir, config)?;
 
     Ok(lib_dir)
 }
