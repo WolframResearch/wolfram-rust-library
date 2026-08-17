@@ -57,7 +57,7 @@ impl, like `SparseArray` — read/write the raw `MArgument.sparse`
 (`MSparseArray`) pointer and drive the `WolframSparseLibrary_Functions` C API
 (exposed as `rtl::MSparseArray_*`/`rtl::MTensor_*` in `wolfram-library-link`)
 directly. See `margs_sparse_array_merge` in
-[wolfram-examples-internal/src/margs.rs](https://github.com/WolframResearch/wolfram-library-link-rs/blob/master/wolfram-examples-internal/src/margs.rs)
+[wolfram-test-lib/src/margs.rs](https://github.com/WolframResearch/wolfram-library-link-rs/blob/master/wolfram-test-lib/src/margs.rs)
 for a worked example.
 
 The `automate-function-loading-boilerplate` feature (on by default) emits the

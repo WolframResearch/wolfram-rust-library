@@ -1,5 +1,5 @@
 [package]
-name = "wolfram-examples-internal"
+name = "wolfram-test-lib"
 version = "0.6.0"
 edition = "2021"
 publish = false
@@ -25,7 +25,10 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 chrono-tz = { version = "0.10", optional = true }
 
 [features]
-default = ["vendor-chrono"]
+# Both chrono features are on by default so the `Example.wlt` suite — which
+# covers the named-IANA-zone functions too — passes with a plain
+# `cargo wl test --features wstp`.
+default = ["vendor-chrono", "vendor-chrono-tz"]
 
 # Pulls in wstp-sys, which needs a WSTP SDK for the target platform. Off by
 # default so a plain `cargo build`/`check` (e.g. when cross-compiling) doesn't

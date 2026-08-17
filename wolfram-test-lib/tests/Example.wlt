@@ -1,4 +1,4 @@
-(* Run via: cargo wl test (from wolfram-examples-internal/) *)
+(* Run via: cargo wl test (from wolfram-test-lib/) *)
 
 (* ── Load libraries ─────────────────────────────────────────────────────────── *)
 (* $LibraryPath and SetDirectory are already set by cargo wl test *)

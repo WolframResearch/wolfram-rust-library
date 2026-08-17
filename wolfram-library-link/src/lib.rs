@@ -75,7 +75,7 @@
 //! `MArgument.sparse` pointer (an [`MSparseArray`][crate::sys::MSparseArray])
 //! and drive the `MSparseArray_*`/`MTensor_*` functions in [`rtl`] directly;
 //! see `margs_sparse_array_merge` in
-//! [wolfram-examples-internal](https://github.com/WolframResearch/wolfram-library-link-rs/blob/master/wolfram-examples-internal/src/margs.rs)
+//! [wolfram-test-lib](https://github.com/WolframResearch/wolfram-library-link-rs/blob/master/wolfram-test-lib/src/margs.rs)
 //! for a worked example.
 //!
 //! **WSTP** functions pass values over a WSTP [`Link`] object that can carry any Wolfram

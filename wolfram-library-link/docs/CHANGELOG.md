@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for types with no `FromArg`/`IntoArg` impl, like `SparseArray` — read the
   raw `MArgument.sparse` (`MSparseArray`) pointer and drive the
   `MSparseArray_*`/`MTensor_*` functions in `rtl` directly; see
-  `margs_sparse_array_merge` in `wolfram-examples-internal/src/margs.rs` for a
+  `margs_sparse_array_merge` in `wolfram-test-lib/src/margs.rs` for a
   worked example.
 
 * Added a new long-form guide, `docs::using_wxf_mode` ("How To: Export typed
