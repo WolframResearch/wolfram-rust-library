@@ -1,5 +1,5 @@
 (* DuckDB example end-to-end tests.
-   Run via: cargo wl test --features duckdb  (from WolframExample/Libs/)
+   Run via: cargo wl test --features duckdb  (from WolframExample/)
    DuckDB is statically compiled in — no driver install needed.
 
    Every db_* function returns one `DuckDbResult` variant (per-variant `enum_head`):

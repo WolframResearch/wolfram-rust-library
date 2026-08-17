@@ -20,7 +20,7 @@ pub fn cmd_test(args: TestArgs) -> Result<()> {
     // build` (and as `cargo wl build`) — the current package if run from a
     // concrete package directory (e.g. wolfram-library-link/, producing just
     // its own dylibs), or every member if run from a virtual-manifest
-    // workspace root (e.g. WolframExample/Libs/, producing duckdb's and mixed's
+    // workspace root (e.g. WolframExample/, producing duckdb's and mixed's
     // together). Both --lib and --examples are requested since different
     // packages use either target kind for their cdylib(s) (e.g.
     // wolfram-library-link's own test suite uses [[example]] targets,

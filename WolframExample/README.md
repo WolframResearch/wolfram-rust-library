@@ -18,10 +18,10 @@ Keeping them apart means the code you edit and the code you build never mix:
 ```
 WolframExample/
 ├── PacletInfo.wl               the paclet (Kernel extension, context WolframExample`)
+├── Cargo.toml                  standalone Cargo workspace — run cargo wl from here
 ├── Kernel/
 │   └── WolframExample.wl       top-level code: wraps the Rust functions
-└── Libs/                       standalone Cargo workspace — the Rust side
-    ├── Cargo.toml
+└── Libs/                       the Rust side
     ├── math/                   namespace "math":    scalars, NumericArrays, structs, enums
     ├── duckdb/                 namespace "duckdb":  an embedded SQL engine
     └── tests/*.wlt             Wolfram-level tests
@@ -47,9 +47,11 @@ manifest each one embeds, and writes a single
 
 * `Functions.wl` — evaluates to `<|"math::add" -> LibraryFunction[…], …|>`,
   every exported Rust function already loaded and ready to call;
-* `PacletInfo.wl` — declares those files as the paclet's `"Functions"` and
-  `"Artifacts"` assets;
-* `Artifacts.wl` — one descriptor per dylib (hash, path, signatures).
+* `Artifacts.wl` — one descriptor per dylib (hash, path, signatures);
+* `License.wl` — the license, version and authors of every Rust crate linked
+  in, dependencies included, so the shipped paclet carries its attribution;
+* `PacletInfo.wl` — declares those files as the paclet's `"Functions"`,
+  `"Artifacts"` and `"License"` assets.
 
 `Kernel/WolframExample.wl` never looks at a path or a platform directory. It
 asks the paclet manager for the asset:
@@ -67,11 +69,11 @@ Rust-side data shapes into idiomatic Wolfram results.
 
 ## Building
 
-From `WolframExample/Libs`:
+From `WolframExample`:
 
 ```shell
 cargo install cargo-wl     # once
-cargo wl build --release   # writes ../../WolframExampleLib-<SystemID>/
+cargo wl build --release   # writes ../WolframExampleLib-<SystemID>/
 ```
 
 The DuckDB crate compiles the engine from source, so the first build takes a
@@ -148,7 +150,7 @@ set — see `wolfram-serialize`'s docs.
 
 ## Testing
 
-From `WolframExample/Libs`:
+From `WolframExample`:
 
 ```shell
 cargo wl test
@@ -157,9 +159,9 @@ cargo wl test
 This builds the crates, packages them, then runs every `.wlt` under the
 current directory in a Wolfram kernel:
 
-* `tests/Duckdb.wlt` tests the library directly, calling the raw
+* `Libs/tests/Duckdb.wlt` tests the library directly, calling the raw
   `LibraryFunction`s out of `Functions.wl`.
-* `tests/WolframExample.wlt` tests the whole chain — it `PacletDirectoryLoad`s
+* `Libs/tests/WolframExample.wlt` tests the whole chain — it `PacletDirectoryLoad`s
   the parent directory (where both paclets sit), `Needs` the
   `WolframExample`` ` context, and calls the top-level API.
 

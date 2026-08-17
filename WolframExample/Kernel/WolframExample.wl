@@ -26,7 +26,7 @@ DuckDBQuery::usage = "DuckDBQuery[conn, sql] runs sql and gives the result as a 
 DuckDBDisconnect::usage = "DuckDBDisconnect[conn] closes the connection.";
 DuckDBExecute::usage = "DuckDBExecute[url, f] opens a connection to url, applies f to it, closes it again, and gives the result of f — even if f fails.";
 
-WolframExample::nolib = "The `1` paclet was not found. Build it with `cargo wl build` from WolframExample/Libs, then make its directory known with PacletDirectoryLoad.";
+WolframExample::nolib = "The `1` paclet was not found. Build it with `cargo wl build` from WolframExample, then make its directory known with PacletDirectoryLoad.";
 WolframExample::nofunc = "`1` is not exported by the `2` paclet; the library may be built without the corresponding feature.";
 WolframExample::divide = "`1`";
 WolframExample::badasset = "The `1` paclet does not provide a readable \"Functions\" asset (looked at `2`).";

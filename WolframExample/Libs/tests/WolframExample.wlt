@@ -1,5 +1,5 @@
 (* End-to-end test of the WolframExample paclet's top-level API.
-   Run via: cargo wl test  (from WolframExample/Libs/)
+   Run via: cargo wl test  (from WolframExample/)
 
    Unlike Duckdb.wlt — which loads Functions.wl directly and calls the raw
    LibraryFunctions — this exercises the whole chain: the generated
