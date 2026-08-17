@@ -125,6 +125,21 @@ To reach a function that has no wrapper yet, use the raw association:
 WolframExampleFunctions[]["math::inactive_sum"][{1, 2, 3}]
 ```
 
+## The tour notebook
+
+`notebooks/WolframExampleTour.nb` runs everything above, section by section,
+with commentary. It is generated — edit the cells in
+`scripts/generate-example-notebook.wls` and regenerate:
+
+```shell
+wolframscript -file scripts/generate-example-notebook.wls
+wolframscript -file scripts/generate-example-notebook.wls --check   # evaluate every cell
+```
+
+`--check` evaluates each input cell in a kernel and reports any that fail, so a
+tour cell that goes stale after an API change is caught without opening the
+front end.
+
 ## Adding a function
 
 1. Write it in `Libs/math/src/lib.rs` (or a new crate) and tag it:

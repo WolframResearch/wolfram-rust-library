@@ -26,7 +26,9 @@ DuckDBQuery::usage = "DuckDBQuery[conn, sql] runs sql and gives the result as a 
 DuckDBDisconnect::usage = "DuckDBDisconnect[conn] closes the connection.";
 DuckDBExecute::usage = "DuckDBExecute[url, f] opens a connection to url, applies f to it, closes it again, and gives the result of f — even if f fails.";
 
-WolframExample::nolib = "The `1` paclet was not found. Build it with `cargo wl build` from WolframExample, then make its directory known with PacletDirectoryLoad.";
+(* No backticks around the shell command: in a message template a backtick
+   pair is a slot marker, so "`cargo wl build`" would be read as slot 0. *)
+WolframExample::nolib = "The `1` paclet was not found. Build it by running \"cargo wl build\" in WolframExample, then make its directory known with PacletDirectoryLoad.";
 WolframExample::nofunc = "`1` is not exported by the `2` paclet; the library may be built without the corresponding feature.";
 WolframExample::divide = "`1`";
 WolframExample::badasset = "The `1` paclet does not provide a readable \"Functions\" asset (looked at `2`).";
@@ -42,31 +44,29 @@ $libraryPaclet = "WolframExampleLib";
    this machine. (The property is singular — "AssetsLocation" is not one of
    PacletObject's properties and evaluates to an unevaluated part access.) *)
 
-loadFunctions[] := Module[{paclet, file, functions},
-    paclet = PacletObject[$libraryPaclet];
-    If[!PacletObjectQ[paclet],
-        Message[WolframExample::nolib, $libraryPaclet];
-        Return[$Failed]
-    ];
-
-    file = paclet["AssetLocation", "Functions"];
-    If[!StringQ[file] || !FileExistsQ[file],
-        Message[WolframExample::badasset, $libraryPaclet, file];
-        Return[$Failed]
-    ];
-
-    functions = Get[file];
-    If[!AssociationQ[functions],
-        Message[WolframExample::badasset, $libraryPaclet, file];
-        Return[$Failed]
-    ];
-
-    functions
+(* Each With sequence sees the previous one's bindings, so the three stages —
+   find the paclet, resolve the asset, read it — chain without any mutable
+   state; every stage guards on the one before it, and a single Which reports
+   whichever one gave out. *)
+loadFunctions[] := With[
+    {paclet = PacletObject[$libraryPaclet]},
+    {file = If[PacletObjectQ[paclet], paclet["AssetLocation", "Functions"], $Failed]},
+    {functions = If[StringQ[file] && FileExistsQ[file], Get[file], $Failed]},
+    Which[
+        !PacletObjectQ[paclet],
+            Message[WolframExample::nolib, $libraryPaclet]; $Failed,
+        !StringQ[file] || !FileExistsQ[file],
+            Message[WolframExample::badasset, $libraryPaclet, file]; $Failed,
+        !AssociationQ[functions],
+            Message[WolframExample::badasset, $libraryPaclet, file]; $Failed,
+        True,
+            functions
+    ]
 ];
 
 (* Cache only a successful load, so a failed lookup can be retried after the
    library has been built or PacletDirectoryLoad-ed. *)
-$functions := Module[{loaded = loadFunctions[]},
+$functions := With[{loaded = loadFunctions[]},
     If[AssociationQ[loaded], $functions = loaded, loaded]
 ];
 
@@ -75,14 +75,15 @@ WolframExampleFunctions[] := Replace[$functions, Except[_?AssociationQ] :> <||>]
 (* `libraryFunction["duckdb::db_query"][args]` — resolves lazily on each call
    and messages once if the key is absent (e.g. a Cargo feature was off when
    the library was built). *)
-libraryFunction[key_String][args___] := Module[{functions = $functions, f},
-    If[!AssociationQ[functions], Return[$Failed]];
-    f = Lookup[functions, key, $Failed];
-    If[f === $Failed,
-        Message[WolframExample::nofunc, key, $libraryPaclet];
-        Return[$Failed]
-    ];
-    f[args]
+libraryFunction[key_String][args___] := With[
+    {functions = $functions},
+    {f = If[AssociationQ[functions], Lookup[functions, key, $Failed], $Failed]},
+    Which[
+        (* the load already messaged — stay quiet here *)
+        !AssociationQ[functions], $Failed,
+        f === $Failed, Message[WolframExample::nofunc, key, $libraryPaclet]; $Failed,
+        True, f[args]
+    ]
 ];
 
 (* ── math ─────────────────────────────────────────────────────────────────── *)
@@ -101,7 +102,7 @@ toReal64[list_List] := NumericArray[N[list], "Real64"];
    WL form is a two-element {"VariantName", <|fields|>} — any head works, so
    "Circle" -> <|"radius" -> 1|> would do just as well. Struct fields keep
    their Rust names ("width", "radius", ...). *)
-ExampleArea[assoc_?AssociationQ] := Module[{shape = shapeFor[assoc]},
+ExampleArea[assoc_?AssociationQ] := With[{shape = shapeFor[assoc]},
     If[shape === $Failed, $Failed, libraryFunction["math::area_shape"][shape]]
 ];
 
@@ -114,10 +115,10 @@ shapeFor[assoc_] := Which[
         $Failed
 ];
 
-ExampleSymmetricPoint[assoc_?AssociationQ] := Module[{point},
-    point = libraryFunction["math::symmetric_point"][
+ExampleSymmetricPoint[assoc_?AssociationQ] := With[
+    {point = libraryFunction["math::symmetric_point"][
         <|"x" -> N[assoc["X"]], "y" -> N[assoc["Y"]]|>
-    ];
+    ]},
     If[AssociationQ[point], <|"X" -> point["x"], "Y" -> point["y"]|>, point]
 ];
 
@@ -155,7 +156,7 @@ DuckDBQuery[conn_String, sql_String, params_List] :=
 DuckDBQuery[conn_String, sql_String, params_?AssociationQ] :=
     libraryFunction["duckdb::db_query"][conn, sql, ToString /@ params];
 
-positionalParams[params_List] := Module[{width = Max[1, IntegerLength[Length[params]]]},
+positionalParams[params_List] := With[{width = Max[1, IntegerLength[Length[params]]]},
     AssociationThread[
         IntegerString[Range[Length[params]], 10, width],
         (* Strings bind as-is; anything else goes through InputForm, which
@@ -168,9 +169,8 @@ DuckDBDisconnect[conn_String] := libraryFunction["duckdb::db_disconnect"][conn];
 
 (* WithCleanup closes the handle even if f aborts or throws, so a failing
    query can't leak a connection out of the registry Rust keeps. *)
-DuckDBExecute[url_String, f_] := Module[{conn = DuckDBConnect[url]},
-    If[!StringQ[conn], Return[conn]];
-    WithCleanup[f[conn], DuckDBDisconnect[conn]]
+DuckDBExecute[url_String, f_] := With[{conn = DuckDBConnect[url]},
+    If[StringQ[conn], WithCleanup[f[conn], DuckDBDisconnect[conn]], conn]
 ];
 
 End[];
