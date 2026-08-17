@@ -48,6 +48,7 @@ inventory = { version = "0.2.1", optional = true }
 process_path = { version = "0.1.3", optional = true }
 
 [dev-dependencies]
+wolfram-export = { path = "../wolfram-export", features = ["native", "wstp", "wxf"] }
 
 [features]
 default = ["wstp", "panic-failure-backtraces", "automate-function-loading-boilerplate"]
