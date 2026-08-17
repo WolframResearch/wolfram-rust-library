@@ -100,10 +100,17 @@ NumericArray by the wrapper first."],
 
         text["The Rust side accumulates into 8 independent lanes so that LLVM \
 can vectorize the loop (see Libs/math/src/lib.rs) \[LongDash] about twice the \
-throughput of the naive left-to-right sum. Timed against the kernel's own \
-Dot, which calls into BLAS:"],
+throughput of the naive left-to-right sum. Timed against the kernel's own Dot, \
+which calls into BLAS; a Speedup above 1 means the Rust library won.
 
-        code["With[{a = Range[1., 100000.], b = Range[100000., 1., -1.]},\n    {\n        \"Rust\" -> First @ RepeatedTiming @ ExampleDot[a, b],\n        \"Kernel\" -> First @ RepeatedTiming @ Dot[a, b]\n    }\n]"]
+Two things decide what you see here. Time only the call, not the packing: both \
+arrays are converted to NumericArrays first, since passing plain lists spends \
+about three times the call itself on the conversion. And build with \
+    cargo wl build --release
+\[LongDash] cargo wl test leaves an unoptimized build in place, which loses by \
+an order of magnitude."],
+
+        code["With[\n    {a = Range[1., 100000.], b = Range[100000., 1., -1.]},\n    {na = NumericArray[a, \"Real64\"], nb = NumericArray[b, \"Real64\"]},\n    {rust = First @ RepeatedTiming @ ExampleDot[na, nb],\n     kernel = First @ RepeatedTiming @ Dot[a, b],\n     packing = First @ RepeatedTiming @ ExampleDot[a, b]},\n    <|\n        \"Rust\" -> Quantity[rust, \"Seconds\"],\n        \"Kernel\" -> Quantity[kernel, \"Seconds\"],\n        \"Speedup\" -> kernel / rust,\n        \"RustFromLists\" -> Quantity[packing, \"Seconds\"]\n    |>\n]"]
     ],
 
     subsection["Structs and enums",
