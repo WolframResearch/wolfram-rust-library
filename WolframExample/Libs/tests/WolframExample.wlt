@@ -1,11 +1,11 @@
 (* End-to-end test of the WolframExample paclet's top-level API.
-   Run via: cargo wl test  (from WolframExample/libs/)
+   Run via: cargo wl test  (from WolframExample/Libs/)
 
    Unlike Duckdb.wlt — which loads Functions.wl directly and calls the raw
    LibraryFunctions — this exercises the whole chain: the generated
    WolframExampleLib paclet is discovered by the paclet manager, and
    WolframExample`'s kernel code resolves it via
-   PacletObject["WolframExampleLib"]["AssetsLocation", "Functions"].
+   PacletObject["WolframExampleLib"]["AssetLocation", "Functions"].
 
    cargo wl test runs with the generated WolframExampleLib-<SystemID>/ as the
    current directory, and that directory sits next to the WolframExample paclet

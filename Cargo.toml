@@ -19,8 +19,8 @@ members = [
 ]
 
 # `WolframExample` is a self-contained Wolfram paclet, not part of this
-# workspace. Its Rust crates live in WolframExample/libs and form their own
-# standalone workspace (see WolframExample/libs/Cargo.toml): they depend on the
+# workspace. Its Rust crates live in WolframExample/Libs and form their own
+# standalone workspace (see WolframExample/Libs/Cargo.toml): they depend on the
 # published crates.io releases of this repo's crates (not local paths), so they
 # aren't members here and have their own Cargo.lock. Unlike `wolfram-test-lib`,
 # they're meant to be copy-pasted as standalone starting points, not built from

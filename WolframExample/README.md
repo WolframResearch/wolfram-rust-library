@@ -8,7 +8,7 @@ the smallest complete example of the split this repo's tooling is built around:
   No binaries, no generated files, nothing platform-specific.
 * **`WolframExampleLib`** — a *generated* paclet containing only compiled
   dylibs and a `Functions.wl` loader. It is produced by `cargo wl build` from
-  the crates in [`libs/`](libs), one directory per platform
+  the crates in [`Libs/`](Libs), one directory per platform
   (`WolframExampleLib-MacOSX-ARM64`, `WolframExampleLib-Linux-x86-64`, …).
 
 Keeping them apart means the code you edit and the code you build never mix:
@@ -20,7 +20,7 @@ WolframExample/
 ├── PacletInfo.wl               the paclet (Kernel extension, context WolframExample`)
 ├── Kernel/
 │   └── WolframExample.wl       top-level code: wraps the Rust functions
-└── libs/                       standalone Cargo workspace — the Rust side
+└── Libs/                       standalone Cargo workspace — the Rust side
     ├── Cargo.toml
     ├── math/                   namespace "math":    scalars, NumericArrays, structs, enums
     ├── duckdb/                 namespace "duckdb":  an embedded SQL engine
@@ -31,7 +31,7 @@ WolframExampleLib-MacOSX-ARM64/ generated next to this directory by cargo wl bui
 
 ## How the two halves meet
 
-Each crate in `libs/` declares its packaging in its own `Cargo.toml`:
+Each crate in `Libs/` declares its packaging in its own `Cargo.toml`:
 
 ```toml
 [package.metadata.wl.pacletinfo]
@@ -67,7 +67,7 @@ Rust-side data shapes into idiomatic Wolfram results.
 
 ## Building
 
-From `WolframExample/libs`:
+From `WolframExample/Libs`:
 
 ```shell
 cargo install cargo-wl     # once
@@ -125,7 +125,7 @@ WolframExampleFunctions[]["math::inactive_sum"][{1, 2, 3}]
 
 ## Adding a function
 
-1. Write it in `libs/math/src/lib.rs` (or a new crate) and tag it:
+1. Write it in `Libs/math/src/lib.rs` (or a new crate) and tag it:
    `#[export]` for plain scalar/NumericArray arguments, `#[export(wxf)]` when
    arguments or results are structs, enums, or `Expr`s.
 2. Rebuild: `cargo wl build`. The new key appears in `Functions.wl` as
@@ -148,7 +148,7 @@ set — see `wolfram-serialize`'s docs.
 
 ## Testing
 
-From `WolframExample/libs`:
+From `WolframExample/Libs`:
 
 ```shell
 cargo wl test
@@ -165,7 +165,7 @@ current directory in a Wolfram kernel:
 
 ## Note on dependencies
 
-The crates in `libs/` depend on the **published crates.io releases** of this
+The crates in `Libs/` depend on the **published crates.io releases** of this
 repo's crates, not on local paths, and form their own Cargo workspace excluded
 from the root one. That is deliberate: the directory is meant to be copied out
 and used as a starting point for a real paclet, unchanged.
