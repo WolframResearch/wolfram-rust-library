@@ -6,21 +6,35 @@
    WolframExampleLib, which contains nothing but the compiled dylibs and a
    generated Functions.wl. That file evaluates to an association of ready-made
    LibraryFunction objects keyed by "<namespace>::<rust_fn_name>", e.g.
-   "duckdb::db_query". Everything below is hand-written boilerplate that turns
-   those raw handles into named, documented, argument-checked WL functions. *)
+   "duckdb::db_query". Everything under Kernel/ is hand-written boilerplate
+   that turns those raw handles into named, documented, argument-checked WL
+   functions.
+
+   This file is the only one the paclet manager loads (PacletInfo.wl names the
+   context, and Root -> "Kernel"). It declares the public symbols, then Gets
+   the implementation files. One file per Rust library, so the WL side is split
+   the same way Libs/ is. *)
 
 BeginPackage["WolframExample`"];
 
+(* Developer maintains these declarations: a symbol has to be mentioned in this
+   file, outside `Private`, or the definitions loaded below would land on a
+   private symbol of the same name instead. *)
+
 WolframExampleFunctions::usage = "WolframExampleFunctions[] gives the association of raw LibraryFunction objects exported by the WolframExampleLib paclet, keyed by \"namespace::name\", or a Failure if that paclet cannot be loaded.";
 
-(* math *)
+(* math — Functions/Math.wl *)
 ExampleAdd::usage = "ExampleAdd[a, b] adds two reals in Rust.";
 ExampleDot::usage = "ExampleDot[a, b] gives the dot product of two packed Real64 NumericArrays, read zero-copy by Rust.";
 ExampleArea::usage = "ExampleArea[<|\"Radius\" -> r|>] or ExampleArea[<|\"Width\" -> w, \"Height\" -> h|>] gives the area of a circle or rectangle, dispatched through a Rust enum.";
 ExampleSymmetricPoint::usage = "ExampleSymmetricPoint[<|\"X\" -> x, \"Y\" -> y|>] reflects a point through the origin.";
 ExampleSafeDivide::usage = "ExampleSafeDivide[a, b] gives a/b, or a Failure when b is zero.";
 
-(* duckdb *)
+(* url — Functions/URL.wl *)
+ExampleURLEncode::usage = "ExampleURLEncode[\"string\"] percent-encodes a string in Rust, matching System`URLEncode. ExampleURLEncode[{s1, s2, ...}] encodes a whole list in a single library call.";
+ExampleURLDecode::usage = "ExampleURLDecode[\"string\"] percent-decodes a string in Rust, matching System`URLDecode. ExampleURLDecode[{s1, s2, ...}] decodes a whole list in a single library call.";
+
+(* duckdb — Functions/DuckDB.wl *)
 DuckDBConnect::usage = "DuckDBConnect[] opens an in-memory DuckDB connection and gives its handle. DuckDBConnect[url] opens \"duckdb:///path/to/file.db\", or ATTACHes a \"postgres://\", \"sqlite://\" or \"mysql://\" database.";
 DuckDBQuery::usage = "DuckDBQuery[conn, sql] runs sql and gives the result as a Tabular. DuckDBQuery[conn, sql, {v1, v2, ...}] binds the values to the ? placeholders in sql, in order.";
 DuckDBDisconnect::usage = "DuckDBDisconnect[conn] closes the connection.";
@@ -36,148 +50,23 @@ WolframExample::badasset = "The `1` paclet does not provide a readable \"Functio
 
 Begin["`Private`"];
 
-$libraryPaclet = "WolframExampleLib";
+(* The loader. Code/ first — it defines libraryFunction[], which every file in
+   Functions/ calls — then one file per Rust library, in whatever order
+   FileNames gives them: the wrappers are independent of each other.
 
-(* ── Loading ────────────────────────────────────────────────────────────────
-   PacletObject[name]["AssetLocation", "Functions"] resolves the "Functions"
-   asset that the generated PacletInfo.wl declares, so we never hard-code a
-   path or a SystemID directory: the paclet manager picks the build matching
-   this machine. (The property is singular — "AssetsLocation" is not one of
-   PacletObject's properties and evaluates to an unevaluated part access.) *)
+   The implementation files deliberately have no BeginPackage of their own.
+   They are read inside the scope opened above, so their definitions land in
+   WolframExample` (public symbols, declared above) or in
+   WolframExample`Private` (everything else) with nothing to keep in sync.
 
-(* Everything that can go wrong here is reported as a Failure carrying the
-   message template rather than as $Failed plus a Message: the object formats
-   itself with the same text, survives being stored in a variable, and can be
-   returned straight to the caller. *)
-failure[tag_String, template_, params_List] := Failure[tag, <|
-    "MessageTemplate" :> template,
-    "MessageParameters" -> params
-|>];
+   $InputFileName is bound before the Scan because Get rebinds it while each
+   file is being read. *)
 
-(* Each With sequence sees the previous one's bindings, so the three stages —
-   find the paclet, resolve the asset, read it — chain without any mutable
-   state; every stage guards on the one before it, and a single Which reports
-   whichever one gave out. *)
-loadFunctions[] := With[
-    {paclet = PacletObject[$libraryPaclet]},
-    {file = If[PacletObjectQ[paclet], paclet["AssetLocation", "Functions"], $Failed]},
-    {functions = If[StringQ[file] && FileExistsQ[file], Get[file], $Failed]},
-    Which[
-        !PacletObjectQ[paclet],
-            failure["MissingPaclet", WolframExample::nolib, {$libraryPaclet}],
-        (* covers both an unusable asset path and a file that did not read
-           back as an association: neither leaves `functions` one *)
-        !AssociationQ[functions],
-            failure["UnreadableAsset", WolframExample::badasset, {$libraryPaclet, file}],
-        True,
-            functions
+With[{root = DirectoryName[$InputFileName]},
+    Scan[
+        Scan[Get, FileNames["*.wl", FileNameJoin[{root, #}]]] &,
+        {"Code", "Functions"}
     ]
-];
-
-(* Cache only a successful load, so a failed lookup can be retried after the
-   library has been built or PacletDirectoryLoad-ed. *)
-$functions := With[{loaded = loadFunctions[]},
-    If[AssociationQ[loaded], $functions = loaded, loaded]
-];
-
-WolframExampleFunctions[] := $functions;
-
-(* `libraryFunction["duckdb::db_query"][args]` — resolves lazily on each call.
-   A library that failed to load, or a key that isn't in it (e.g. a Cargo
-   feature was off when it was built), comes back as a Failure the caller can
-   inspect — the load Failure is passed through unchanged rather than
-   re-wrapped, so the original cause survives. *)
-libraryFunction[key_String][args___] := With[
-    {functions = $functions},
-    {f = If[AssociationQ[functions], Lookup[functions, key, Missing[key]], functions]},
-    Which[
-        !AssociationQ[functions], functions,
-        MissingQ[f], failure["UnknownFunction", WolframExample::nofunc, {key, $libraryPaclet}],
-        True, f[args]
-    ]
-];
-
-(* ── math ─────────────────────────────────────────────────────────────────── *)
-
-ExampleAdd[a_?NumericQ, b_?NumericQ] := libraryFunction["math::add"][N[a], N[b]];
-
-(* The Rust side takes &NumericArray<f64>, so both arguments must be Real64
-   NumericArrays; plain lists are converted here rather than in the library. *)
-ExampleDot[a_List, b_List] := ExampleDot[toReal64[a], toReal64[b]];
-ExampleDot[a_NumericArray, b_NumericArray] :=
-    libraryFunction["math::dot"][a, b];
-
-toReal64[list_List] := NumericArray[N[list], "Real64"];
-
-(* One Rust function, two shapes: `area_shape` takes the `Shape` enum, whose
-   WL form is a two-element {"VariantName", <|fields|>} — any head works, so
-   "Circle" -> <|"radius" -> 1|> would do just as well. Struct fields keep
-   their Rust names ("width", "radius", ...). *)
-ExampleArea[assoc_?AssociationQ] := With[{shape = shapeFor[assoc]},
-    If[FailureQ[shape], shape, libraryFunction["math::area_shape"][shape]]
-];
-
-shapeFor[assoc_] := Which[
-    KeyExistsQ[assoc, "Radius"],
-        {"Circle", <|"radius" -> N[assoc["Radius"]]|>},
-    KeyExistsQ[assoc, "Width"] && KeyExistsQ[assoc, "Height"],
-        {"Rect", <|"width" -> N[assoc["Width"]], "height" -> N[assoc["Height"]]|>},
-    True,
-        failure["UnknownShape", WolframExample::shape, {Keys[assoc]}]
-];
-
-ExampleSymmetricPoint[assoc_?AssociationQ] := With[
-    {point = libraryFunction["math::symmetric_point"][
-        <|"x" -> N[assoc["X"]], "y" -> N[assoc["Y"]]|>
-    ]},
-    If[AssociationQ[point], <|"X" -> point["x"], "Y" -> point["y"]|>, point]
-];
-
-(* A Rust `Result<f64, String>` crosses as the plain enum {"Ok", value} /
-   {"Err", message} — only error types deriving `Failure` come back as a real
-   Failure — so the wrapper is where that becomes idiomatic WL. *)
-ExampleSafeDivide[a_?NumericQ, b_?NumericQ] := Replace[
-    libraryFunction["math::safe_divide"][N[a], N[b]],
-    {
-        {"Ok", value_} :> value,
-        {"Err", message_} :> failure["DivisionError", WolframExample::divide, {message}]
-    }
-];
-
-(* ── duckdb ───────────────────────────────────────────────────────────────────
-   Every db_* function returns a transparent success value (the handle string,
-   or the Tabular) or a Failure["ConnectionError"/"ExecuteError"/..., <|...|>],
-   so results are passed through unchanged — Failures propagate on their own. *)
-
-DuckDBConnect[] := DuckDBConnect["duckdb://"];
-DuckDBConnect[url_String] := libraryFunction["duckdb::db_connect"][url];
-
-DuckDBQuery[conn_String, sql_String] := DuckDBQuery[conn, sql, {}];
-
-(* The Rust signature binds a HashMap<String, String> positionally, sorted by
-   key — so a user-facing ordered list of values is zero-padded into keys that
-   sort in that same order ("01", "02", ... beyond nine params). *)
-DuckDBQuery[conn_String, sql_String, params_List] :=
-    libraryFunction["duckdb::db_query"][conn, sql, positionalParams[params]];
-
-DuckDBQuery[conn_String, sql_String, params_?AssociationQ] :=
-    libraryFunction["duckdb::db_query"][conn, sql, ToString /@ params];
-
-positionalParams[params_List] := With[{width = Max[1, IntegerLength[Length[params]]]},
-    AssociationThread[
-        IntegerString[Range[Length[params]], 10, width],
-        (* Strings bind as-is; anything else goes through InputForm, which
-           DuckDB then casts per the column type. *)
-        Replace[params, x : Except[_String] :> ToString[x, InputForm], {1}]
-    ]
-];
-
-DuckDBDisconnect[conn_String] := libraryFunction["duckdb::db_disconnect"][conn];
-
-(* WithCleanup closes the handle even if f aborts or throws, so a failing
-   query can't leak a connection out of the registry Rust keeps. *)
-DuckDBExecute[url_String, f_] := With[{conn = DuckDBConnect[url]},
-    If[StringQ[conn], WithCleanup[f[conn], DuckDBDisconnect[conn]], conn]
 ];
 
 End[];

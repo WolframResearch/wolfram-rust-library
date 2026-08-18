@@ -146,6 +146,67 @@ match, two shapes:"],
     ]
 ],
 
+section["URL encoding",
+
+    text["ExampleURLEncode and ExampleURLDecode are drop-in equivalents of the \
+kernel's own URLEncode and URLDecode, built on percent-encoding \[LongDash] the \
+RFC 3986 half of the Rust url crate. Same character set, same uppercase hex, \
+same treatment of a bare + on the way back."],
+
+    code["ExampleURLEncode[\"Hello, world!\"]"],
+
+    code["ExampleURLDecode[\"Hello%2C%20world%21\"]"],
+
+    subsection["Lists are the real interface",
+
+        text["The Rust functions take a list and return a list, and that is \
+all they take: crossing the library boundary costs one WXF round trip, so \
+encoding n strings should be one call rather than n. The single-string form \
+above is a two-line wrapper in Kernel/Functions/URL.wl \[LongDash] wrap, call, \
+unwrap."],
+
+        code["ExampleURLEncode[{\"a+b\", \"7 x + 5 y\", \"Kurt G\\[ODoubleDot]del\"}]"],
+
+        text["Decoding is deliberately asymmetric, exactly as the kernel's is: \
+a literal + is a space, while %2B is a plus sign. Anything that is not a \
+complete escape is left alone."],
+
+        code["ExampleURLDecode[{\"a+b\", \"a%2Bb\", \"a+b%2Bc\", \"100%\", \"%zz\"}]"]
+    ],
+
+    subsection["Agreement with the kernel",
+
+        text["Not a spot check: every character in the Basic Multilingual \
+Plane, encoded both ways and compared. Lone surrogates are left out because \
+they have no UTF-8 form at all \[LongDash] a Wolfram string can hold one, a Rust \
+str cannot, and the library boundary rejects the payload before any of this \
+code runs."],
+
+        code["bmp = FromCharacterCode /@ Join[Range[0, 16^^D7FF], Range[16^^E000, 2^16 - 1]];\nLength[bmp]"],
+
+        code["Counts[MapThread[SameQ, {ExampleURLEncode[bmp], URLEncode /@ bmp}]]"],
+
+        code["Counts[MapThread[SameQ, {ExampleURLDecode[URLEncode /@ bmp], bmp}]]"]
+    ],
+
+    subsection["Benchmark",
+
+        text["Both directions, against the kernel's own implementation, over \
+lists of 40-character strings drawn from an alphabet that is mostly \
+punctuation and non-ASCII \[LongDash] so almost every character needs escaping. \
+Speedup above 1 means the Rust library won.
+
+At n = 1 the WXF round trip is most of the call and the margin is small; by \
+n = 100 it has amortized away and the ratio settles. As with ExampleDot, build \
+with\n    cargo wl build --release\n\[LongDash] cargo wl test leaves an \
+unoptimized build in place."],
+
+        code["SeedRandom[42];\nalphabet = Join[Characters[\"abcdefgh ?&=/:%\"], {\"\\[ODoubleDot]\", \"\\[Alpha]\"}];\nsample[n_] := Table[StringJoin[RandomChoice[alphabet, 40]], n];"],
+
+        code["row[n_] := Module[{data = sample[n], encoded},\n    encoded = URLEncode /@ data;\n    <|\n        \"n\" -> n,\n        \"EncodeSpeedup\" -> First[RepeatedTiming[URLEncode /@ data]] /\n                           First[RepeatedTiming[ExampleURLEncode[data]]],\n        \"DecodeSpeedup\" -> First[RepeatedTiming[URLDecode /@ encoded]] /\n                           First[RepeatedTiming[ExampleURLDecode[encoded]]]\n    |>\n];\nDataset[row /@ {1, 10, 100, 1000, 10000}]"]
+    ]
+],
+
 section["DuckDB",
 
     text["An entire embedded SQL engine, statically linked into the library \[LongDash] \

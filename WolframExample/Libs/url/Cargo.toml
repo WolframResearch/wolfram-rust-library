@@ -1,0 +1,32 @@
+[package]
+# Named differently from the `url`/`percent-encoding` crates.io ecosystem so
+# `-p <name>` never collides with a dependency name (same reasoning as
+# ../duckdb/Cargo.toml).
+name = "url-example"
+version = "0.6.0"
+edition = "2021"
+publish = false
+
+[package.metadata.wl.pacletinfo]
+name = "WolframExampleLib"
+version = "1.0.0"
+namespace = "url"
+named-exports = false
+# See the note in ../math/Cargo.toml: every member writes into the same
+# `WolframExampleLib-<SystemID>/` next to the `WolframExample` paclet, so every
+# setting here except `namespace` must match math's.
+output = "../../../"
+
+[lib]
+# Keeps the dylib (and so the WL function namespace, `url::url_encode`) named
+# `url` regardless of the package name above.
+name = "url"
+crate-type = ["cdylib"]
+
+[dependencies]
+wolfram-export = { version = "0.6", features = ["wxf"] }
+wolfram-serialize = { version = "0.6" }
+
+# The percent-encoding half of the servo `url` crate — the de-facto standard
+# Rust implementation of RFC 3986 percent-encoding.
+percent-encoding = { version = "2" }

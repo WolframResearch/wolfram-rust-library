@@ -24,9 +24,9 @@ name = "duckdb"
 crate-type = ["cdylib"]
 
 [dependencies]
-wolfram-export = { version = "=0.6.0", features = ["wxf"] }
-wolfram-expr = { version = "=0.6.0" }
-wolfram-serialize = { version = "=0.6.0" }
+wolfram-export = { version = "0.6", features = ["wxf"] }
+wolfram-expr = { version = "0.6" }
+wolfram-serialize = { version = "0.6" }
 
 # DuckDB is statically compiled in via `bundled`; `vtab-arrow` enables native
 # Arrow output so query results come back as RecordBatches without manual conversion.

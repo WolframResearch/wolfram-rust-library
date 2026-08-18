@@ -20,9 +20,12 @@ WolframExample/
 ├── PacletInfo.wl               the paclet (Kernel extension, context WolframExample`)
 ├── Cargo.toml                  standalone Cargo workspace — run cargo wl from here
 ├── Kernel/
-│   └── WolframExample.wl       top-level code: wraps the Rust functions
+│   ├── WolframExample.wl       declares the public symbols, then loads the rest
+│   ├── Code/                   shared helpers (the library loader)
+│   └── Functions/              one file per Rust library, wrapping its functions
 └── Libs/                       the Rust side
     ├── math/                   namespace "math":    scalars, NumericArrays, structs, enums
+    ├── url/                    namespace "url":     strings in, strings out, in batches
     ├── duckdb/                 namespace "duckdb":  an embedded SQL engine
     └── tests/*.wlt             Wolfram-level tests
 
@@ -95,6 +98,29 @@ ExampleArea[<|"Width" -> 10, "Height" -> 20|>]      (* 200. *)
 ExampleSymmetricPoint[<|"X" -> 10, "Y" -> 20|>]     (* <|"X" -> -10., "Y" -> -20.|> *)
 ExampleSafeDivide[1, 0]                             (* Failure["DivisionError", …] *)
 ```
+
+URL encoding, matching `System`URLEncode` / `URLDecode` exactly:
+
+```wolfram
+ExampleURLEncode["Hello, world!"]                   (* "Hello%2C%20world%21" *)
+ExampleURLDecode["a+b"]                             (* "a b" — a bare + is a space *)
+ExampleURLDecode["a%2Bb"]                           (* "a+b" — but %2B is a plus *)
+```
+
+The Rust side takes and returns a **list**, which is the point: one call across
+the library boundary costs a WXF round trip either way, so encoding 10,000
+strings should be one call, not 10,000. The single-string forms above are
+one-line wrappers in `Kernel/Functions/URL.wl`.
+
+```wolfram
+ExampleURLEncode[{"a+b", "7 x + 5 y", "Kurt Gödel"}]
+```
+
+Batched, this runs several times faster than mapping the kernel's own
+`URLEncode` over the same list; per string, the cost stops falling at about 100
+strings per call. Below roughly ten it is a wash, and for a *single* string the
+boundary crossing costs more than `URLEncode` does — use the kernel's
+built-in there.
 
 DuckDB, with the connection handled for you:
 

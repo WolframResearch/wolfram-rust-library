@@ -19,7 +19,7 @@ output = "../../../"
 crate-type = ["cdylib"]
 
 [dependencies]
-wolfram-export = { version = "=0.6.0", features = ["wxf"] }
-wolfram-expr = { version = "=0.6.0" }
-wolfram-serialize = { version = "=0.6.0" }
-wolfram-library-link = { version = "=0.6.0", default-features = false, features = ["panic-failure-backtraces"] }
+wolfram-export = { version = "0.6", features = ["wxf"] }
+wolfram-expr = { version = "0.6" }
+wolfram-serialize = { version = "0.6" }
+wolfram-library-link = { version = "0.6", default-features = false, features = ["panic-failure-backtraces"] }

@@ -23,6 +23,16 @@ If[!$loaded,
     Return[]
 ];
 
+(* Shared corpora for the url tests below. *)
+$URLCorpus = {"", "a+b", "Hello, world!", "7 x + 5 y", "123.123123",
+    "abcdef!@#$%^&*()", "http://www.wolfram.com/solutions", "\n",
+    "Kurt G\[ODoubleDot]del", "Paul Erd\[ODoubleAcute]s", "-_.~"};
+
+$URLBMP = FromCharacterCode /@ Join[Range[0, 16^^D7FF], Range[16^^E000, 2^16 - 1]];
+
+$URLDecodeLiterals = {"a+b", "a+b%2Bc", "100%", "%zz", "%2", "adfad\[EGrave]", "",
+    "%C3%B6", "%c3%b6"};
+
 $Tests = {
 
     (* ── math: native MArgument functions ──────────────────────────────────── *)
@@ -76,6 +86,56 @@ $Tests = {
     <|"TestID"   -> "WolframExample-functions-association",
       "Input"    -> AssociationQ[WolframExample`WolframExampleFunctions[]],
       "Output"   -> True,
+      "Messages" -> {}|>,
+
+    (* ── url ──────────────────────────────────────────────────────────────────
+       The point of these is agreement with the kernel's own URLEncode /
+       URLDecode, so the expected values are computed by System` rather than
+       written out: a divergence shows up as a failure here, not as a stale
+       literal someone has to re-derive. *)
+
+    (* the corpus from URLUtilities' own URLEncode.mt, character for character *)
+    <|"TestID"   -> "WolframExample-url-encode-corpus",
+      "Input"    -> WolframExample`ExampleURLEncode[$URLCorpus],
+      "Output"   -> URLEncode /@ $URLCorpus,
+      "Messages" -> {}|>,
+
+    <|"TestID"   -> "WolframExample-url-decode-corpus",
+      "Input"    -> WolframExample`ExampleURLDecode[URLEncode /@ $URLCorpus],
+      "Output"   -> $URLCorpus,
+      "Messages" -> {}|>,
+
+    (* every non-surrogate BMP character. Lone surrogates are excluded on
+       purpose: they have no UTF-8 form, so the library boundary rejects the
+       payload before Rust sees it (see Libs/url/src/lib.rs). *)
+    <|"TestID"   -> "WolframExample-url-encode-bmp",
+      "Input"    -> WolframExample`ExampleURLEncode[$URLBMP],
+      "Output"   -> URLEncode /@ $URLBMP,
+      "Messages" -> {}|>,
+
+    <|"TestID"   -> "WolframExample-url-decode-bmp",
+      "Input"    -> WolframExample`ExampleURLDecode[URLEncode /@ $URLBMP],
+      "Output"   -> $URLBMP,
+      "Messages" -> {}|>,
+
+    (* the decoder's awkward corners: a bare + is a space while %2B is a plus,
+       and anything that isn't a complete escape is left alone *)
+    <|"TestID"   -> "WolframExample-url-decode-literals",
+      "Input"    -> WolframExample`ExampleURLDecode[$URLDecodeLiterals],
+      "Output"   -> URLDecode /@ $URLDecodeLiterals,
+      "Messages" -> {}|>,
+
+    (* the scalar form is the list form with the list taken off again *)
+    <|"TestID"   -> "WolframExample-url-scalar",
+      "Input"    -> {WolframExample`ExampleURLEncode["Hello, world!"],
+                     WolframExample`ExampleURLDecode["Hello%2C%20world%21"]},
+      "Output"   -> {"Hello%2C%20world%21", "Hello, world!"},
+      "Messages" -> {}|>,
+
+    (* list in, list out — including the empty one *)
+    <|"TestID"   -> "WolframExample-url-empty-list",
+      "Input"    -> {WolframExample`ExampleURLEncode[{}], WolframExample`ExampleURLDecode[{}]},
+      "Output"   -> {{}, {}},
       "Messages" -> {}|>,
 
     (* ── duckdb ────────────────────────────────────────────────────────────── *)

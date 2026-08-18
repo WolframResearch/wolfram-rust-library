@@ -15,4 +15,5 @@ resolver = "2"
 members = [
     "Libs/duckdb",
     "Libs/math",
+    "Libs/url",
 ]
