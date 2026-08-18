@@ -6,6 +6,12 @@
      wolframscript -file scripts/generate-example-notebook.wls
      wolframscript -file scripts/generate-example-notebook.wls --check
      wolframscript -file scripts/generate-example-notebook.wls --out /tmp/Tour.nb
+     wolframscript -file scripts/generate-example-notebook.wls --markdown
+
+   --markdown writes notebooks/WolframExampleTour.md instead of the .nb: the
+   same cells, with Title/Section/Subsection as ATX headings and every Input
+   cell as a fenced wolfram block. Round-trips back through
+       Import[file, "Markdown"]
 
    The notebook is written unevaluated - open it and press Evaluate Notebook.
    --check additionally evaluates every input cell in this kernel and reports
@@ -29,13 +35,16 @@
 
 $args = Rest[$ScriptCommandLine];
 $check = MemberQ[$args, "--check"];
+$markdown = MemberQ[$args, "--markdown"];
 $outArg = Replace[
     FirstPosition[$args, "--out"],
     {{i_Integer} :> $args[[i + 1]], _ :> None}
 ];
 
 $repoRoot = ParentDirectory[DirectoryName[$InputFileName]];
-$out = Replace[$outArg, None :> FileNameJoin[{$repoRoot, "notebooks", "WolframExampleTour.nb"}]];
+$defaultOut = FileNameJoin[{$repoRoot, "notebooks",
+    If[$markdown, "WolframExampleTour.md", "WolframExampleTour.nb"]}];
+$out = Replace[$outArg, None :> $defaultOut];
 
 (* -- Cell constructors ------------------------------------------------------- *)
 
@@ -105,7 +114,7 @@ which calls into BLAS; a Speedup above 1 means the Rust library won.
 
 Two things decide what you see here. Time only the call, not the packing: both \
 arrays are converted to NumericArrays first, since passing plain lists spends \
-about three times the call itself on the conversion. And build with \
+about three times the call itself on the conversion. And build with
     cargo wl build --release
 \[LongDash] cargo wl test leaves an unoptimized build in place, which loses by \
 an order of magnitude."],
@@ -349,7 +358,45 @@ $notebook = Notebook[$sections,
 
 If[!DirectoryQ[DirectoryName[$out]], CreateDirectory[DirectoryName[$out], CreateIntermediateDirectories -> True]];
 
-Export[$out, $notebook, "NB"];
+(* -- Markdown rendering ------------------------------------------------------ *)
+
+(* One block per cell, in notebook order. Cell groups are flattened away: the
+   heading is already the first cell of its group, so the nesting the notebook
+   gets from CellGroupData is what the heading level says in Markdown. *)
+md[Cell[CellGroupData[cells_List, ___]]] := md /@ cells;
+md[Cell[body_String, "Title"]] := "# " <> body;
+md[Cell[body_String, "Section"]] := "## " <> body;
+md[Cell[body_String, "Subsection"]] := "### " <> body;
+md[Cell[body_String, "Input"]] := "```wolfram\n" <> body <> "\n```";
+
+(* Text cells wrap by hand across several source lines. A single newline is a
+   soft wrap in Markdown, so hand-wrapped paragraphs come back out as one
+   paragraph and a blank line stays a paragraph break.
+
+   The indented shell commands are the exception: an indented line that follows
+   a paragraph line directly is a lazy continuation, not an indented code
+   block, so it would be pulled into the sentence before it. Emit those runs of
+   lines as their own fenced block, which is unambiguous either way. *)
+md[Cell[body_String, "Text"]] := StringRiffle[
+    Map[
+        If[StringStartsQ[First[#], "    "],
+            "```\n" <> StringRiffle[StringDelete[#, StartOfString ~~ "    "], "\n"] <> "\n```",
+            StringRiffle[#, "\n"]
+        ] &,
+        Split[StringSplit[body, "\n", All], StringStartsQ[#1, "    "] == StringStartsQ[#2, "    "] &]
+    ],
+    "\n\n"
+];
+
+md[other_] := (Print["skipping ", Head[other]]; Nothing);
+
+toMarkdown[Notebook[cells_List, ___]] :=
+    StringRiffle[Flatten[md /@ cells], "\n\n"] <> "\n";
+
+If[$markdown,
+    Export[$out, toMarkdown[$notebook], "Text", CharacterEncoding -> "UTF8"],
+    Export[$out, $notebook, "NB"]
+];
 Print["wrote ", $out];
 
 (* -- --check: evaluate every input cell here in the kernel ------------------- *)
