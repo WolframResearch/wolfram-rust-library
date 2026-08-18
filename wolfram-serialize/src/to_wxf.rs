@@ -108,6 +108,11 @@ impl ToWXF for String {
 // `Vec<String>` (and `Vec<Vec<String>>`, etc.) encode as `Function[List, …]`.
 impl WxfStruct for String {}
 
+// Borrowed counterparts of `String` / `Vec<u8>`: same List-element role, so
+// `Vec<&str>` and `Vec<&[u8]>` get the blanket List impls too.
+impl WxfStruct for &str {}
+impl WxfStruct for &[u8] {}
+
 impl<T: ToWXF + ?Sized> ToWXF for &T {
     fn to_wxf<W: Writer>(&self, w: &mut WxfWriter<W>) -> Result<(), Error> {
         (*self).to_wxf(w)

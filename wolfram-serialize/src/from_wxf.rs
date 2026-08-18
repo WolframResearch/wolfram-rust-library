@@ -100,7 +100,12 @@ pub fn err_at(path: impl Into<String>, expected: &'static str, got: String) -> E
 // Borrowed (zero-copy) primitives
 //==============================================================================
 
-impl<'de> FromWXF<'de> for &'de str {
+// `'de: 'a` rather than `for &'de str`: the field lifetime only has to be
+// *outlived by* the buffer, not equal to it. That's what lets these borrowed
+// primitives sit inside containers generic over `T: FromWXF<'de>` — `Vec<&'a
+// str>`, `Option<&'a str>`, `(&'a str, &'a [u8])` — where a `&'de`-only impl
+// would force `'a == 'de` and fail to unify with a struct's own lifetime param.
+impl<'de: 'a, 'a> FromWXF<'de> for &'a str {
     fn from_wxf_with_tag<R: Reader<'de>>(
         r: &mut WxfReader<R>,
         tok: ExpressionEnum,
@@ -112,7 +117,7 @@ impl<'de> FromWXF<'de> for &'de str {
     }
 }
 
-impl<'de> FromWXF<'de> for &'de [u8] {
+impl<'de: 'a, 'a> FromWXF<'de> for &'a [u8] {
     fn from_wxf_with_tag<R: Reader<'de>>(
         r: &mut WxfReader<R>,
         tok: ExpressionEnum,
