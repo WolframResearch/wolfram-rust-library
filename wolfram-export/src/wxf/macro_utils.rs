@@ -78,7 +78,8 @@ const WXF_HEADER: [u8; 2] =
 /// `io::Write` sink over an uninitialized byte buffer. Lets the WXF token
 /// stream be written straight into an [`UninitNumericArray`]'s storage — the
 /// only safe way to fill one is element-wise `MaybeUninit::write`, which this
-/// batches per `write` call.
+/// batches per `write` call. Writing past the end is an error, never a
+/// clobber, so a short buffer fails cleanly.
 struct UninitSliceWriter<'a> {
     buf: &'a mut [MaybeUninit<u8>],
     pos: usize,
@@ -129,25 +130,23 @@ fn wxf_byte_len<R: ToWXF>(value: &R) -> Result<usize, wolfram_serialize::Error> 
     Ok(counter.0)
 }
 
-/// Serialize `value` as WXF directly into a UInt8 NumericArray: a counting
-/// pass (`wxf_byte_len`) computes the exact byte length, then the token
-/// stream is written straight into the array's (kernel-allocated) storage.
-/// No intermediate `Vec<u8>` and no final copy — for large payloads this
-/// avoids doubling the Rust-side memory of the return path.
+/// Write the WXF encoding of `value` into `dest`, which must be exactly
+/// [`wxf_byte_len`] bytes long.
 ///
-/// The kernel owns numeric-array storage and needs its length up front (a
-/// fixed-size array can't grow as bytes are produced), which is why the sizing
-/// pass exists rather than serializing into a growable `Vec` and copying.
-pub fn try_encode<R: ToWXF>(
+/// Returns `Ok(())` only when every byte of `dest` was written — that is the
+/// condition [`try_encode`] needs before it may call `assume_init`, and this
+/// function checks it rather than assuming it. Writing *past* the end is
+/// already an error from [`UninitSliceWriter`]; the explicit check here is for
+/// the opposite case, a write pass that stops short.
+///
+/// Split out from `try_encode` because it needs no kernel, so the
+/// short-write path is directly testable.
+fn fill_wxf<R: ToWXF>(
     value: &R,
-) -> Result<NumericArray<u8>, wolfram_serialize::Error> {
-    // WXF output is never empty (2-byte header), so from_dimensions is safe.
-    let len = wxf_byte_len(value)?;
-    let mut uninit = UninitNumericArray::<u8>::from_dimensions(&[len]);
-    let mut sink = UninitSliceWriter {
-        buf: uninit.as_slice_mut(),
-        pos: 0,
-    };
+    dest: &mut [MaybeUninit<u8>],
+) -> Result<(), wolfram_serialize::Error> {
+    let len = dest.len();
+    let mut sink = UninitSliceWriter { buf: dest, pos: 0 };
     // Header first (via the `Writer` trait), then the token body through a
     // `WxfWriter` wrapping the same sink.
     sink.write_bytes(&WXF_HEADER)?;
@@ -155,10 +154,51 @@ pub fn try_encode<R: ToWXF>(
         let mut w = WxfWriter::new(&mut sink);
         value.to_wxf(&mut w)?;
     }
-    debug_assert_eq!(sink.pos, len);
-    // Safety: the sizing pass and the write pass emit an identical token
-    // stream, and UninitSliceWriter errors rather than leaving gaps, so all
-    // `len` bytes are initialized.
+    if sink.pos != len {
+        return Err(wolfram_serialize::Error::Invalid {
+            message: format!(
+                "ToWXF impl is not deterministic: sizing pass measured {len} bytes, \
+                 write pass produced {}",
+                sink.pos
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Serialize `value` as WXF directly into a UInt8 NumericArray: a counting
+/// pass ([`wxf_byte_len`]) computes the exact byte length, then the token
+/// stream is written straight into the array's (kernel-allocated) storage.
+///
+/// The kernel owns numeric-array storage and needs its length up front — a
+/// fixed-size array cannot grow as bytes are produced — so something has to
+/// bridge "length unknown until written" to "length required before
+/// allocating". The two ways to do that are to buffer the output or to produce
+/// it twice, and this takes the second: **results can be very large** (a query
+/// returning its whole Arrow stream as one ByteArray, say), and buffering
+/// would hold the payload and the array alive at once, doubling peak memory on
+/// exactly the calls that can least afford it. A counting pass allocates
+/// nothing.
+///
+/// The price is that `value`'s own [`ToWXF`] impl runs **twice**. For the
+/// impls in this crate's orbit that is cheap — they walk a finished structure
+/// and copy — but it means a `ToWXF` that *computes* (transforming as it
+/// serializes) pays for that work twice per call. Do such work before
+/// returning, not inside `to_wxf`.
+///
+/// Correctness does not rest on the two passes agreeing: [`fill_wxf`] verifies
+/// that the write pass filled the buffer exactly, and reports an error if not,
+/// so a non-deterministic impl gets a `Failure` rather than a
+/// partly-uninitialized array.
+pub fn try_encode<R: ToWXF>(
+    value: &R,
+) -> Result<NumericArray<u8>, wolfram_serialize::Error> {
+    // WXF output is never empty (2-byte header), so from_dimensions is safe.
+    let len = wxf_byte_len(value)?;
+    let mut uninit = UninitNumericArray::<u8>::from_dimensions(&[len]);
+    fill_wxf(value, uninit.as_slice_mut())?;
+    // SAFETY: `fill_wxf` returned Ok, which it does only after confirming that
+    // all `len` bytes of the buffer were written.
     Ok(unsafe { uninit.assume_init() })
 }
 
@@ -233,4 +273,64 @@ pub unsafe fn call_wxf_wolfram_library_function<'a, F: NativeFunction<'a>>(
     }
 
     sys::LIBRARY_NO_ERROR as c_int
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    /// A `ToWXF` impl whose output shrinks after the first call — the shape a
+    /// non-deterministic impl has (a `HashMap` iterated in a different order,
+    /// an embedded timestamp), reduced to its essential misbehaviour.
+    struct Shrinking<'a>(&'a Cell<usize>);
+
+    impl ToWXF for Shrinking<'_> {
+        fn to_wxf<W: Writer>(
+            &self,
+            w: &mut WxfWriter<W>,
+        ) -> Result<(), wolfram_serialize::Error> {
+            let call = self.0.get();
+            self.0.set(call + 1);
+            if call == 0 {
+                "a long payload".to_wxf(w)
+            } else {
+                "short".to_wxf(w)
+            }
+        }
+    }
+
+    /// A well-behaved impl fills the buffer exactly.
+    #[test]
+    fn fill_wxf_writes_every_byte() {
+        let len = wxf_byte_len(&"payload").unwrap();
+        let mut dest = vec![MaybeUninit::<u8>::uninit(); len];
+        fill_wxf(&"payload", &mut dest).unwrap();
+
+        // SAFETY: `fill_wxf` returned Ok, so every byte was written.
+        let bytes: Vec<u8> = dest.iter().map(|b| unsafe { b.assume_init() }).collect();
+        assert_eq!(bytes, wolfram_serialize::to_wxf(&"payload", None).unwrap());
+    }
+
+    /// The sizing pass and the write pass are two separate runs of a
+    /// caller-supplied impl, so they can disagree. When they do, the buffer is
+    /// left partly uninitialized — `try_encode` must not reach `assume_init`.
+    /// This used to be a `debug_assert`, i.e. undefined behaviour in release.
+    #[test]
+    fn short_write_is_an_error_not_uninitialized_memory() {
+        let calls = Cell::new(0);
+        let value = Shrinking(&calls);
+
+        let len = wxf_byte_len(&value).unwrap();
+        let mut dest = vec![MaybeUninit::<u8>::uninit(); len];
+        let err = fill_wxf(&value, &mut dest).unwrap_err();
+
+        assert_eq!(calls.get(), 2, "one sizing pass, one write pass");
+        assert!(
+            matches!(&err, wolfram_serialize::Error::Invalid { message }
+                if message.contains("not deterministic")),
+            "expected a deterministic-ness error, got {err:?}"
+        );
+    }
 }
