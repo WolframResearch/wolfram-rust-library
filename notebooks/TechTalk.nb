@@ -280,7 +280,7 @@ Cell[BoxData[{
           RowBox[{"{", 
            RowBox[{
            "out", ",", " ", "\"\<../\>\"", ",", 
-            " ", "\"\<wolfram-examples\>\""}], "}"}], "]"}]}], ",", " ", "\n",
+            " ", "\"\<WolframExample\>\""}], "}"}], "]"}]}], ",", " ", "\n",
          "       ", 
         RowBox[{"\"\<ProcessEnvironment\>\"", " ", "->", " ", "env"}], ",", 
         "\n", "       ", 

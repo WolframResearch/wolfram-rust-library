@@ -70,7 +70,7 @@ Cell[BoxData[{
           RowBox[{"{", 
            RowBox[{
            "out", ",", " ", "\"\<../\>\"", ",", 
-            " ", "\"\<wolfram-examples-internal\>\""}], "}"}], "]"}]}], ",", 
+            " ", "\"\<wolfram-test-lib\>\""}], "}"}], "]"}]}], ",", 
         " ", "\n", "       ", 
         RowBox[{"\"\<ProcessEnvironment\>\"", " ", "->", " ", "env"}], ",", 
         "\n", "       ", 

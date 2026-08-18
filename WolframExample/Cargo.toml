@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+
+# A standalone workspace — not part of the main repo workspace (see the root
+# Cargo.toml's `exclude`). These are copy-paste-able sample crates: they depend
+# on the published crates.io releases of this repo's crates, not local paths.
+#
+# This manifest sits next to PacletInfo.wl, so `cargo wl build` / `cargo wl
+# test` run from the paclet directory itself: the build covers every member in
+# Libs/ and the test run finds the .wlt files under it.
+#
+# Every member packages into the same paclet, `WolframExampleLib`, written next
+# to the `WolframExample` paclet that consumes it (see each member's
+# `[package.metadata.wl.pacletinfo]`).
+members = [
+    "Libs/duckdb",
+    "Libs/math",
+    "Libs/url",
+]

@@ -8,7 +8,7 @@
 //!
 //! - **`cargo wl build`** — compile the crate's `cdylib` targets and generate a
 //!   Wolfram Language loader package (`Functions.wl`, `Artifacts.wl`,
-//!   `PacletInfo.wl`) alongside each binary. Exported functions are discovered
+//!   `License.wl`, `PacletInfo.wl`) alongside each binary. Exported functions are discovered
 //!   from the `__wolfram_manifest__` symbol emitted by `#[export]`, so no
 //!   hand-written WL glue is required. Can optionally cross-compile for several
 //!   Wolfram `SystemID`s in one invocation.

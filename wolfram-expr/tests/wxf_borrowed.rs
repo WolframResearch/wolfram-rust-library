@@ -61,3 +61,62 @@ fn borrowed_tuple_struct() {
     })
     .unwrap();
 }
+
+// Borrowed primitives inside containers: `Vec<&str>`, `Option<&str>`, tuples.
+// These route through the generic `T: FromWXF<'de>` bounds rather than the
+// derive's inline `&str` / `&[u8]` special cases, so they only compile because
+// the borrowed impls are `'de: 'a` rather than `&'de`-exact.
+#[derive(Debug, PartialEq, ToWXF, FromWXF)]
+struct Batch<'a> {
+    names: Vec<&'a str>,
+    chunks: Vec<&'a [u8]>,
+    tag: Option<&'a str>,
+    pair: (&'a str, &'a [u8]),
+}
+
+#[test]
+fn borrowed_containers_are_zero_copy() {
+    let bytes = to_wxf(
+        &Batch {
+            names: vec!["alpha", "beta"],
+            chunks: vec![&[1u8, 2][..], &[3u8][..]],
+            tag: Some("gamma"),
+            pair: ("delta", &[4u8, 5]),
+        },
+        None,
+    )
+    .unwrap();
+
+    read_wxf(&bytes, |r| {
+        let b = Batch::from_wxf(r)?;
+        assert_eq!(b.names, vec!["alpha", "beta"]);
+        assert_eq!(b.chunks, vec![&[1u8, 2][..], &[3u8][..]]);
+        assert_eq!(b.tag, Some("gamma"));
+        assert_eq!(b.pair, ("delta", &[4u8, 5][..]));
+
+        // Every element points inside `bytes` — no per-string allocation.
+        let range = bytes.as_ptr_range();
+        let inside = |p: *const u8| range.start <= p && p < range.end;
+        for s in &b.names {
+            assert!(inside(s.as_ptr()), "Vec<&str> element should borrow");
+        }
+        for c in &b.chunks {
+            assert!(inside(c.as_ptr()), "Vec<&[u8]> element should borrow");
+        }
+        assert!(inside(b.tag.unwrap().as_ptr()));
+        Ok(())
+    })
+    .unwrap();
+}
+
+// A bare `Vec<&str>` / `Vec<&[u8]>` as the whole payload — needs the `WxfStruct`
+// marker on the borrowed types so the blanket List impls apply.
+#[test]
+fn top_level_vec_of_borrowed() {
+    let bytes = to_wxf(&vec!["x", "y", "z"], None).unwrap();
+    read_wxf(&bytes, |r| {
+        assert_eq!(Vec::<&str>::from_wxf(r)?, vec!["x", "y", "z"]);
+        Ok(())
+    })
+    .unwrap();
+}

@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hatch for types with no `FromArg`/`IntoArg` impl, like `SparseArray`; read
   the raw `MArgument.sparse` pointer and drive the `MSparseArray_*`/`MTensor_*`
   C API directly, see `margs_sparse_array_merge` in
-  `wolfram-examples-internal/src/margs.rs` for a worked example).
+  `wolfram-test-lib/src/margs.rs` for a worked example).
 
 * **`wstp` feature** — functions called over a WSTP `Link`. Corresponds to
   `#[export(wstp)]`. Implies `native`.

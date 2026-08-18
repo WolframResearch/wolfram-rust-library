@@ -9,15 +9,15 @@ cargo = FileNameJoin[{$HomeDirectory, ".cargo", "bin", "cargo"}];
    which used to make WXF look catastrophically slower than WSTP in this
    benchmark, when in fact WSTP just wasn't running at all.
 
-   Uses `wolfram-examples-internal` (the in-repo test/benchmark crate, built via
-   local path deps) rather than the standalone `wolfram-examples` workspace —
+   Uses `wolfram-test-lib` (the in-repo test/benchmark crate, built via
+   local path deps) rather than the standalone `WolframExample` workspace —
    that one only holds copy-paste sample crates (duckdb, math) and depends on
    published crates.io releases, not this checkout's code. Functions here have
    no namespace prefix (namespace-exports is off); native_/wstp_/wxf_ prefixes
    in the Rust source disambiguate instead. *)
 libDir = StringTrim @ First @ ExternalEvaluate[
   {"Shell", "ProcessDirectory" -> repo, "ReturnType" -> "StandardOutput"},
-  {cargo -> {"wl", "build", "--release", "-p", "wolfram-examples-internal", "--features", "wstp"}}
+  {cargo -> {"wl", "build", "--release", "-p", "wolfram-test-lib", "--features", "wstp"}}
 ];
 
 (* ── Load ───────────────────────────────────────────────────────────────── *)
@@ -41,7 +41,7 @@ wxfPoint    = $fns["wxf_echo_point"];
 wxfDs       = $fns["wxf_echo_dataset"];
 
 (* `mem_reset`/`mem_allocated` read a byte counter kept by a tracking global
-   allocator wired into the wolfram-examples-internal dylib (src/mem.rs) —
+   allocator wired into the wolfram-test-lib dylib (src/mem.rs) —
    it tallies every byte requested via the Rust allocator, letting us measure
    allocation churn per call the same way avgUs/timeMicros measure wall time. *)
 memReset      = $fns["mem_reset"];

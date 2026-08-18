@@ -203,7 +203,7 @@ fn init_(attr: TokenStream2, item: TokenStream) -> Result<TokenStream2, Error> {
 /// For a type with no `FromArg`/`IntoArg` impl at all — reading the raw
 /// `MArgument.sparse` pointer and driving the `MSparseArray_*` C API in `rtl`
 /// directly — see `margs_sparse_array_merge` in
-/// [wolfram-examples-internal](https://github.com/WolframResearch/wolfram-rust-library/blob/master/wolfram-examples-internal/src/margs.rs).
+/// [wolfram-test-lib](https://github.com/WolframResearch/wolfram-rust-library/blob/master/wolfram-test-lib/src/margs.rs).
 ///
 /// The `args = (..)`/`ret = ..` annotation declares the function's
 /// `LibraryFunctionLoad` type specs — the same `{Real, Real}, Real` you would

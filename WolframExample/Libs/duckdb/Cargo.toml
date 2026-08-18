@@ -8,10 +8,14 @@ edition = "2021"
 publish = false
 
 [package.metadata.wl.pacletinfo]
-name = "WolframExamples"
+name = "WolframExampleLib"
 version = "1.0.0"
 namespace = "duckdb"
 named-exports = false
+# See the note in ../math/Cargo.toml: both members write into the same
+# `WolframExampleLib-<SystemID>/` next to the `WolframExample` paclet, so every
+# setting here except `namespace` must match math's.
+output = "../../../"
 
 [lib]
 # Keeps the built dylib (and so the WL function namespace, `duckdb::fn_name`)
@@ -20,9 +24,9 @@ name = "duckdb"
 crate-type = ["cdylib"]
 
 [dependencies]
-wolfram-export = { version = "=0.6.0", features = ["wxf"] }
-wolfram-expr = { version = "=0.6.0" }
-wolfram-serialize = { version = "=0.6.0" }
+wolfram-export = { version = "0.6", features = ["wxf"] }
+wolfram-expr = { version = "0.6" }
+wolfram-serialize = { version = "0.6" }
 
 # DuckDB is statically compiled in via `bundled`; `vtab-arrow` enables native
 # Arrow output so query results come back as RecordBatches without manual conversion.

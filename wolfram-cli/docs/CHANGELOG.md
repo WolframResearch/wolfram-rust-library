@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Generated packages now include a third asset, `License.wl`, registered in
+  `PacletInfo.wl` as the `"License"` asset alongside `"Functions"` and
+  `"Artifacts"`. It lists one association per Rust package linked into the
+  paclet — `"Name"`, `"Version"`, `"License"` (the SPDX expression),
+  `"LicenseFile"`, `"Authors"`, `"Repository"` — covering the packaged crates
+  and their entire resolved dependency graph, so a shipped paclet carries its
+  own attribution data. Dev-dependencies are excluded (they are never linked
+  into the `cdylib`s); build-dependencies are included. Entries are
+  deduplicated and sorted by name and version, so the file is stable across
+  builds.
+
 ## [0.6.2] — 2026-07-31
 
 ### Fixed
