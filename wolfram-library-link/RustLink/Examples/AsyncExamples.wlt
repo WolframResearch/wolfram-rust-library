@@ -78,3 +78,34 @@ VerificationTest[
     {expectedModifiedTime},
     TestID -> "RustLink-AsyncExamples-2"
 ]
+
+(* Test the async_ticker.rs example, which uses an async task that has no thread
+   of its own: the events come from a thread the library started itself. *)
+VerificationTest[
+    interval = 50;
+    count = 4;
+
+    $ticks = {};
+
+    tickHandler[taskObject_, "tick", {tick_}] := AppendTo[$ticks, tick];
+
+    task = Internal`CreateAsynchronousTask[
+        LibraryFunctionLoad[
+            "libasync_ticker",
+            "start_ticker",
+            {Integer, Integer},
+            Integer
+        ],
+        {interval, count},
+        tickHandler
+    ];
+
+    (* Give every tick time to arrive, and the task time to remove itself. *)
+    Pause[Quantity[4 * interval * count, "Milliseconds"]];
+
+    (* The library removes the task once it has ticked the requested number of
+       times, so it should no longer be listed as running. *)
+    {$ticks, MemberQ[AsynchronousTasks[], task]},
+    {Range[count], False},
+    TestID -> "RustLink-AsyncExamples-3"
+]
