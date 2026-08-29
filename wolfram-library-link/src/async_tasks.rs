@@ -62,6 +62,52 @@ impl AsyncTaskObject {
         spawn_async_task_with_thread(f)
     }
 
+    /// Create a new Wolfram Language asynchronous task that has no background
+    /// thread of its own.
+    ///
+    /// Use this instead of [`spawn_with_thread()`][AsyncTaskObject::spawn_with_thread]
+    /// when the events will be raised by something that is already running — a
+    /// thread the library started earlier, a callback from a C library, or an
+    /// event loop — rather than by a thread created for this task alone.
+    ///
+    /// Like `spawn_with_thread()`, this is used within a LibraryLink function
+    /// that was called via
+    ///
+    /// ```wolfram
+    /// Internal`CreateAsynchronousTask[
+    ///     _LibraryFunction,
+    ///     args_List,
+    ///     handler
+    /// ]
+    /// ```
+    ///
+    /// which expects the library function to return the id of the task it
+    /// created. Whatever goes on to raise events with
+    /// [`raise_async_event()`][AsyncTaskObject::raise_async_event] needs the
+    /// `AsyncTaskObject` itself, so hand it over before returning
+    /// [`id()`][AsyncTaskObject::id] to the Wolfram Language.
+    ///
+    /// Nothing tears the task down on its own, since there is no thread whose
+    /// return could mark it finished; call [`remove()`][AsyncTaskObject::remove]
+    /// once the work it stands for is over.
+    ///
+    /// *LibraryLink C Function:* [`createAsynchronousTaskWithoutThread`][sys::st_WolframIOLibrary_Functions::createAsynchronousTaskWithoutThread].
+    pub fn create_without_thread() -> Self {
+        AsyncTaskObject(unsafe { rtl::createAsynchronousTaskWithoutThread() })
+    }
+
+    /// Remove this asynchronous task, releasing what the Wolfram Language holds
+    /// for it.
+    ///
+    /// Takes `self` by value: the id does not identify anything afterwards, and
+    /// raising an event on a removed task does nothing.
+    ///
+    /// *LibraryLink C Function:* [`removeAsynchronousTask`][sys::st_WolframIOLibrary_Functions::removeAsynchronousTask].
+    pub fn remove(self) {
+        // removeAsynchronousTask always returns 0 as of this writing
+        unsafe { rtl::removeAsynchronousTask(self.id()) };
+    }
+
     /// Returns the numeric ID which identifies this async object.
     pub fn id(&self) -> sys::mint {
         let AsyncTaskObject(id) = *self;
