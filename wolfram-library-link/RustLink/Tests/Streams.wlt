@@ -422,6 +422,65 @@ VerificationTest[
 ]
 
 (*====================================*)
+(* Derived streams                    *)
+(*====================================*)
+
+(*
+	`#[derive(InputStream)]`, `#[derive(SeekableInputStream)]` and
+	`#[derive(OutputStream)]` forward to a type's own `std::io` impls. These
+	check that the derived impls behave the same as the hand-written ones.
+*)
+
+VerificationTest[
+	stream = OpenRead["anything", Method -> "TestDerivedRead"];
+	contents = ReadString[stream];
+	Close[stream];
+	contents
+	,
+	"derived read"
+	,
+	TestID -> "Streams-derived-input-stream-reads"
+]
+
+(* `#[derive(SeekableInputStream)]` must also report the stream as seekable. *)
+VerificationTest[
+	stream = OpenRead["anything", Method -> "TestDerivedSeek", BinaryFormat -> True];
+	SetStreamPosition[stream, 200000];
+	bytes = BinaryReadList[stream, "Byte", 4];
+	Close[stream];
+	bytes
+	,
+	Mod[Range[200000, 200003], 251]
+	,
+	TestID -> "Streams-derived-seekable-stream-seeks"
+]
+
+VerificationTest[
+	stream = OpenRead["anything", Method -> "TestDerivedSeek", BinaryFormat -> True];
+	SetStreamPosition[stream, 200000];
+	BinaryReadList[stream, "Byte", 4];
+	position = StreamPosition[stream];
+	Close[stream];
+	position
+	,
+	200004
+	,
+	TestID -> "Streams-derived-seekable-stream-position"
+]
+
+VerificationTest[
+	$reset[];
+	stream = OpenWrite["anything", Method -> "TestDerivedWrite"];
+	WriteString[stream, "derived write"];
+	Close[stream];
+	$takeWritten[]
+	,
+	"derived write"
+	,
+	TestID -> "Streams-derived-output-stream-writes"
+]
+
+(*====================================*)
 (* Registration                       *)
 (*====================================*)
 

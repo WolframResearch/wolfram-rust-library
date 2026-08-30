@@ -28,6 +28,7 @@ named-exports = true
 
 [dependencies]
 wolfram-export-macros          = { version = "=0.6.1", path = "../wolfram-export-macros" }
+wolfram-stream-macros          = { version = "=0.6.0", path = "../wolfram-stream-macros" }
 
 wolfram-library-link-sys       = { version = "=0.6.0", path = "../wolfram-library-link-sys" }
 wolfram-export-core            = { version = "=0.6.0", path = "../wolfram-export-core" }

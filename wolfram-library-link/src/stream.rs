@@ -99,6 +99,11 @@ use crate::{
     sys::{self, mbool, mint, MInputStream, MOutputStream},
 };
 
+// Derive macros. A derive and a trait can share a name (they live in different
+// namespaces), so `use wolfram_library_link::stream::InputStream` brings in
+// both -- the same arrangement `wolfram-serialize` uses for `ToWXF`.
+pub use wolfram_stream_macros::{InputStream, OutputStream, SeekableInputStream};
+
 const TRUE: mbool = 1;
 const FALSE: mbool = 0;
 

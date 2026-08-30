@@ -16,8 +16,10 @@ use wolfram_library_link::{
     self as wll,
     stream::{
         register_input_stream_method, register_output_stream_method, InputStream,
-        InputStreamMethod, OpenRequest, OutputMode, OutputStream, OutputStreamMethod,
-        ReaderInputStream, StreamError, StreamUnitSize, WriterOutputStream,
+        InputStream as DeriveInputStream, InputStreamMethod, OpenRequest, OutputMode,
+        OutputStream, OutputStream as DeriveOutputStream, OutputStreamMethod,
+        ReaderInputStream, SeekableInputStream as DeriveSeekableInputStream, StreamError,
+        StreamUnitSize, WriterOutputStream,
     },
 };
 
@@ -80,6 +82,12 @@ pub fn register_test_stream_methods() {
     register_output_stream_method("TestCollect", CollectMethod);
 
     register_output_stream_method("TestShortWrite", ShortWriteMethod);
+
+    register_input_stream_method("TestDerivedRead", DerivedReadMethod);
+
+    register_input_stream_method("TestDerivedSeek", DerivedSeekMethod);
+
+    register_output_stream_method("TestDerivedWrite", DerivedWriteMethod);
 }
 
 //======================================
@@ -437,5 +445,94 @@ impl std::io::Write for OneByteAtATime {
 
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
+    }
+}
+
+//======================================
+// Derived streams
+//======================================
+
+//
+// The `#[derive(..)]` counterparts to `ReaderInputStream` /
+// `WriterOutputStream`, for types a library owns and can therefore derive on.
+//
+
+/// A reader whose `InputStream` impl comes from `#[derive(InputStream)]`.
+#[derive(DeriveInputStream)]
+struct DerivedReader(Cursor<Vec<u8>>);
+
+impl std::io::Read for DerivedReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+
+struct DerivedReadMethod;
+
+impl InputStreamMethod for DerivedReadMethod {
+    type Stream = DerivedReader;
+
+    fn open(&self, request: &mut OpenRequest) -> Result<Self::Stream, StreamError> {
+        record_request(request);
+        Ok(DerivedReader(Cursor::new(b"derived read".to_vec())))
+    }
+}
+
+/// A seekable reader whose impls come from `#[derive(SeekableInputStream)]`.
+#[derive(DeriveSeekableInputStream)]
+struct DerivedSeeker(Cursor<Vec<u8>>);
+
+impl std::io::Read for DerivedSeeker {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+
+impl std::io::Seek for DerivedSeeker {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.0.seek(pos)
+    }
+}
+
+struct DerivedSeekMethod;
+
+impl InputStreamMethod for DerivedSeekMethod {
+    type Stream = DerivedSeeker;
+
+    fn open(&self, request: &mut OpenRequest) -> Result<Self::Stream, StreamError> {
+        record_request(request);
+
+        let contents: Vec<u8> = (0..SEEKABLE_LEN).map(|i| (i % 251) as u8).collect();
+        Ok(DerivedSeeker(Cursor::new(contents)))
+    }
+}
+
+/// A writer whose `OutputStream` impl comes from `#[derive(OutputStream)]`.
+#[derive(DeriveOutputStream)]
+struct DerivedWriter;
+
+impl std::io::Write for DerivedWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        observed().written.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+struct DerivedWriteMethod;
+
+impl OutputStreamMethod for DerivedWriteMethod {
+    type Stream = DerivedWriter;
+
+    fn open(
+        &self,
+        request: &mut OpenRequest,
+        _mode: OutputMode,
+    ) -> Result<Self::Stream, StreamError> {
+        record_request(request);
+        Ok(DerivedWriter)
     }
 }

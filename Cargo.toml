@@ -11,6 +11,7 @@ members = [
     "wolfram-library-link",
     "wolfram-library-link-sys",
     "wolfram-export-macros",
+    "wolfram-stream-macros",
     "wolfram-export-core",
     "wolfram-export",
     "wolfram-examples-internal",
@@ -36,6 +37,7 @@ default-members = [
     "wstp",
     "wolfram-library-link",
     "wolfram-export-macros",
+    "wolfram-stream-macros",
     "wolfram-export-core",
     "wolfram-export",
 ]
