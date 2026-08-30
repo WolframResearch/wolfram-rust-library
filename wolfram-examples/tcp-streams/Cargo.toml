@@ -1,0 +1,23 @@
+[package]
+name = "tcp-streams-example"
+version = "0.6.0"
+edition = "2021"
+publish = false
+
+[package.metadata.wl.pacletinfo]
+name = "WolframExamples"
+version = "1.0.0"
+namespace = "tcp"
+named-exports = false
+
+[lib]
+# Keeps the built dylib (and so the WL function namespace, `tcp::fn_name`)
+# named `tcp` regardless of the package name above.
+name = "tcp"
+crate-type = ["cdylib"]
+
+[dependencies]
+# NOTE: unlike the other examples in this workspace, this one uses a `path`
+# dependency, because the streams API it demonstrates is not in a published
+# release yet. Switch to the plain `version` form once it ships.
+wolfram-library-link = { version = "0.6.1", path = "../../wolfram-library-link", default-features = false, features = ["panic-failure-backtraces", "automate-function-loading-boilerplate"] }
