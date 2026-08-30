@@ -5,9 +5,11 @@
 //! * [How To: Convert Between Rust and Wolfram Types][converting_between_rust_and_wolfram_types]
 //! * [How To: Evaluate Wolfram code from Rust][evaluate_wolfram_code_from_rust]
 //! * [How To: Export typed functions using WXF][using_wxf_mode]
+//! * [How To: Provide a custom Wolfram Language stream][io_streams]
 
 #![allow(unused_imports)]
 
 pub mod converting_between_rust_and_wolfram_types;
 pub mod evaluate_wolfram_code_from_rust;
+pub mod io_streams;
 pub mod using_wxf_mode;

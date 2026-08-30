@@ -6,3 +6,7 @@ mod convert {
 mod evaluate_wolfram_code_from_rust {
     mod generate_message;
 }
+
+mod io_streams {
+    mod echo_stream;
+}
