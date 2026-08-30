@@ -833,18 +833,571 @@ pub type MLENV = *mut ml_environment;
 pub type MLEnvironment = MLENV;
 pub type WSENV = *mut ml_environment;
 pub type WSEnvironment = WSENV;
+pub type MInputStream = *mut st_MInputStream;
+pub type MOutputStream = *mut st_MOutputStream;
+pub const MStream_StreamUnitSize_t_MSTREAM_8BIT: MStream_StreamUnitSize_t = 0;
+pub const MStream_StreamUnitSize_t_MSTREAM_UTF32: MStream_StreamUnitSize_t = 2;
+pub type MStream_StreamUnitSize_t = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct st_MInputStream {
-    _unused: [u8; 0],
+    pub name: *mut ::std::os::raw::c_char,
+    #[doc = " name as supplied by user, before path resolution"]
+    pub userSuppliedName: *mut ::std::os::raw::c_char,
+    #[doc = " Absolute file path (if 'name' is a file path)"]
+    pub expandedName: *mut ::std::os::raw::c_char,
+    #[doc = " TRUE iff name and expandedName are file paths"]
+    pub filePathNameQ: mbool,
+    pub hasError: mbool,
+    pub messageIssued: mbool,
+    pub isClosed: mbool,
+    pub InternalData: *mut ::std::os::raw::c_void,
+    pub MSdata: *mut ::std::os::raw::c_void,
+    pub handlerIdentity: *mut ::std::os::raw::c_void,
+    #[doc = " set when this stream is chained"]
+    pub underlyingStream: *mut st_MInputStream,
+    pub Mfread: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut st_MInputStream,
+            arg2: *mut ::std::os::raw::c_void,
+            arg3: usize,
+        ) -> mint,
+    >,
+    pub Mfseek: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut st_MInputStream,
+            offset: i64,
+        ) -> ::std::os::raw::c_int,
+    >,
+    pub Mfeof: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MInputStream) -> ::std::os::raw::c_int,
+    >,
+    pub Mftell:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MInputStream) -> i64>,
+    pub MferrorText: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MInputStream) -> *mut ::std::os::raw::c_char,
+    >,
+    pub Mclearerr:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MInputStream)>,
+    pub Mstreamsize:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MInputStream) -> i64>,
+    pub MoptionChanges: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut st_MInputStream,
+            optionsLink: *mut ::std::os::raw::c_void,
+        ),
+    >,
+    pub SeekableQ:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MInputStream) -> mbool>,
+    pub MstreamUnitSize: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MInputStream) -> MStream_StreamUnitSize_t,
+    >,
+    pub WaitForInput:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MInputStream)>,
+    pub Mfclose: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MInputStream) -> ::std::os::raw::c_int,
+    >,
 }
-pub type MInputStream = *mut st_MInputStream;
+#[test]
+fn bindgen_test_layout_st_MInputStream() {
+    const UNINIT: ::std::mem::MaybeUninit<st_MInputStream> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<st_MInputStream>(),
+        168usize,
+        concat!("Size of: ", stringify!(st_MInputStream))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<st_MInputStream>(),
+        8usize,
+        concat!("Alignment of ", stringify!(st_MInputStream))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(name)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).userSuppliedName) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(userSuppliedName)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).expandedName) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(expandedName)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).filePathNameQ) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(filePathNameQ)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hasError) as usize - ptr as usize },
+        28usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(hasError)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).messageIssued) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(messageIssued)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).isClosed) as usize - ptr as usize },
+        36usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(isClosed)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).InternalData) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(InternalData)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MSdata) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(MSdata)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).handlerIdentity) as usize - ptr as usize },
+        56usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(handlerIdentity)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).underlyingStream) as usize - ptr as usize },
+        64usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(underlyingStream)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfread) as usize - ptr as usize },
+        72usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mfread)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfseek) as usize - ptr as usize },
+        80usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mfseek)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfeof) as usize - ptr as usize },
+        88usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mfeof)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mftell) as usize - ptr as usize },
+        96usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mftell)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MferrorText) as usize - ptr as usize },
+        104usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(MferrorText)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mclearerr) as usize - ptr as usize },
+        112usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mclearerr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mstreamsize) as usize - ptr as usize },
+        120usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mstreamsize)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MoptionChanges) as usize - ptr as usize },
+        128usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(MoptionChanges)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).SeekableQ) as usize - ptr as usize },
+        136usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(SeekableQ)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MstreamUnitSize) as usize - ptr as usize },
+        144usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(MstreamUnitSize)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).WaitForInput) as usize - ptr as usize },
+        152usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(WaitForInput)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfclose) as usize - ptr as usize },
+        160usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MInputStream),
+            "::",
+            stringify!(Mfclose)
+        )
+    );
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct st_MOutputStream {
-    _unused: [u8; 0],
+    pub name: *mut ::std::os::raw::c_char,
+    #[doc = " name as supplied by user, before path resolution"]
+    pub userSuppliedName: *mut ::std::os::raw::c_char,
+    #[doc = " Absolute file path (if 'name' is a file path)"]
+    pub expandedName: *mut ::std::os::raw::c_char,
+    #[doc = " TRUE iff name and expandedName are file paths"]
+    pub filePathNameQ: mbool,
+    pub hasError: mbool,
+    pub messageIssued: mbool,
+    pub isClosed: mbool,
+    pub InternalData: *mut ::std::os::raw::c_void,
+    pub MSdata: *mut ::std::os::raw::c_void,
+    pub handlerIdentity: *mut ::std::os::raw::c_void,
+    #[doc = " set when this stream is chained"]
+    pub underlyingStream: *mut st_MOutputStream,
+    pub Mfwrite: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut st_MOutputStream,
+            arg2: *mut ::std::os::raw::c_void,
+            arg3: usize,
+        ) -> mint,
+    >,
+    pub Mfflush: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MOutputStream) -> ::std::os::raw::c_int,
+    >,
+    pub Mftell:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MOutputStream) -> i64>,
+    pub MferrorText: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MOutputStream) -> *mut ::std::os::raw::c_char,
+    >,
+    pub Mclearerr:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut st_MOutputStream)>,
+    pub Mfclose: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MOutputStream) -> ::std::os::raw::c_int,
+    >,
+    pub MoptionChanges: ::std::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut st_MOutputStream,
+            optionsLink: *mut ::std::os::raw::c_void,
+        ),
+    >,
+    pub MstreamUnitSize: ::std::option::Option<
+        unsafe extern "C" fn(arg1: *mut st_MOutputStream) -> MStream_StreamUnitSize_t,
+    >,
 }
-pub type MOutputStream = *mut st_MOutputStream;
+#[test]
+fn bindgen_test_layout_st_MOutputStream() {
+    const UNINIT: ::std::mem::MaybeUninit<st_MOutputStream> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<st_MOutputStream>(),
+        136usize,
+        concat!("Size of: ", stringify!(st_MOutputStream))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<st_MOutputStream>(),
+        8usize,
+        concat!("Alignment of ", stringify!(st_MOutputStream))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(name)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).userSuppliedName) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(userSuppliedName)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).expandedName) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(expandedName)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).filePathNameQ) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(filePathNameQ)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hasError) as usize - ptr as usize },
+        28usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(hasError)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).messageIssued) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(messageIssued)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).isClosed) as usize - ptr as usize },
+        36usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(isClosed)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).InternalData) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(InternalData)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MSdata) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(MSdata)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).handlerIdentity) as usize - ptr as usize },
+        56usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(handlerIdentity)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).underlyingStream) as usize - ptr as usize },
+        64usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(underlyingStream)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfwrite) as usize - ptr as usize },
+        72usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(Mfwrite)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfflush) as usize - ptr as usize },
+        80usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(Mfflush)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mftell) as usize - ptr as usize },
+        88usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(Mftell)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MferrorText) as usize - ptr as usize },
+        96usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(MferrorText)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mclearerr) as usize - ptr as usize },
+        104usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(Mclearerr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).Mfclose) as usize - ptr as usize },
+        112usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(Mfclose)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MoptionChanges) as usize - ptr as usize },
+        120usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(MoptionChanges)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).MstreamUnitSize) as usize - ptr as usize },
+        128usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(st_MOutputStream),
+            "::",
+            stringify!(MstreamUnitSize)
+        )
+    );
+}
 pub const LIBRARY_NO_ERROR: _bindgen_ty_1 = 0;
 pub const LIBRARY_TYPE_ERROR: _bindgen_ty_1 = 1;
 pub const LIBRARY_RANK_ERROR: _bindgen_ty_1 = 2;

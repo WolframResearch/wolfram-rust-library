@@ -205,6 +205,7 @@ fn generate_library_link_bindings(
     #[rustfmt::skip]
     let bindings = bindgen::builder()
         .header(c_includes.join("WolframLibrary.h").display().to_string())
+        .header(c_includes.join("WolframStreamsLibrary.h").display().to_string())
         .header(c_includes.join("WolframNumericArrayLibrary.h").display().to_string())
         .header(c_includes.join("WolframIOLibraryFunctions.h").display().to_string())
         .header(c_includes.join("WolframImageLibrary.h").display().to_string())
