@@ -61,35 +61,25 @@ fn observed() -> MutexGuard<'static, Observed> {
 /// Register every test stream method. Called from this library's
 /// `#[init]` function in `main.rs`.
 pub fn register_test_stream_methods() {
-    register_input_stream_method("TestFixed", FixedMethod)
-        .expect("failed to register the TestFixed stream method");
+    register_input_stream_method("TestFixed", FixedMethod);
 
-    register_input_stream_method("TestOptions", OptionsMethod)
-        .expect("failed to register the TestOptions stream method");
+    register_input_stream_method("TestOptions", OptionsMethod);
 
-    register_input_stream_method("TestError", ErrorMethod)
-        .expect("failed to register the TestError stream method");
+    register_input_stream_method("TestError", ErrorMethod);
 
-    register_input_stream_method("TestBlocking", BlockingMethod)
-        .expect("failed to register the TestBlocking stream method");
+    register_input_stream_method("TestBlocking", BlockingMethod);
 
-    register_input_stream_method("TestSeekable", SeekableMethod)
-        .expect("failed to register the TestSeekable stream method");
+    register_input_stream_method("TestSeekable", SeekableMethod);
 
-    register_input_stream_method("TestOpenFail", OpenFailMethod)
-        .expect("failed to register the TestOpenFail stream method");
+    register_input_stream_method("TestOpenFail", OpenFailMethod);
 
-    register_input_stream_method("TestPanic", PanicMethod)
-        .expect("failed to register the TestPanic stream method");
+    register_input_stream_method("TestPanic", PanicMethod);
 
-    register_input_stream_method("TestProto", ProtoMethod)
-        .expect("failed to register the TestProto stream method");
+    register_input_stream_method("TestProto", ProtoMethod);
 
-    register_output_stream_method("TestCollect", CollectMethod)
-        .expect("failed to register the TestCollect stream method");
+    register_output_stream_method("TestCollect", CollectMethod);
 
-    register_output_stream_method("TestShortWrite", ShortWriteMethod)
-        .expect("failed to register the TestShortWrite stream method");
+    register_output_stream_method("TestShortWrite", ShortWriteMethod);
 }
 
 //======================================
@@ -144,9 +134,13 @@ fn test_stream_reset() -> bool {
 
 /// Register a method under a name that is already taken, to check that the
 /// failure is reported rather than silently ignored.
+///
+/// Registration panics on a duplicate name, so catch the unwind rather than
+/// letting it escape into the Wolfram Language.
 #[wll::export]
-fn test_stream_duplicate_registration_fails() -> bool {
-    register_input_stream_method("TestFixed", FixedMethod).is_err()
+fn test_stream_duplicate_registration_panics() -> bool {
+    std::panic::catch_unwind(|| register_input_stream_method("TestFixed", FixedMethod))
+        .is_err()
 }
 
 //======================================

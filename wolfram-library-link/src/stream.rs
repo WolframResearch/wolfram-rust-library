@@ -37,8 +37,7 @@
 //!
 //! #[wolfram_library_link::init]
 //! fn init() {
-//!     register_input_stream_method("RustFile", FileMethod)
-//!         .expect("failed to register the RustFile stream method");
+//!     register_input_stream_method("RustFile", FileMethod);
 //! }
 //! ```
 //!
@@ -203,39 +202,6 @@ impl From<&str> for StreamError {
         StreamError::Error(message.to_owned())
     }
 }
-
-/// An error returned when registering or unregistering a stream method.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum RegisterError {
-    /// The Wolfram Language rejected the registration. This normally means a
-    /// method is already registered under that name.
-    Rejected,
-
-    /// No method is registered under that name.
-    NotRegistered,
-
-    /// The method name contained an interior NUL byte.
-    InvalidName,
-}
-
-impl std::fmt::Display for RegisterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RegisterError::Rejected => f.write_str(
-                "stream method registration was rejected (name already in use?)",
-            ),
-            RegisterError::NotRegistered => {
-                f.write_str("no stream method is registered under that name")
-            },
-            RegisterError::InvalidName => {
-                f.write_str("stream method name contained an interior NUL byte")
-            },
-        }
-    }
-}
-
-impl std::error::Error for RegisterError {}
 
 //======================================
 // Supporting types
@@ -774,13 +740,14 @@ impl InputStreamMethodHandle {
     /// Unregister this method.
     ///
     /// *LibraryLink C Function:* [`unregisterInputStreamMethod`][sys::st_WolframLibraryData::unregisterInputStreamMethod].
-    pub fn unregister(self) -> Result<(), RegisterError> {
+    pub fn unregister(self) {
         let ok = unsafe { rtl::unregisterInputStreamMethod(self.name.as_ptr()) };
 
-        if crate::bool_from_mbool(ok) {
-            Ok(())
-        } else {
-            Err(RegisterError::NotRegistered)
+        if !crate::bool_from_mbool(ok) {
+            panic!(
+                "no input stream method with name '{}' is registered",
+                self.name.to_string_lossy()
+            );
         }
     }
 }
@@ -800,13 +767,14 @@ impl OutputStreamMethodHandle {
     /// Unregister this method.
     ///
     /// *LibraryLink C Function:* [`unregisterOutputStreamMethod`][sys::st_WolframLibraryData::unregisterOutputStreamMethod].
-    pub fn unregister(self) -> Result<(), RegisterError> {
+    pub fn unregister(self) {
         let ok = unsafe { rtl::unregisterOutputStreamMethod(self.name.as_ptr()) };
 
-        if crate::bool_from_mbool(ok) {
-            Ok(())
-        } else {
-            Err(RegisterError::NotRegistered)
+        if !crate::bool_from_mbool(ok) {
+            panic!(
+                "no output stream method with name '{}' is registered",
+                self.name.to_string_lossy()
+            );
         }
     }
 }
@@ -821,12 +789,16 @@ impl OutputStreamMethodHandle {
 ///
 /// Call this from a function annotated with [`#[init]`][crate::init].
 ///
+/// # Panics
+///
+/// Panics if a stream method is already registered under `name`.
+///
 /// *LibraryLink C Function:* [`registerInputStreamMethod`][sys::st_WolframLibraryData::registerInputStreamMethod].
 pub fn register_input_stream_method<M: InputStreamMethod>(
     name: &str,
     method: M,
-) -> Result<InputStreamMethodHandle, RegisterError> {
-    let name = CString::new(name).map_err(|_| RegisterError::InvalidName)?;
+) -> InputStreamMethodHandle {
+    let name = CString::new(name).expect("failed to allocate C string");
 
     // The method itself is the C API's `methodData`. The kernel hands it back
     // through the stream's `handlerIdentity` field, which is how `input_ctor`
@@ -849,14 +821,17 @@ pub fn register_input_stream_method<M: InputStreamMethod>(
         )
     };
 
-    if crate::bool_from_mbool(ok) {
-        Ok(InputStreamMethodHandle { name })
-    } else {
+    if !crate::bool_from_mbool(ok) {
         // Registration failed, so `destroyMethod` will never run. Reclaim the
         // box here rather than leaking it.
         drop(unsafe { Box::from_raw(method_data as *mut M) });
-        Err(RegisterError::Rejected)
+        panic!(
+            "input stream method with name '{}' has already been registered",
+            name.to_string_lossy()
+        );
     }
+
+    InputStreamMethodHandle { name }
 }
 
 /// Register an output stream method under `name`.
@@ -867,12 +842,16 @@ pub fn register_input_stream_method<M: InputStreamMethod>(
 /// OpenWrite["some-name", Method -> name]
 /// ```
 ///
+/// # Panics
+///
+/// Panics if a stream method is already registered under `name`.
+///
 /// *LibraryLink C Function:* [`registerOutputStreamMethod`][sys::st_WolframLibraryData::registerOutputStreamMethod].
 pub fn register_output_stream_method<M: OutputStreamMethod>(
     name: &str,
     method: M,
-) -> Result<OutputStreamMethodHandle, RegisterError> {
-    let name = CString::new(name).map_err(|_| RegisterError::InvalidName)?;
+) -> OutputStreamMethodHandle {
+    let name = CString::new(name).expect("failed to allocate C string");
 
     let method_data = Box::into_raw(Box::new(method)) as *mut c_void;
 
@@ -892,12 +871,15 @@ pub fn register_output_stream_method<M: OutputStreamMethod>(
         )
     };
 
-    if crate::bool_from_mbool(ok) {
-        Ok(OutputStreamMethodHandle { name })
-    } else {
+    if !crate::bool_from_mbool(ok) {
         drop(unsafe { Box::from_raw(method_data as *mut M) });
-        Err(RegisterError::Rejected)
+        panic!(
+            "output stream method with name '{}' has already been registered",
+            name.to_string_lossy()
+        );
     }
+
+    OutputStreamMethodHandle { name }
 }
 
 //======================================

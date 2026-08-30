@@ -16,7 +16,7 @@ $lastOpenRequest = LibraryFunctionLoad["liblibrary_tests", "test_stream_last_ope
 $takeWritten = LibraryFunctionLoad["liblibrary_tests", "test_stream_take_written", {}, String];
 $waitCount = LibraryFunctionLoad["liblibrary_tests", "test_stream_wait_count", {}, Integer];
 $outputMode = LibraryFunctionLoad["liblibrary_tests", "test_stream_output_mode", {}, String];
-$duplicateFails = LibraryFunctionLoad["liblibrary_tests", "test_stream_duplicate_registration_fails", {}, "Boolean"];
+$duplicateFails = LibraryFunctionLoad["liblibrary_tests", "test_stream_duplicate_registration_panics", {}, "Boolean"];
 
 (*====================================*)
 (* Reading                            *)
@@ -425,11 +425,11 @@ VerificationTest[
 (* Registration                       *)
 (*====================================*)
 
-(* Registering a name that is already taken fails rather than silently winning. *)
+(* Registering a name that is already taken panics rather than silently winning. *)
 VerificationTest[
 	$duplicateFails[]
 	,
 	True
 	,
-	TestID -> "Streams-duplicate-registration-fails"
+	TestID -> "Streams-duplicate-registration-panics"
 ]
