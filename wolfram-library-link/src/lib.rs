@@ -273,6 +273,7 @@ mod numeric_array;
 pub mod macro_utils;
 pub mod managed;
 pub mod rtl;
+pub mod stream;
 
 pub mod docs;
 
