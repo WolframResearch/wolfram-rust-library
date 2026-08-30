@@ -73,6 +73,18 @@
 //! * **Nothing retries a partial write.** This module therefore loops on
 //!   [`OutputStream::write`] until the whole buffer is consumed, so a short
 //!   write can never silently drop bytes.
+//!
+//! # Related links
+//!
+//! * [Streams] section of the LibraryLink documentation.
+//! * [`OpenRead`][ref/OpenRead]<sub>WL</sub>, [`OpenWrite`][ref/OpenWrite]<sub>WL</sub>
+//!   and [`OpenAppend`][ref/OpenAppend]<sub>WL</sub>, which open a stream with a
+//!   registered method.
+//!
+//! [Streams]: https://reference.wolfram.com/language/LibraryLink/tutorial/InteractionWithWolframLanguage.html#509267359
+//! [ref/OpenRead]: https://reference.wolfram.com/language/ref/OpenRead.html
+//! [ref/OpenWrite]: https://reference.wolfram.com/language/ref/OpenWrite.html
+//! [ref/OpenAppend]: https://reference.wolfram.com/language/ref/OpenAppend.html
 
 use std::{
     ffi::{c_void, CStr, CString},
@@ -105,7 +117,23 @@ const EMPTY_CSTR: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum StreamError {
-    /// The operation failed. The message is what the Wolfram Language reports.
+    /// The operation failed.
+    ///
+    /// The message is reported verbatim by the Wolfram Language, substituted
+    /// into [`General::strmerr`][ref/message/strmerr] under the tag of whichever
+    /// function was reading. A stream named `"my-stream"` failing a
+    /// [`Read`][ref/Read]<sub>WL</sub> with `StreamError::new("The connection
+    /// was reset.")` produces:
+    ///
+    /// ```text
+    /// Read::strmerr: Error on stream my-stream. Error message: The connection was reset.
+    /// ```
+    ///
+    /// The message is inserted verbatim and unquoted, so write it in sentence
+    /// case, with a period after each sentence.
+    ///
+    /// [ref/Read]: https://reference.wolfram.com/language/ref/Read.html
+    /// [ref/message/strmerr]: https://reference.wolfram.com/language/ref/message/General/strmerr.html
     Error(String),
 
     /// No data is available *yet*. This is not an error and not end of stream.
@@ -131,7 +159,9 @@ impl StreamError {
         match self {
             StreamError::Error(message) => Some(message.as_str()),
             StreamError::WouldBlock => None,
-            StreamError::Unsupported => Some("operation is not supported by this stream"),
+            StreamError::Unsupported => {
+                Some("Operation is not supported by this stream.")
+            },
         }
     }
 }
@@ -140,9 +170,9 @@ impl std::fmt::Display for StreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StreamError::Error(message) => f.write_str(message),
-            StreamError::WouldBlock => f.write_str("no data available yet"),
+            StreamError::WouldBlock => f.write_str("No data is available yet."),
             StreamError::Unsupported => {
-                f.write_str("operation is not supported by this stream")
+                f.write_str("Operation is not supported by this stream.")
             },
         }
     }
@@ -192,9 +222,9 @@ pub enum RegisterError {
 impl std::fmt::Display for RegisterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RegisterError::Rejected => {
-                f.write_str("stream method registration was rejected (name already in use?)")
-            },
+            RegisterError::Rejected => f.write_str(
+                "stream method registration was rejected (name already in use?)",
+            ),
             RegisterError::NotRegistered => {
                 f.write_str("no stream method is registered under that name")
             },
@@ -213,7 +243,7 @@ impl std::error::Error for RegisterError {}
 
 /// The size of the units a stream deals in.
 ///
-/// *LibraryLink C type:* `MStream_StreamUnitSize_t`.
+/// *LibraryLink C type:* [`MStream_StreamUnitSize_t`][sys::MStream_StreamUnitSize_t].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StreamUnitSize {
     /// 8-bit units (`MSTREAM_8BIT`). This is the default.
@@ -275,13 +305,57 @@ impl<'a> StreamOptions<'a> {
         self.raw
     }
 
+    /// Read the options as an [`Expr`][crate::expr::Expr].
+    ///
+    /// This is the normal way to inspect a stream's options. The Wolfram
+    /// Language places a single expression on the link — typically a list of
+    /// option rules — which this reads off in one go.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use wolfram_library_link::stream::{OpenRequest, StreamError};
+    /// # fn open(request: &mut OpenRequest) -> Result<(), StreamError> {
+    /// let options = request.options().get_expr()?;
+    /// println!("opened with options: {options}");
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "wstp")]
+    pub fn get_expr(&mut self) -> Result<crate::expr::Expr, StreamError> {
+        use crate::expr::Symbol;
+
+        let Some(link) = self.link() else {
+            return Err(StreamError::new(
+                "The stream was opened without an options link.",
+            ));
+        };
+
+        // The Wolfram Language writes bare symbol names like `List` to this
+        // link, which `Link::get_expr()` alone rejects for having no context.
+        // Resolve them the same way argument lists are resolved.
+        link.get_expr_with_resolver(&mut |name| {
+            Symbol::try_new(&format!("System`{name}"))
+        })
+        .map_err(|err| {
+            StreamError::new(format!("Unable to read the stream options: {err}."))
+        })
+    }
+
     /// Borrow the options as a WSTP [`Link`][wstp::Link].
+    ///
+    /// This is the escape hatch for reading or writing the link directly;
+    /// prefer [`get_expr()`][StreamOptions::get_expr].
     ///
     /// Returns [`None`] if the Wolfram Language provided no link.
     ///
     /// The kernel owns the link: it is not closed when the borrow ends, and the
     /// link must be left balanced — read whole expressions off it, and write
-    /// whole expressions to it.
+    /// whole expressions to it. Note that the Wolfram Language writes
+    /// unqualified symbol names to this link, so
+    /// [`Link::get_expr()`][wstp::Link::get_expr] will fail on them; resolve
+    /// them into the `` System` `` context, as
+    /// [`get_expr()`][StreamOptions::get_expr] does.
     #[cfg(feature = "wstp")]
     pub fn link(&mut self) -> Option<&mut wstp::Link> {
         if self.raw.is_null() {
@@ -424,9 +498,11 @@ pub trait InputStream: Send + 'static {
     /// * `Ok(0)` — end of stream, as in [`std::io::Read::read`].
     /// * `Err(`[`StreamError::WouldBlock`]`)` — no data *yet*. The kernel calls
     ///   [`wait_for_input()`][InputStream::wait_for_input] and reads again.
-    /// * `Err(_)` — an error, reported to the user.
+    /// * `Err(_)` — an error, reported to the user. Write the message in
+    ///   sentence case with a period after each sentence; see
+    ///   [`StreamError::Error`].
     ///
-    /// *LibraryLink C field:* `Mfread`.
+    /// *LibraryLink C field:* [`Mfread`][sys::st_MInputStream::Mfread].
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, StreamError>;
 
     /// Reposition the stream to an absolute `offset`.
@@ -438,7 +514,7 @@ pub trait InputStream: Send + 'static {
     ///
     /// A successful seek clears the end-of-stream flag.
     ///
-    /// *LibraryLink C field:* `Mfseek`.
+    /// *LibraryLink C field:* [`Mfseek`][sys::st_MInputStream::Mfseek].
     fn seek(&mut self, offset: i64) -> Result<(), StreamError> {
         let _ = offset;
         Err(StreamError::Unsupported)
@@ -449,7 +525,7 @@ pub trait InputStream: Send + 'static {
     /// This is what the Wolfram Language consults to decide whether the stream
     /// can be repositioned, so it must agree with `seek()`.
     ///
-    /// *LibraryLink C field:* `SeekableQ`.
+    /// *LibraryLink C field:* [`SeekableQ`][sys::st_MInputStream::SeekableQ].
     fn is_seekable(&self) -> bool {
         false
     }
@@ -460,7 +536,7 @@ pub trait InputStream: Send + 'static {
     /// call this; when it is not implemented, this module reports the number of
     /// bytes read so far, adjusted by successful seeks.
     ///
-    /// *LibraryLink C field:* `Mftell`.
+    /// *LibraryLink C field:* [`Mftell`][sys::st_MInputStream::Mftell].
     fn tell(&mut self) -> Result<i64, StreamError> {
         Err(StreamError::Unsupported)
     }
@@ -469,7 +545,7 @@ pub trait InputStream: Send + 'static {
     ///
     /// Reported to the Wolfram Language as "unknown" when unsupported.
     ///
-    /// *LibraryLink C field:* `Mstreamsize`.
+    /// *LibraryLink C field:* [`Mstreamsize`][sys::st_MInputStream::Mstreamsize].
     fn size(&mut self) -> Result<i64, StreamError> {
         Err(StreamError::Unsupported)
     }
@@ -483,19 +559,19 @@ pub trait InputStream: Send + 'static {
     /// [`aborted()`][crate::aborted] and return when it is `true`, or the user
     /// will not be able to interrupt the read.
     ///
-    /// *LibraryLink C field:* `WaitForInput`.
+    /// *LibraryLink C field:* [`WaitForInput`][sys::st_MInputStream::WaitForInput].
     fn wait_for_input(&mut self) {}
 
     /// The size of the units this stream deals in.
     ///
-    /// *LibraryLink C field:* `MstreamUnitSize`.
+    /// *LibraryLink C field:* [`MstreamUnitSize`][sys::st_MInputStream::MstreamUnitSize].
     fn unit_size(&self) -> StreamUnitSize {
         StreamUnitSize::Bytes8
     }
 
     /// Handle the options of this stream being queried or changed.
     ///
-    /// *LibraryLink C field:* `MoptionChanges`.
+    /// *LibraryLink C field:* [`MoptionChanges`][sys::st_MInputStream::MoptionChanges].
     fn set_options(&mut self, options: StreamOptions<'_>) {
         let _ = options;
     }
@@ -505,7 +581,7 @@ pub trait InputStream: Send + 'static {
     /// [`Drop`] runs afterwards, so this is only needed to report a failure
     /// that closing can produce.
     ///
-    /// *LibraryLink C field:* `Mfclose`.
+    /// *LibraryLink C field:* [`Mfclose`][sys::st_MInputStream::Mfclose].
     fn close(self) -> Result<(), StreamError>
     where
         Self: Sized,
@@ -545,12 +621,12 @@ pub trait OutputStream: Send + 'static {
     /// API has no wait-for-output counterpart to
     /// [`InputStream::wait_for_input`], so there is nothing to wait on.
     ///
-    /// *LibraryLink C field:* `Mfwrite`.
+    /// *LibraryLink C field:* [`Mfwrite`][sys::st_MOutputStream::Mfwrite].
     fn write(&mut self, buf: &[u8]) -> Result<usize, StreamError>;
 
     /// Flush buffered output.
     ///
-    /// *LibraryLink C field:* `Mfflush`.
+    /// *LibraryLink C field:* [`Mfflush`][sys::st_MOutputStream::Mfflush].
     fn flush(&mut self) -> Result<(), StreamError> {
         Ok(())
     }
@@ -563,7 +639,7 @@ pub trait OutputStream: Send + 'static {
     /// which is correct except for a stream opened in
     /// [`OutputMode::Append`] over existing content.
     ///
-    /// *LibraryLink C field:* `Mftell`.
+    /// *LibraryLink C field:* [`Mftell`][sys::st_MOutputStream::Mftell].
     ///
     /// [ref/StreamPosition]: https://reference.wolfram.com/language/ref/StreamPosition.html
     fn tell(&mut self) -> Result<i64, StreamError> {
@@ -572,14 +648,14 @@ pub trait OutputStream: Send + 'static {
 
     /// The size of the units this stream deals in.
     ///
-    /// *LibraryLink C field:* `MstreamUnitSize`.
+    /// *LibraryLink C field:* [`MstreamUnitSize`][sys::st_MOutputStream::MstreamUnitSize].
     fn unit_size(&self) -> StreamUnitSize {
         StreamUnitSize::Bytes8
     }
 
     /// Handle the options of this stream being queried or changed.
     ///
-    /// *LibraryLink C field:* `MoptionChanges`.
+    /// *LibraryLink C field:* [`MoptionChanges`][sys::st_MOutputStream::MoptionChanges].
     fn set_options(&mut self, options: StreamOptions<'_>) {
         let _ = options;
     }
@@ -598,7 +674,7 @@ pub trait OutputStream: Send + 'static {
 
     /// Close the stream.
     ///
-    /// *LibraryLink C field:* `Mfclose`.
+    /// *LibraryLink C field:* [`Mfclose`][sys::st_MOutputStream::Mfclose].
     fn close(self) -> Result<(), StreamError>
     where
         Self: Sized,
@@ -639,7 +715,8 @@ pub trait InputStreamMethod: Send + Sync + 'static {
     /// Only called when [`NAME_DISPATCH`][InputStreamMethod::NAME_DISPATCH] is
     /// `true`.
     ///
-    /// *LibraryLink C parameter:* `handlerTest`.
+    /// *LibraryLink C parameter:* `handlerTest` of
+    /// [`registerInputStreamMethod`][sys::st_WolframLibraryData::registerInputStreamMethod].
     fn handles_name(&self, name: &str) -> bool {
         let _ = name;
         false
@@ -696,7 +773,7 @@ impl InputStreamMethodHandle {
 
     /// Unregister this method.
     ///
-    /// *LibraryLink C Function:* `unregisterInputStreamMethod`.
+    /// *LibraryLink C Function:* [`unregisterInputStreamMethod`][sys::st_WolframLibraryData::unregisterInputStreamMethod].
     pub fn unregister(self) -> Result<(), RegisterError> {
         let ok = unsafe { rtl::unregisterInputStreamMethod(self.name.as_ptr()) };
 
@@ -722,7 +799,7 @@ impl OutputStreamMethodHandle {
 
     /// Unregister this method.
     ///
-    /// *LibraryLink C Function:* `unregisterOutputStreamMethod`.
+    /// *LibraryLink C Function:* [`unregisterOutputStreamMethod`][sys::st_WolframLibraryData::unregisterOutputStreamMethod].
     pub fn unregister(self) -> Result<(), RegisterError> {
         let ok = unsafe { rtl::unregisterOutputStreamMethod(self.name.as_ptr()) };
 
@@ -744,7 +821,7 @@ impl OutputStreamMethodHandle {
 ///
 /// Call this from a function annotated with [`#[init]`][crate::init].
 ///
-/// *LibraryLink C Function:* `registerInputStreamMethod`.
+/// *LibraryLink C Function:* [`registerInputStreamMethod`][sys::st_WolframLibraryData::registerInputStreamMethod].
 pub fn register_input_stream_method<M: InputStreamMethod>(
     name: &str,
     method: M,
@@ -790,7 +867,7 @@ pub fn register_input_stream_method<M: InputStreamMethod>(
 /// OpenWrite["some-name", Method -> name]
 /// ```
 ///
-/// *LibraryLink C Function:* `registerOutputStreamMethod`.
+/// *LibraryLink C Function:* [`registerOutputStreamMethod`][sys::st_WolframLibraryData::registerOutputStreamMethod].
 pub fn register_output_stream_method<M: OutputStreamMethod>(
     name: &str,
     method: M,
@@ -845,8 +922,26 @@ fn catch<T>(what: &str, f: impl FnOnce() -> T) -> Result<T, StreamError> {
             String::from("Box<dyn Any>")
         };
 
-        StreamError::Error(format!("Rust panic in stream {what}: {detail}"))
+        StreamError::Error(format!(
+            "Rust panic in stream {what}: {}",
+            end_sentence(&detail)
+        ))
     })
+}
+
+/// Give `message` a terminating period if it does not already end a sentence.
+///
+/// Panic messages come from user code and may or may not be punctuated, but
+/// what reaches the Wolfram Language should read as a sentence either way (see
+/// [`StreamError::Error`]).
+fn end_sentence(message: &str) -> String {
+    let trimmed = message.trim_end();
+
+    if trimmed.ends_with(['.', '!', '?']) {
+        trimmed.to_owned()
+    } else {
+        format!("{trimmed}.")
+    }
 }
 
 //======================================
@@ -882,10 +977,9 @@ impl<S> StreamBox<S> {
 
         // A NUL in the message would truncate it; replace rather than drop the
         // error entirely.
-        self.error = Some(
-            CString::new(message)
-                .unwrap_or_else(|_| CString::new(message.replace('\0', "\u{fffd}")).unwrap()),
-        );
+        self.error = Some(CString::new(message).unwrap_or_else(|_| {
+            CString::new(message.replace('\0', "\u{fffd}")).unwrap()
+        }));
     }
 
     fn error_ptr(&self) -> *mut c_char {
@@ -1068,7 +1162,10 @@ unsafe extern "C" fn input_eof<S: InputStream>(strm: MInputStream) -> c_int {
     }
 }
 
-unsafe extern "C" fn input_seek<S: InputStream>(strm: MInputStream, offset: i64) -> c_int {
+unsafe extern "C" fn input_seek<S: InputStream>(
+    strm: MInputStream,
+    offset: i64,
+) -> c_int {
     let Some(boxed) = input_box::<S>(strm) else {
         return 1;
     };
@@ -1362,7 +1459,7 @@ unsafe extern "C" fn output_write<S: OutputStream>(
         match result {
             Ok(0) => {
                 failure = Some(StreamError::new(
-                    "output stream accepted none of the bytes written",
+                    "The output stream accepted none of the bytes written.",
                 ));
                 break;
             },
@@ -1388,7 +1485,9 @@ unsafe extern "C" fn output_flush<S: OutputStream>(strm: MOutputStream) -> c_int
     };
 
     let result = match boxed.stream.as_mut() {
-        Some(stream) => catch("flush", || stream.flush()).and_then(std::convert::identity),
+        Some(stream) => {
+            catch("flush", || stream.flush()).and_then(std::convert::identity)
+        },
         None => return 1,
     };
 
@@ -1544,7 +1643,7 @@ impl ReaderInputStream {
     /// [`InputStream::is_seekable`] reports `true`, and
     /// [`seek`][InputStream::seek], [`tell`][InputStream::tell] and
     /// [`size`][InputStream::size] are served by the underlying
-    /// [`Seek`][std::io::Seek].
+    /// [`Seek`].
     pub fn seekable<R: Read + Seek + Send + 'static>(reader: R) -> ReaderInputStream {
         ReaderInputStream {
             reader: Reader::Seekable(Box::new(reader)),
@@ -1788,7 +1887,8 @@ mod tests {
 
     #[test]
     fn seekable_reader_reports_position_and_size() {
-        let mut stream = ReaderInputStream::seekable(Cursor::new(b"hello world".to_vec()));
+        let mut stream =
+            ReaderInputStream::seekable(Cursor::new(b"hello world".to_vec()));
 
         assert!(stream.is_seekable());
         assert_eq!(stream.size().unwrap(), 11);
@@ -1847,6 +1947,24 @@ mod tests {
         let stream = ReaderInputStream::new(Cursor::new(Vec::new()))
             .with_unit_size(StreamUnitSize::Utf32);
         assert_eq!(stream.unit_size(), StreamUnitSize::Utf32);
+    }
+
+    #[test]
+    fn panic_message_is_a_single_sentence() {
+        // A panic message that is already punctuated must not gain a second
+        // period when it reaches `General::strmerr`.
+        assert_eq!(end_sentence("Already punctuated."), "Already punctuated.");
+        assert_eq!(end_sentence("Not punctuated"), "Not punctuated.");
+        assert_eq!(end_sentence("Trailing space "), "Trailing space.");
+        assert_eq!(end_sentence("What?"), "What?");
+
+        let result = catch("read", || panic!("The stream failed."));
+        match result {
+            Err(StreamError::Error(message)) => {
+                assert_eq!(message, "Rust panic in stream read: The stream failed.")
+            },
+            other => panic!("expected a StreamError::Error, got {other:?}"),
+        }
     }
 
     #[test]

@@ -1,17 +1,4 @@
-use std::os::raw::c_int;
-use wolfram_library_link::{
-    self as wll,
-    sys::{self, WolframLibraryData},
-    DataStore, NumericArray,
-};
-
-#[no_mangle]
-pub unsafe extern "C" fn WolframLibrary_initialize(lib: WolframLibraryData) -> c_int {
-    match wll::initialize(lib) {
-        Ok(()) => return 0,
-        Err(()) => return 1,
-    }
-}
+use wolfram_library_link::{self as wll, sys, DataStore, NumericArray};
 
 #[wll::export]
 fn test_empty_data_store() -> DataStore {
